@@ -6,3 +6,6 @@ data
 docs
 scripts
 *.zip
+secrets
+*firebase-adminsdk*.json
+*service-account*.json

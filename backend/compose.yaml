@@ -1,0 +1,39 @@
+name: gomate-auth
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: gomate_auth
+      POSTGRES_USER: gomate
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Run scripts/setup-env.ps1 first}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gomate -d gomate_auth"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  api:
+    build: .
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/gomate_auth
+      DB_USERNAME: gomate
+      DB_PASSWORD: ${DB_PASSWORD:?Run scripts/setup-env.ps1 first}
+      FIREBASE_ENABLED: ${FIREBASE_ENABLED:-false}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-service-account.json
+      JWT_SECRET: ${JWT_SECRET:?Run scripts/setup-env.ps1 first}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./secrets:/run/secrets:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  postgres_data:

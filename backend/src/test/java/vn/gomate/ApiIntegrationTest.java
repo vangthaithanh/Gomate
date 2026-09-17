@@ -88,8 +88,12 @@ class ApiIntegrationTest {
   mvc.perform(MockMvcRequestBuilders.get("/v3/api-docs")).andExpect(status().isOk()).andExpect(jsonPath("$.paths['/api/v1/auth/register']").exists());
  }
  @Test void googleRequiresConfigurationAndLinkRequiresSession() throws Exception {
-  call("POST","/auth/google",null,Map.of("idToken","fake"),503);
+  assertEquals("FIREBASE_NOT_CONFIGURED",call("POST","/auth/google",null,Map.of("idToken","fake"),503).get("code").asText());
   call("POST","/auth/google/link",null,Map.of("idToken","fake"),401);
   call("POST","/auth/google",null,Map.of("idToken",""),400);
+ }
+ @Test void healthIsPublicAtBothPaths() throws Exception {
+  mvc.perform(MockMvcRequestBuilders.get("/health")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("UP"));
+  mvc.perform(MockMvcRequestBuilders.get("/api/v1/health")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("UP"));
  }
 }

@@ -5,8 +5,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 @RestController @RequestMapping("/api/v1")
 public class AuthController {
- private final GoogleVerifier google;private final AuthService service;private final AuthRepository repo;
- public AuthController(AuthService service,AuthRepository repo,GoogleVerifier google) { this.google=google;this.service=service;this.repo=repo; }
+ private final FirebaseGoogleVerifier google;private final AuthService service;private final AuthRepository repo;
+ public AuthController(AuthService service,AuthRepository repo,FirebaseGoogleVerifier google) { this.google=google;this.service=service;this.repo=repo; }
  @PostMapping("/auth/register") @ResponseStatus(HttpStatus.CREATED)
  public Map<String,Object> register(@Valid @RequestBody AuthDtos.Register req) { return service.register(req); }
  @PostMapping("/auth/login") public Map<String,Object> login(@Valid @RequestBody AuthDtos.Login req) { return service.login(req); }

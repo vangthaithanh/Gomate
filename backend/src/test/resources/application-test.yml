@@ -3,9 +3,8 @@ spring:
     url: jdbc:h2:mem:gomate;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
     username: sa
     password: ""
-  sql:
-    init:
-      data-locations: optional:classpath:/test-data.sql
 app:
+  firebase:
+    enabled: false
   jwt-secret: test-only-secret-32-bytes-long-never-use-in-production
   auth-requests-per-minute: 1000

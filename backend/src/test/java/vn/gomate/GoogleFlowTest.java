@@ -11,7 +11,7 @@ import static vn.gomate.common.Db.args;
 @SpringBootTest @ActiveProfiles("test")
 class GoogleFlowTest {
  @Autowired AuthService auth; @Autowired Db db;
- GoogleVerifier.Identity identity() {String id=UUID.randomUUID().toString();return new GoogleVerifier.Identity(id,id+"@example.com","Google Test");}
+ FirebaseGoogleVerifier.Identity identity() {String id=UUID.randomUUID().toString();return new FirebaseGoogleVerifier.Identity("firebase-"+id,id,id+"@example.com","Google Test");}
  @SuppressWarnings("unchecked") UUID uid(Map<String,Object> session) {return (UUID)((Map<String,Object>)session.get("user")).get("id");}
  @Test void exactlyFourTables() {
   var tables=db.list("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'",Map.of());
@@ -25,18 +25,21 @@ class GoogleFlowTest {
   assertEquals(2,db.count("SELECT COUNT(*) FROM refresh_sessions WHERE user_id=:id",args("id",id)));
   assertThrows(ApiException.class,()->auth.login(new AuthDtos.Login(identity.email(),"GuessPass123")));
  }
- @Test void existingEmailAutoLinksVerifiedGoogle() {
+ @Test void existingEmailRequiresAuthenticatedLink() {
   var identity=identity();UUID id=uid(auth.register(new AuthDtos.Register(identity.email(),"TestPass123!","n"+UUID.randomUUID())));
-  assertEquals(id,uid(auth.google(identity)));
-  assertTrue((Boolean)db.one("SELECT CASE WHEN google_subject IS NULL THEN FALSE ELSE TRUE END AS linked FROM users WHERE id=:id",args("id",id)).get("linked"));
+  assertThrows(ApiException.class,()->auth.google(identity));
+  assertThrows(ApiException.class,()->auth.linkGoogle(id,identity()));
+  assertTrue((Boolean)auth.linkGoogle(id,identity).get("googleLinked"));
   assertEquals(id,uid(auth.google(identity)));
  }
- @Test void googleRejectsEmailAlreadyLinkedToDifferentSubject() {
+ @Test void reusesLegacyGoogleAccountByProviderIdWithoutChangingProfile() {
   var identity=identity();UUID id=uid(auth.google(identity));
-  var otherSubjectSameEmail=new GoogleVerifier.Identity(UUID.randomUUID().toString(),identity.email(),"Other Google");
-  var error=assertThrows(ApiException.class,()->auth.google(otherSubjectSameEmail));
-  assertEquals(409,error.status);
-  assertEquals(id,uid(auth.google(identity)));
+  db.update("UPDATE user_profiles SET full_name='Saved profile' WHERE user_id=:id",args("id",id));
+  var firebaseIdentity=new FirebaseGoogleVerifier.Identity("new-firebase-uid",identity.subject(),identity.email(),"Firebase name");
+  var session=auth.google(firebaseIdentity);
+  assertEquals(id,uid(session));
+  assertEquals("Saved profile",((Map<?,?>)session.get("user")).get("fullName"));
+  assertEquals(1,db.count("SELECT COUNT(*) FROM users WHERE google_subject=:sub",args("sub",identity.subject())));
  }
  @Test void googleLockedAccountRejected() {
   var identity=identity();UUID id=uid(auth.google(identity));

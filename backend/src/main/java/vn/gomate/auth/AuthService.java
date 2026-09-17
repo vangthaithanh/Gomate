@@ -79,25 +79,17 @@ public class AuthService {
  }
 
  @Transactional
- public Map<String,Object> google(GoogleVerifier.Identity identity) {
+ public Map<String,Object> google(FirebaseGoogleVerifier.Identity identity) {
   var rows=repo.db().list("SELECT id FROM users WHERE google_subject=:sub FOR UPDATE",args("sub",identity.subject()));
   UUID uid;
   if(rows.isEmpty()) {
-   var emailRows=repo.db().list("SELECT id,google_subject FROM users WHERE email=:email FOR UPDATE",args("email",identity.email()));
-   if(emailRows.isEmpty()) {
-    uid=UUID.randomUUID();
-    repo.db().update("INSERT INTO users(id,email,google_subject) VALUES(:id,:email,:sub)",args("id",uid,"email",identity.email(),"sub",identity.subject()));
-    String nickname="gomate_"+uid.toString().replace("-","").substring(0,20);
-    repo.db().update("INSERT INTO user_profiles(user_id,nickname,nickname_key,full_name) VALUES(:id,:nick,:nick,:name)",args("id",uid,"nick",nickname,"name",identity.fullName()));
-    repo.db().update("INSERT INTO user_settings(user_id) VALUES(:id)",args("id",uid));
-   } else {
-    var existing=emailRows.get(0);uid=(UUID)existing.get("id");
-    Object linked=existing.get("googleSubject");
-    if(linked!=null && !identity.subject().equals(linked))
-     throw new ApiException(409,"GOOGLE_EMAIL_ALREADY_LINKED","Email này đã liên kết với một tài khoản Google khác.");
-    if(linked==null)
-     repo.db().update("UPDATE users SET google_subject=:sub WHERE id=:id",args("id",uid,"sub",identity.subject()));
-   }
+   if(repo.byEmail(identity.email()).isPresent())
+    throw new ApiException(409,"GOOGLE_LINK_REQUIRED","Email đã có tài khoản. Đăng nhập bằng mật khẩu rồi liên kết Google trong trang cá nhân.");
+   uid=UUID.randomUUID();
+   repo.db().update("INSERT INTO users(id,email,google_subject) VALUES(:id,:email,:sub)",args("id",uid,"email",identity.email(),"sub",identity.subject()));
+   String nickname="gomate_"+uid.toString().replace("-","").substring(0,20);
+   repo.db().update("INSERT INTO user_profiles(user_id,nickname,nickname_key,full_name) VALUES(:id,:nick,:nick,:name)",args("id",uid,"nick",nickname,"name",identity.fullName()));
+   repo.db().update("INSERT INTO user_settings(user_id) VALUES(:id)",args("id",uid));
   } else { uid=(UUID)rows.get(0).get("id"); }
   var user=repo.db().one("SELECT status FROM users WHERE id=:id FOR UPDATE",args("id",uid));
   if(!"ACTIVE".equals(user.get("status"))) throw new ApiException(403,"ACCOUNT_LOCKED","Tài khoản đã bị khóa.");
@@ -105,7 +97,7 @@ public class AuthService {
   return newSession(uid);
  }
  @Transactional
- public Map<String,Object> linkGoogle(UUID uid,GoogleVerifier.Identity identity) {
+ public Map<String,Object> linkGoogle(UUID uid,FirebaseGoogleVerifier.Identity identity) {
   var user=repo.db().one("SELECT email,google_subject,status FROM users WHERE id=:id FOR UPDATE",args("id",uid));
   if(!"ACTIVE".equals(user.get("status"))) throw ApiException.unauthorized();
   if(!identity.email().equals(user.get("email"))) throw ApiException.bad("Hãy chọn Google có cùng email với tài khoản GoMate.");

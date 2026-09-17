@@ -6,6 +6,7 @@ public final class AuthDtos {
  public record Login(@NotBlank @Email @Size(max=254) String email, @NotBlank @Size(max=72) String password) {}
  public record Refresh(@NotBlank @Size(max=200) String refreshToken) {}
  public record ChangePassword(@NotBlank @Size(max=72) String currentPassword, @NotBlank @Size(min=8,max=72) String newPassword) {}
+ /** idToken = FirebaseAuth.currentUser.getIdToken(), không phải Google OAuth ID token. */
  public record Google(@NotBlank @Size(max=10000) String idToken) {}
  public record Onboarding(@NotNull @Size(max=18) java.util.List<@NotBlank @Size(max=40) String> optionCodes) {}
 }

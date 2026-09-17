@@ -13,6 +13,6 @@ public class ApiConfig {
    .addSecurityItem(new SecurityRequirement().addList("bearerAuth"));
  }
  @RestController public static class Health {
-  @GetMapping("/api/v1/health") public Map<String,String> health() { return Map.of("status","UP"); }
+  @GetMapping({"/health", "/api/v1/health"}) public Map<String,String> health() { return Map.of("status","UP"); }
  }
 }

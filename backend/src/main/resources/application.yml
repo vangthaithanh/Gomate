@@ -17,7 +17,10 @@ spring:
     deserialization:
       fail-on-unknown-properties: true
 app:
-  google-client-ids: ${GOOGLE_CLIENT_IDS:}
+  firebase:
+    enabled: ${FIREBASE_ENABLED:false}
+    project-id: ${FIREBASE_PROJECT_ID:}
+    credentials-path: ${GOOGLE_APPLICATION_CREDENTIALS:}
   jwt-secret: ${JWT_SECRET}
   issuer: gomate-api
   access-token-seconds: 900
