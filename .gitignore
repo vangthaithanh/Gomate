@@ -52,3 +52,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firebase local/project-specific config
+/android/app/google-services.json
+/backend/secrets/*.json
+!/backend/secrets/README.md

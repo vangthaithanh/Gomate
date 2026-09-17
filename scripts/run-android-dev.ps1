@@ -1,7 +1,7 @@
 param(
   [string]$DeviceId = "",
   [string]$HostIp = "",
-  [int]$ApiPort = 8081,
+  [int]$ApiPort = 8080,
   [switch]$InstallOnly,
   [switch]$NoDockerStart,
   [string]$ApplicationId = "com.example.gomate"
@@ -114,7 +114,7 @@ $device = Get-ConnectedDevice -AdbPath $adbPath -RequestedDeviceId $DeviceId
 
 if (-not $NoDockerStart) {
   Write-Host "Starting Docker services..."
-  docker compose up -d
+  docker compose -f .\backend\compose.yaml --env-file .\backend\.env up -d
 }
 
 $healthUrl = "http://localhost:$ApiPort/api/v1/health"
