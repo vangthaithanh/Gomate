@@ -22,11 +22,16 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/gomate_auth
       DB_USERNAME: gomate
       DB_PASSWORD: ${DB_PASSWORD:?Run backend/scripts/setup-env.ps1 first}
+      FIREBASE_ENABLED: ${FIREBASE_ENABLED:-false}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-service-account.json
       GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS:-}
       JWT_SECRET: ${JWT_SECRET:?Run backend/scripts/setup-env.ps1 first}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
     ports:
       - "${API_PORT:-8081}:8080"
+    volumes:
+      - ./backend/secrets:/run/secrets:ro
     depends_on:
       postgres:
         condition: service_healthy

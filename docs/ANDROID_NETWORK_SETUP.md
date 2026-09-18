@@ -16,6 +16,7 @@ Dung IP LAN cua PC thi dien thoai goi duoc backend. Tuy nhien khong nen hardcode
   - `API_BASE_URLS` cho nhieu URL fallback.
 - Them `scripts/run-android-dev.ps1` de tu dong:
   - khoi dong Docker service,
+  - ep Docker dev API dung cong `8081`,
   - chon Android device,
   - do IPv4 LAN cua PC,
   - cau hinh `adb reverse` lam fallback,
@@ -65,3 +66,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run-android-dev.ps1 -HostIp <
 - `API_BASE_URL`/`API_BASE_URLS` duoc gan luc `flutter run`/`flutter build`, nen APK cu van giu cau hinh cu.
 - Windows Firewall phai cho phep thiet bi trong cung Wi-Fi truy cap cong `8081` neu dung duong LAN.
 - Khong sua IP truc tiep trong `lib/core/config/api_config.dart`.
+- Neu chua co `android/app/google-services.json`, debug APK van build duoc de test email/password; Google/Firebase sign-in chi chay sau khi them file Firebase that.
+- Android Gradle dang tat `kotlin.incremental` de tranh loi Kotlin cache khi project o o `F:` con Pub cache o o `C:` tren Windows.
+- Script tu dong xoa rule `adb reverse tcp:8080` cu khi dang chay dev port `8081`, de tranh nham lan voi loi cong `8080` da bi `AgentService` giu.
+- Script chay `docker compose up -d --build` de sau khi pull code moi thi API image duoc build lai, tranh backend chay image cu.
+- Google/Firebase sign-in tren backend can `FIREBASE_ENABLED=true`, `FIREBASE_PROJECT_ID=...`, va file `backend/secrets/firebase-service-account.json`; root `docker-compose.yml` da mount file nay vao `/run/secrets`.

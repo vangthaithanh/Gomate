@@ -384,3 +384,89 @@ Kiem tra da chay sau cap nhat:
 - Kiem tra tu shell Android goi `http://192.168.1.6:8081/api/v1/health`: tra `HTTP 200` va `{"status":"UP"}`.
 
 File ghi chu rieng cho van hanh Android network: `docs/ANDROID_NETWORK_SETUP.md`.
+
+## Cap nhat cau hinh Google/Firebase local
+
+Ngay cap nhat: 2026-09-17
+
+Nguoi dung cung cap:
+
+- `google-services.json`
+- `firebase-service-account.json`
+- cac bien `.env` de bat Firebase backend.
+
+Da thuc hien:
+
+- Copy `google-services.json` vao `android/app/google-services.json`.
+- Copy `firebase-service-account.json` vao `backend/secrets/firebase-service-account.json`.
+- Cap nhat `.env` local voi `FIREBASE_ENABLED=true`, `FIREBASE_PROJECT_ID=gomate-498319`, `API_PORT=8081` va cac secret nguoi dung cung cap.
+- Cap nhat root `docker-compose.yml` de truyen Firebase env va mount `backend/secrets` vao `/run/secrets`.
+- Cap nhat `.env.example` de co placeholder Firebase.
+- Doi password user PostgreSQL `gomate` trong volume hien tai sang password moi trong `.env` bang `ALTER USER`, khong xoa volume.
+
+Kiem tra:
+
+- Backend container nhan `FIREBASE_ENABLED=true`, `FIREBASE_PROJECT_ID=gomate-498319`, `GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/firebase-service-account.json`.
+- `GET /api/v1/health`: `UP`.
+- Login seed email/password thanh cong.
+- `/auth/google` voi token gia tra `INVALID_FIREBASE_TOKEN`, chung to Firebase verifier da bat.
+- `flutter build apk --debug` qua script thanh cong, cai va mo app tren `RF8N32408EN` thanh cong.
+- `flutter test`: pass 2/2.
+
+Luu y con lai:
+
+- SHA-1 debug cua may hien tai la `38:E8:7A:5B:1C:B6:2E:2A:BB:D3:12:D2:B3:35:80:04:59:8A:2D:08`.
+- `google-services.json` hien co Android OAuth certificate hash `92e7b6042aab10e9493de4db1b4d79134302e527`.
+- Hai gia tri khong khop, nen neu Google login van bao OAuth thi can them SHA-1/SHA-256 cua may nay vao Firebase Console/Google Cloud Android app `com.example.gomate`, tai lai `google-services.json`, dat lai vao `android/app/google-services.json`, roi build lai app.
+- Chi tiet ghi trong `docs/GOOGLE_FIREBASE_LOCAL_SETUP.md`.
+
+## Cap nhat sua loi port 8081/8080 khi run
+
+Ngay cap nhat: 2026-09-17
+
+Nguoi dung bao hien khong run duoc va nghi loi port `8081`.
+
+Ket qua kiem tra:
+
+- `8080` tren Windows dang bi process `AgentService` giu.
+- Root `docker-compose.yml` dung dung map `${API_PORT:-8081}:8080`.
+- Container API ban dau chi o trang thai `Created`, PostgreSQL van `healthy`.
+- `scripts/run-android-dev.ps1` bi lech ve:
+  - default `$ApiPort = 8080`,
+  - goi `backend\compose.yaml` thay vi root `docker-compose.yml`.
+- Vi vay script lam Docker co bind `0.0.0.0:8080`, dung vao cong dang bi `AgentService` giu.
+- Android build con fail vi thieu `android/app/google-services.json`.
+- Sau khi sua Google Services plugin, build cham loi Kotlin incremental cache do project o o `F:` con Pub cache o o `C:`.
+
+Da sua:
+
+- `scripts/run-android-dev.ps1`
+  - default `$ApiPort = 8081`.
+  - dung root `docker compose up -d`.
+  - ep bien moi truong `API_PORT=8081` trong phien script.
+  - tu xoa stale `adb reverse tcp:8080` khi dang dung dev port `8081`.
+- `lib/core/config/api_config.dart`
+  - default debug ve `8081`.
+  - Android fallback gom `127.0.0.1:8081` va `10.0.2.2:8081`.
+- `android/app/build.gradle.kts`
+  - chi apply Google Services plugin khi ton tai `google-services.json`.
+  - Debug email/password build duoc khi chua co file Firebase that.
+- `android/gradle.properties`
+  - them `kotlin.incremental=false` de tranh loi Kotlin cache cross-drive tren Windows.
+- `docs/ANDROID_NETWORK_SETUP.md`
+  - cap nhat ghi chu van hanh tuong ung.
+
+Kiem tra da chay:
+
+- `docker compose config`: API published port la `8081`, target container la `8080`.
+- `docker compose up -d`: API start thanh cong.
+- `Get-NetTCPConnection`: `8080` do `AgentService` giu; `8081` do Docker backend giu.
+- `GET http://localhost:8081/api/v1/health`: tra `UP`.
+- Login seed `demo@gomate.local` / `GoMate123!`: thanh cong.
+- `flutter clean`: thanh cong.
+- `scripts/run-android-dev.ps1 -DeviceId RF8N32408EN -InstallOnly`: thanh cong.
+  - Health host `UP`.
+  - LAN API URL dung `http://192.168.1.6:8081/api/v1`.
+  - `flutter build apk --debug`: thanh cong.
+  - `adb install -r`: thanh cong.
+  - Mo app `com.example.gomate`: thanh cong.

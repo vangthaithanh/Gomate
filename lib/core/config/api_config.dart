@@ -13,9 +13,9 @@ class ApiConfig {
       );
     }
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080/api/v1';
+      return 'http://127.0.0.1:8081/api/v1';
     }
-    return 'http://localhost:8080/api/v1';
+    return 'http://localhost:8081/api/v1';
   }
 
   static List<String> get candidateBaseUrls {
@@ -35,7 +35,7 @@ class ApiConfig {
 
     final primary = baseUrl;
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return [primary];
+      return [primary, 'http://10.0.2.2:8081/api/v1'];
     }
     return [primary];
   }

@@ -1,7 +1,7 @@
 param(
   [string]$DeviceId = "",
   [string]$HostIp = "",
-  [int]$ApiPort = 8080,
+  [int]$ApiPort = 8081,
   [switch]$InstallOnly,
   [switch]$NoDockerStart,
   [string]$ApplicationId = "com.example.gomate"
@@ -114,7 +114,8 @@ $device = Get-ConnectedDevice -AdbPath $adbPath -RequestedDeviceId $DeviceId
 
 if (-not $NoDockerStart) {
   Write-Host "Starting Docker services..."
-  docker compose -f .\backend\compose.yaml --env-file .\backend\.env up -d
+  $env:API_PORT = "$ApiPort"
+  docker compose up -d --build
 }
 
 $healthUrl = "http://localhost:$ApiPort/api/v1/health"
@@ -136,6 +137,14 @@ $apiBaseUrls = $fallbackUrls -join ","
 
 Write-Host "Android device: $device"
 Write-Host "LAN API URL: $apiBaseUrl"
+
+if ($ApiPort -ne 8080) {
+  try {
+    & $adbPath -s $device reverse --remove "tcp:8080" 2>$null | Out-Null
+  } catch {
+    # Stale reverse rules are best-effort cleanup only.
+  }
+}
 
 try {
   & $adbPath -s $device reverse "tcp:$ApiPort" "tcp:$ApiPort" | Out-Host
