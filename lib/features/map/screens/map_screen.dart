@@ -1,568 +1,941 @@
+import 'dart:async';
+import '../../trip/screens/create_trip_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../trip/screens/create_trip_screen.dart';
 import 'place_detail_screen.dart';
 
-class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+import '../data/demo_map_gateway.dart';
+import '../models/map_place.dart';
+import '../services/location_service.dart';
+import '../services/mapbox_layer_controller.dart';
+import '../state/map_state.dart';
+import '../theme/map_ui_tokens.dart';
+import '../widgets/directions_route_sheet.dart';
+import '../widgets/map_controls.dart';
+import '../widgets/map_filter_chips.dart';
+import '../widgets/map_search_bar.dart';
+import '../widgets/map_status_pill.dart';
+import '../widgets/place_bottom_sheet.dart';
+import '../widgets/trip_route_sheet.dart';
+
+class GoMateMapScreen extends StatefulWidget {
+  final double bottomNavigationInset;
+
+  const GoMateMapScreen({
+    super.key,
+    this.bottomNavigationInset = 0,
+  });
 
   @override
-  State<MapScreen> createState() => _MapScreenState();
+  State<GoMateMapScreen> createState() =>
+      _GoMateMapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
-  final List<MapPlaceUi> _places = const [
-    MapPlaceUi(
-      id: '1',
-      name: 'Tiệm Cà Phê Gió',
-      subtitle: 'Quán cà phê chill ngắm đồi thông và hoàng hôn.',
-      address: '42 Đường Trần Hưng Đạo, Đà Lạt',
-      distanceText: '2,4 km',
-      openInfo: '08:00 - 22:00',
-      priceInfo: 'Đồ uống từ 45k',
-      rating: 4.5,
-      reviewCount: 30,
-      likeCount: 13,
-      tags: ['Sống ảo', 'View đẹp', 'Cà phê'],
-    ),
-    MapPlaceUi(
-      id: '2',
-      name: 'Hồ Xuân Hương',
-      subtitle: 'Điểm đi dạo, đạp vịt và ngắm cảnh ngay trung tâm.',
-      address: 'Phường 1, Đà Lạt, Lâm Đồng',
-      distanceText: '1,1 km',
-      openInfo: 'Cả ngày',
-      priceInfo: 'Miễn phí',
-      rating: 4.8,
-      reviewCount: 120,
-      likeCount: 52,
-      tags: ['Dạo chơi', 'Trung tâm', 'Nhẹ nhàng'],
-    ),
-    MapPlaceUi(
-      id: '3',
-      name: 'Chợ Đà Lạt',
-      subtitle: 'Thiên đường ăn vặt và mua đặc sản địa phương.',
-      address: 'Nguyễn Thị Minh Khai, Đà Lạt',
-      distanceText: '1,8 km',
-      openInfo: '06:00 - 21:30',
-      priceInfo: 'Ăn uống từ 20k',
-      rating: 4.4,
-      reviewCount: 87,
-      likeCount: 41,
-      tags: ['Ẩm thực', 'Đặc sản', 'Nhộn nhịp'],
-    ),
-    MapPlaceUi(
-      id: '4',
-      name: 'Que Garden',
-      subtitle: 'Khu vườn bonsai và hồ cá koi nổi tiếng.',
-      address: 'Đường Khởi Nghĩa Bắc Sơn, Đà Lạt',
-      distanceText: '4,0 km',
-      openInfo: '07:30 - 17:00',
-      priceInfo: 'Vé từ 70k',
-      rating: 4.6,
-      reviewCount: 64,
-      likeCount: 25,
-      tags: ['Check-in', 'Vườn', 'Gia đình'],
-    ),
-  ];
+class _GoMateMapScreenState
+    extends State<GoMateMapScreen> {
+  final _state =
+      GoMateMapState(DemoGoMateMapGateway());
 
-  MapPlaceUi? _selectedPlace;
+  final _layers =
+      GoMateMapboxLayerController();
+
+  final _locationService =
+      GoMateLocationService();
+
+  final _searchController =
+      TextEditingController();
+
+  MapboxMap? _map;
+  Timer? _searchDebounce;
+  String? _coordinateText;
+
+  final Position _defaultCenter =
+      Position(108.4488, 11.9416);
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: _buildMap(),
-          ),
-          SafeArea(
-            child: Column(
-              children: [
-                const SizedBox(height: 10),
-                _buildTopSearch(),
-                const Spacer(),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
-                  child: _selectedPlace == null
-                      ? _buildHintCard()
-                      : _buildRouteCard(_selectedPlace!),
-                ),
-              ],
-            ),
-          ),
-        ],
+  void initState() {
+    super.initState();
+
+    _state.addListener(_onStateChanged);
+    unawaited(_loadInitialPlaces());
+  }
+
+  Future<void> _openCreateTrip() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const CreateTripScreen(),
       ),
     );
   }
 
-  // ============================================================
-  // TOP SEARCH
-  // ============================================================
+  Future<void> _loadInitialPlaces() async {
+    await _state.init();
 
-  Widget _buildTopSearch() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-
-      child: Row(
-        children: [
-          _mapButton(
-            icon: Icons.search_rounded,
-            onTap: _openSearchSheet,
-          ),
-
-          const Spacer(),
-
-          // Phím tắt tạo lịch trình.
-          _tripShortcutButton(),
-
-          const SizedBox(width: 10),
-
-          _mapButton(
-            icon: Icons.my_location_rounded,
-            onTap: () {},
-          ),
-        ],
-      ),
-    );
+    if (_map != null &&
+        _state.mode == GoMateMapMode.explore) {
+      await _layers.showExplorePlaces(
+        _state.places,
+      );
+    }
   }
 
-  Widget _tripShortcutButton() {
-    return Tooltip(
-      message: 'Tạo lịch trình',
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
 
-      child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => const CreateTripScreen(),
-            ),
-          );
-        },
-        borderRadius: BorderRadius.circular(16),
+    _state.removeListener(_onStateChanged);
+    _state.dispose();
 
-        child: Container(
-          width: 52,
-          height: 52,
+    _layers.dispose();
 
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.96),
-            borderRadius: BorderRadius.circular(16),
-
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-
-          child: Stack(
-            clipBehavior: Clip.none,
-
-            children: [
-              const Center(
-                child: Icon(
-                  Icons.calendar_month_outlined,
-                  size: 23,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-
-              Positioned(
-                right: 8,
-                bottom: 8,
-
-                child: Container(
-                  width: 17,
-                  height: 17,
-
-                  decoration: BoxDecoration(
-                    color: AppColors.blue500,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white,
-                      width: 1.5,
-                    ),
-                  ),
-
-                  child: const Icon(
-                    Icons.add_rounded,
-                    size: 11,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    super.dispose();
   }
 
-  // ============================================================
-  // MAP
-  // ============================================================
+  /// Chỉ rebuild UI.
+  ///
+  /// Không render lại toàn bộ Mapbox layer mỗi lần
+  /// ChangeNotifier notify để tránh lag emulator.
+  void _onStateChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
 
-  Widget _buildMap() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            Container(
-              color: AppColors.background,
-              child: CustomPaint(
-                painter: _MapPainter(),
-              ),
-            ),
-            ..._buildMarkers(
-              constraints.maxWidth,
-              constraints.maxHeight,
-            ),
-            if (_selectedPlace != null)
-              IgnorePointer(
-                child: CustomPaint(
-                  painter: _RoutePainter(),
-                ),
-              ),
-          ],
+  Future<void> _onMapCreated(
+    MapboxMap map,
+  ) async {
+    _map = map;
+
+    await _layers.attach(
+      map,
+      onPlaceTap: (placeId) {
+        unawaited(_selectPlace(placeId));
+      },
+    );
+
+    await _renderCurrentMode();
+  }
+
+  Future<void> _onStyleLoaded() async {
+    await _layers.configureGoMateBaseStyle();
+  }
+
+  Future<void> _renderCurrentMode() async {
+    switch (_state.mode) {
+      case GoMateMapMode.explore:
+        await _layers.showExplorePlaces(
+          _state.places,
         );
+        break;
+
+      case GoMateMapMode.directions:
+        final route = _state.route;
+        final origin = _state.directionsOrigin;
+        final destination =
+            _state.directionsDestination;
+
+        if (route != null &&
+            origin != null &&
+            destination != null) {
+          await _layers.renderDirections(
+            route: route,
+            origin: origin,
+            destination: destination,
+          );
+        }
+        break;
+
+      case GoMateMapMode.trip:
+        final route = _state.route;
+
+        if (route != null) {
+          await _layers.renderTrip(
+            route: route,
+            stops: _state.tripStops,
+            members: _state.members,
+          );
+        }
+        break;
+    }
+  }
+
+  Future<void> _selectPlace(
+    String placeId,
+  ) async {
+    if (_state.mode != GoMateMapMode.explore) {
+      return;
+    }
+
+    await _state.selectPlace(placeId);
+
+    final place = _state.selectedPlace;
+
+    if (place != null) {
+      await _layers.renderSelected(place);
+      await _layers.focusPlace(place);
+    }
+  }
+
+  void _onSearchChanged(
+    String value,
+  ) {
+    setState(() {});
+
+    _searchDebounce?.cancel();
+
+    _searchDebounce =
+        Timer(
+      const Duration(milliseconds: 280),
+      () {
+        unawaited(_applySearch(value));
       },
     );
   }
 
-  List<Widget> _buildMarkers(
-      double width,
-      double height,
-      ) {
-    final offsets = <Offset>[
-      const Offset(0.24, 0.30),
-      const Offset(0.62, 0.25),
-      const Offset(0.54, 0.48),
-      const Offset(0.75, 0.42),
-    ];
+  Future<void> _applySearch(
+    String value,
+  ) async {
+    await _state.setQuery(value);
 
-    return List.generate(_places.length, (index) {
-      final place = _places[index];
-      final point = offsets[index];
-      final active = _selectedPlace?.id == place.id;
-
-      return Positioned(
-        left: width * point.dx - 19,
-        top: height * point.dy - 38,
-        child: GestureDetector(
-          onTap: () => _openPlace(place),
-          child: Column(
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: active
-                      ? AppColors.blue500
-                      : Colors.white,
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  place.name,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: active
-                        ? Colors.white
-                        : AppColors.textPrimary,
-                  ),
-                ),
-              ),
-              Container(
-                width: 16,
-                height: 16,
-                margin: const EdgeInsets.only(top: 4),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: active
-                      ? AppColors.blue500
-                      : Colors.white,
-                  border: Border.all(
-                    color: AppColors.blue500,
-                    width: 2,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+    if (_state.mode ==
+        GoMateMapMode.explore) {
+      await _layers.showExplorePlaces(
+        _state.places,
       );
+    }
+  }
+
+  Future<void> _setCategory(
+    GoMatePlaceCategory? value,
+  ) async {
+    await _state.setCategory(value);
+
+    if (_state.mode ==
+        GoMateMapMode.explore) {
+      await _layers.showExplorePlaces(
+        _state.places,
+      );
+    }
+  }
+
+  Future<void> _moveToCurrentLocation() async {
+    final result =
+        await _locationService.getCurrentLocation();
+
+    switch (result.state) {
+      case GoMateLocationState.ready:
+        final p = result.position!;
+
+        await _layers.enableLocationPuck();
+
+        await _layers.focusCoordinate(
+          Position(
+            p.longitude,
+            p.latitude,
+          ),
+          zoom: 16.2,
+        );
+        break;
+
+      case GoMateLocationState.serviceOff:
+        _showMessage(
+          'GPS đang tắt. Hãy bật Location rồi thử lại.',
+        );
+        break;
+
+      case GoMateLocationState.permissionDenied:
+        _showMessage(
+          'GoMate cần quyền vị trí để hiển thị vị trí của bạn.',
+        );
+        break;
+
+      case GoMateLocationState.permissionDeniedForever:
+        _showMessage(
+          'Quyền vị trí đã bị chặn. Hãy bật lại trong Settings.',
+        );
+        break;
+    }
+  }
+
+  Future<Position?> _currentPosition() async {
+    final result =
+        await _locationService.getCurrentLocation();
+
+    switch (result.state) {
+      case GoMateLocationState.ready:
+        final p = result.position!;
+
+        return Position(
+          p.longitude,
+          p.latitude,
+        );
+
+      case GoMateLocationState.serviceOff:
+        _showMessage(
+          'GPS đang tắt. Hãy bật Location rồi thử lại.',
+        );
+        return null;
+
+      case GoMateLocationState.permissionDenied:
+        _showMessage(
+          'GoMate cần quyền vị trí để chỉ đường.',
+        );
+        return null;
+
+      case GoMateLocationState.permissionDeniedForever:
+        _showMessage(
+          'Quyền vị trí đã bị chặn. Hãy bật lại trong Settings.',
+        );
+        return null;
+    }
+  }
+
+  Future<void> _directionsToSelected() async {
+    final destination =
+        _state.selectedPlace;
+
+    if (destination == null) return;
+
+    final origin =
+        await _currentPosition();
+
+    if (origin == null) return;
+
+    await _layers.enableLocationPuck();
+
+    final ok =
+        await _state.showDirections(
+      origin: origin,
+      destination: destination,
+      originIsCurrentLocation: true,
+      originLabel: 'Vị trí của tôi',
+    );
+
+    if (!ok) {
+      _showMessage(
+        _state.errorMessage ??
+            'Không tải được chỉ đường.',
+      );
+      return;
+    }
+
+    final route = _state.route;
+    final actualOrigin =
+        _state.directionsOrigin;
+    final actualDestination =
+        _state.directionsDestination;
+
+    if (route != null &&
+        actualOrigin != null &&
+        actualDestination != null) {
+      await _layers.renderDirections(
+        route: route,
+        origin: actualOrigin,
+        destination: actualDestination,
+      );
+    }
+  }
+
+  void _beginChooseOrigin() {
+    _state.beginChooseDirectionsOrigin();
+
+    _showMessage(
+      'Chạm lên bản đồ để chọn điểm bắt đầu mới.',
+    );
+  }
+
+  Future<void> _useCurrentLocationForDirections() async {
+    final origin =
+        await _currentPosition();
+
+    if (origin == null) return;
+
+    await _layers.enableLocationPuck();
+
+    final ok =
+        await _state.changeDirectionsOrigin(
+      origin: origin,
+      originIsCurrentLocation: true,
+      originLabel: 'Vị trí của tôi',
+    );
+
+    if (!ok) {
+      _showMessage(
+        _state.errorMessage ??
+            'Không tải được chỉ đường.',
+      );
+      return;
+    }
+
+    await _renderCurrentMode();
+  }
+
+  Future<void> _resetNorth() async {
+    final map = _map;
+
+    if (map == null) return;
+
+    final camera =
+        await map.getCameraState();
+
+    await map.easeTo(
+      CameraOptions(
+        center: camera.center,
+        zoom: camera.zoom,
+        pitch: 15,
+        bearing: 0,
+      ),
+      MapAnimationOptions(
+        duration: 450,
+      ),
+    );
+  }
+
+  Future<void> _showTrip() async {
+    await _state.showTrip(
+      'trip-demo-01',
+    );
+
+    await _renderCurrentMode();
+  }
+
+  Future<void> _showExplore() async {
+    await _state.showExplore();
+
+    await _layers.showExplorePlaces(
+      _state.places,
+    );
+  }
+
+  void _onMapTap(
+    MapContentGestureContext context,
+  ) {
+    unawaited(
+      _handleMapTap(context),
+    );
+  }
+
+  Future<void> _handleMapTap(
+    MapContentGestureContext context,
+  ) async {
+    final lng =
+        context.point.coordinates.lng.toDouble();
+
+    final lat =
+        context.point.coordinates.lat.toDouble();
+
+    if (_state.mode ==
+            GoMateMapMode.directions &&
+        _state.choosingDirectionsOrigin) {
+      final origin =
+          Position(lng, lat);
+
+      final ok =
+          await _state.changeDirectionsOrigin(
+        origin: origin,
+        originIsCurrentLocation: false,
+        originLabel:
+            '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}',
+      );
+
+      if (!ok) {
+        _showMessage(
+          _state.errorMessage ??
+              'Không đổi được điểm bắt đầu.',
+        );
+        return;
+      }
+
+      await _renderCurrentMode();
+      return;
+    }
+
+    if (_state.mode !=
+        GoMateMapMode.explore) {
+      return;
+    }
+
+    if (_state.selectedPlace != null) {
+      _state.clearSelection();
+
+      await _layers.renderSelected(
+        null,
+      );
+
+      return;
+    }
+
+    setState(() {
+      _coordinateText =
+          '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}';
     });
-  }
 
-  // ============================================================
-  // BOTTOM CARDS
-  // ============================================================
-
-  Widget _buildHintCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: _cardDecoration(),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Khám phá bản đồ',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Tìm kiếm địa điểm, xem thông tin và bắt đầu chỉ đường.',
-            style: TextStyle(
-              fontSize: 14,
-              height: 1.45,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
+    Future<void>.delayed(
+      const Duration(seconds: 3),
+      () {
+        if (mounted) {
+          setState(
+            () => _coordinateText = null,
+          );
+        }
+      },
     );
   }
 
-  Widget _buildRouteCard(MapPlaceUi place) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: _cardDecoration(),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: AppColors.blue50,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(
-                  Icons.place_rounded,
-                  color: AppColors.blue500,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      place.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 16.5,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${place.distanceText} • ${place.openInfo}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                onPressed: () {
-                  setState(() {
-                    _selectedPlace = null;
-                  });
-                },
-                icon: const Icon(Icons.close_rounded),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _metric(
-                  Icons.route_outlined,
-                  '3000 m',
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _metric(
-                  Icons.schedule_outlined,
-                  '50 min',
-                ),
-              ),
-              const SizedBox(width: 10),
-              SizedBox(
-                height: 42,
-                child: ElevatedButton(
-                  onPressed: () => _openPlace(place),
-                  style: ElevatedButton.styleFrom(
-                    elevation: 0,
-                    backgroundColor: AppColors.blue500,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: const Text(
-                    'Chi tiết',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _metric(
-      IconData icon,
-      String text,
-      ) {
-    return Container(
-      height: 42,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: AppColors.blue50.withOpacity(0.75),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            size: 16,
-            color: AppColors.blue500,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            text,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // SEARCH SHEET
-  // ============================================================
 
   Future<void> _openSearchSheet() async {
-    final place = await showModalBottomSheet<MapPlaceUi>(
+    final uiPlaces = _state.places
+        .map(_toUiPlace)
+        .toList(growable: false);
+
+    final selectedUi = await showModalBottomSheet<MapPlaceUi>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _MapSearchSheet(
-        places: _places,
+        places: uiPlaces,
       ),
     );
 
-    if (place == null) return;
+    if (!mounted || selectedUi == null) {
+      return;
+    }
 
-    setState(() {
-      _selectedPlace = place;
-    });
+    GoMateMapPlace? destination;
+    for (final place in _state.places) {
+      if (place.placeId == selectedUi.id) {
+        destination = place;
+        break;
+      }
+    }
+
+    if (destination == null) {
+      _showMessage('Không tìm thấy địa điểm trên bản đồ hiện tại.');
+      return;
+    }
+
+    await _state.selectPlace(destination.placeId);
+    await _directionsToSelected();
   }
 
-  Future<void> _openPlace(MapPlaceUi place) async {
-    final route = await Navigator.push<bool>(
-      context,
+  Future<void> _openSelectedPlaceDetail() async {
+    final selected = _state.selectedPlace;
+    if (selected == null) return;
+
+    final routeRequested = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => PlaceDetailScreen(
-          place: place,
+          place: _toUiPlace(selected),
         ),
       ),
     );
 
-    if (route == true) {
-      setState(() {
-        _selectedPlace = place;
-      });
+    if (!mounted) return;
+
+    if (routeRequested == true) {
+      await _directionsToSelected();
     }
   }
 
-  Widget _mapButton({
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        width: 52,
-        height: 52,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.96),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Icon(
-          icon,
-          color: AppColors.textPrimary,
-        ),
+  MapPlaceUi _toUiPlace(GoMateMapPlace place) {
+    var subtitle = 'Khám phá địa điểm nổi bật tại Đà Lạt.';
+    var distanceText = 'Xem trên bản đồ';
+    var openInfo = 'Đang cập nhật';
+    var priceInfo = 'Đang cập nhật';
+    var likeCount = 24;
+    var tags = <String>[place.categoryLabel, 'Đà Lạt'];
+
+    switch (place.placeId) {
+      case 'place-101':
+        subtitle = 'Điểm đi dạo, đạp vịt và ngắm cảnh ngay trung tâm.';
+        distanceText = '1,1 km';
+        openInfo = 'Cả ngày';
+        priceInfo = 'Miễn phí';
+        likeCount = 52;
+        tags = ['Dạo chơi', 'Trung tâm', 'Nhẹ nhàng'];
+        break;
+      case 'place-102':
+        subtitle = 'Biểu tượng kiến trúc và điểm check-in nổi bật của Đà Lạt.';
+        distanceText = '1,6 km';
+        openInfo = 'Cả ngày';
+        priceInfo = 'Miễn phí';
+        likeCount = 68;
+        tags = ['Check-in', 'Trung tâm', 'Kiến trúc'];
+        break;
+      case 'place-103':
+        subtitle = 'Thiên đường ăn vặt và mua đặc sản địa phương.';
+        distanceText = '1,8 km';
+        openInfo = '06:00 - 21:30';
+        priceInfo = 'Ăn uống từ 20k';
+        likeCount = 41;
+        tags = ['Ẩm thực', 'Đặc sản', 'Nhộn nhịp'];
+        break;
+      case 'place-104':
+        subtitle = 'Không gian hoa và cây xanh nổi tiếng gần trung tâm thành phố.';
+        distanceText = '2,0 km';
+        openInfo = '07:30 - 17:00';
+        priceInfo = 'Vé từ 50k';
+        likeCount = 35;
+        tags = ['Thiên nhiên', 'Hoa', 'Check-in'];
+        break;
+      case 'place-105':
+        subtitle = 'Quán cà phê lâu đời, phù hợp ngồi thư giãn giữa trung tâm.';
+        distanceText = '1,7 km';
+        openInfo = '07:00 - 22:00';
+        priceInfo = 'Đồ uống từ 35k';
+        likeCount = 47;
+        tags = ['Cà phê', 'Local', 'Thư giãn'];
+        break;
+      case 'place-106':
+        subtitle = 'Địa điểm ăn uống phong cách địa phương tại trung tâm Đà Lạt.';
+        distanceText = '1,5 km';
+        openInfo = '10:00 - 22:00';
+        priceInfo = 'Món từ 50k';
+        likeCount = 32;
+        tags = ['Ẩm thực', 'Local', 'Ăn uống'];
+        break;
+      case 'place-107':
+        subtitle = 'Nhà ga cổ với kiến trúc đặc trưng và nhiều góc check-in.';
+        distanceText = '2,8 km';
+        openInfo = '07:30 - 17:30';
+        priceInfo = 'Vé từ 10k';
+        likeCount = 59;
+        tags = ['Check-in', 'Văn hóa', 'Kiến trúc'];
+        break;
+      case 'place-108':
+        subtitle = 'Điểm tham quan lịch sử gắn với kiến trúc và văn hóa Đà Lạt.';
+        distanceText = '3,4 km';
+        openInfo = '07:00 - 17:30';
+        priceInfo = 'Vé từ 50k';
+        likeCount = 44;
+        tags = ['Văn hóa', 'Dinh', 'Check-in'];
+        break;
+    }
+
+    return MapPlaceUi(
+      id: place.placeId,
+      name: place.name,
+      subtitle: subtitle,
+      address: place.address,
+      distanceText: distanceText,
+      openInfo: openInfo,
+      priceInfo: priceInfo,
+      rating: place.rating,
+      reviewCount: place.reviewCount,
+      likeCount: likeCount,
+      tags: tags,
+    );
+  }
+
+  void _showMessage(
+    String message,
+  ) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content: Text(message),
       ),
     );
   }
 
-  BoxDecoration _cardDecoration() {
-    return BoxDecoration(
-      color: Colors.white.withOpacity(0.97),
-      borderRadius: BorderRadius.circular(24),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.06),
-          blurRadius: 18,
-          offset: const Offset(0, 6),
-        ),
-      ],
+  @override
+  Widget build(
+    BuildContext context,
+  ) {
+    final bottom =
+        widget.bottomNavigationInset;
+
+    return Scaffold(
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: MapWidget(
+              key: const ValueKey(
+                'gomate-map',
+              ),
+              styleUri:
+                  MapboxStyles.STANDARD,
+              cameraOptions:
+                  CameraOptions(
+                center: Point(
+                  coordinates:
+                      _defaultCenter,
+                ),
+                zoom: 14.2,
+                pitch: 15,
+                bearing: 0,
+              ),
+              onMapCreated:
+                  _onMapCreated,
+              onStyleLoadedListener:
+                  (_) =>
+                      _onStyleLoaded(),
+              onTapListener:
+                  _onMapTap,
+            ),
+          ),
+
+          if (_state.mode == GoMateMapMode.explore)
+            SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.only(
+                  left: 16,
+                  top: 10,
+                ),
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _openSearchSheet,
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        width: 58,
+                        height: 58,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.96),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 12,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.search_rounded,
+                          size: 27,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          Positioned(
+            right: 14,
+            bottom:
+                _controlsBottom(
+              bottom,
+            ),
+            child:
+            GoMateMapControls(
+              onCreateTrip: _openCreateTrip,
+              onTrip: _showTrip,
+              onResetNorth: _resetNorth,
+              onLocation: _moveToCurrentLocation,
+            ),
+          ),
+
+          if (_state.loading)
+            Positioned(
+              top:
+                  MediaQuery.paddingOf(
+                            context,
+                          ).top +
+                      118,
+              left: 0,
+              right: 0,
+              child: const Center(
+                child:
+                    GoMateMapStatusPill(
+                  text:
+                      'Đang tính lộ trình...',
+                  icon:
+                      Icons.sync_rounded,
+                ),
+              ),
+            ),
+
+          if (_state.mode ==
+                  GoMateMapMode
+                      .directions &&
+              _state
+                  .choosingDirectionsOrigin)
+            Positioned(
+              top:
+                  MediaQuery.paddingOf(
+                            context,
+                          ).top +
+                      18,
+              left: 14,
+              right: 14,
+              child:
+                  const GoMateMapStatusPill(
+                text:
+                    'Chạm lên bản đồ để chọn điểm bắt đầu',
+                icon: Icons
+                    .edit_location_alt_rounded,
+              ),
+            ),
+
+          if (_coordinateText != null)
+            Positioned(
+              top:
+                  MediaQuery.paddingOf(
+                            context,
+                          ).top +
+                      118,
+              left: 0,
+              right: 0,
+              child: Center(
+                child:
+                    GoMateMapStatusPill(
+                  text:
+                      _coordinateText!,
+                  icon: Icons
+                      .pin_drop_outlined,
+                ),
+              ),
+            ),
+
+          if (_state.errorMessage !=
+              null)
+            Positioned(
+              top:
+                  MediaQuery.paddingOf(
+                            context,
+                          ).top +
+                      118,
+              left: 14,
+              right: 14,
+              child:
+                  GoMateMapStatusPill(
+                text:
+                    _state.errorMessage!,
+                icon: Icons
+                    .error_outline_rounded,
+              ),
+            ),
+
+          if (_state.selectedPlace !=
+              null)
+            Positioned(
+              left: 14,
+              right: 14,
+              bottom: 14 + bottom,
+              child:
+                  GoMatePlaceBottomSheet(
+                place:
+                    _state.selectedPlace!,
+                onClose: () {
+                  _state
+                      .clearSelection();
+
+                  unawaited(
+                    _layers
+                        .renderSelected(
+                      null,
+                    ),
+                  );
+                },
+                onToggleSaved:
+                    _state
+                        .toggleSavedSelected,
+                onDirections:
+                    _directionsToSelected,
+                onOpenDetail: () {
+                  unawaited(
+                    _openSelectedPlaceDetail(),
+                  );
+                },
+              ),
+            )
+          else if (_state.mode ==
+                  GoMateMapMode
+                      .directions &&
+              _state.route != null &&
+              _state
+                      .directionsDestination !=
+                  null)
+            Positioned(
+              left: 14,
+              right: 14,
+              bottom: 14 + bottom,
+              child:
+                  GoMateDirectionsRouteSheet(
+                route:
+                    _state.route!,
+                destination:
+                    _state
+                        .directionsDestination!,
+                originLabel:
+                    _state
+                        .directionsOriginLabel,
+                originIsCurrentLocation:
+                    _state
+                        .directionsOriginIsCurrentLocation,
+                choosingOrigin:
+                    _state
+                        .choosingDirectionsOrigin,
+                onChooseOrigin:
+                    _beginChooseOrigin,
+                onUseCurrentLocation:
+                    _useCurrentLocationForDirections,
+                onClose:
+                    _showExplore,
+              ),
+            )
+          else if (_state.mode ==
+                  GoMateMapMode.trip &&
+              _state.route != null)
+            Positioned(
+              left: 14,
+              right: 14,
+              bottom: 14 + bottom,
+              child:
+                  GoMateTripRouteSheet(
+                route:
+                    _state.route!,
+                stops:
+                    _state.tripStops,
+                onExitTrip:
+                    _showExplore,
+                onStartTrip: () {
+                  _showMessage(
+                    'Production: chuyển sang Live Trip mode.',
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
     );
+  }
+
+  double _controlsBottom(
+    double bottomInset,
+  ) {
+    if (_state.selectedPlace != null) {
+      return 238 + bottomInset;
+    }
+
+    if (_state.mode ==
+        GoMateMapMode.directions) {
+      return 270 + bottomInset;
+    }
+
+    if (_state.mode ==
+            GoMateMapMode.trip &&
+        _state.route != null) {
+      return 248 + bottomInset;
+    }
+
+    return 30 + bottomInset;
   }
 }
 
 // ============================================================================
-// SEARCH SHEET
-// Bố cục: Search -> Danh mục -> Grid 2 cột
+// FRONTEND SEARCH UI GIỮ TỪ BẢN DART CỦA BẠN
+// Fake map cũ KHÔNG được mang sang; Mapbox V4 vẫn là map thật.
 // ============================================================================
 
 class _MapSearchSheet extends StatefulWidget {
@@ -897,24 +1270,23 @@ class _MapSearchSheetState extends State<_MapSearchSheet> {
                     return _PlaceGridCard(
                       place: place,
                       onTap: () async {
-                        await Navigator.push<bool>(
+                        final routeRequested = await Navigator.push<bool>(
                           context,
                           MaterialPageRoute(
-                            builder: (_) =>
-                                PlaceDetailScreen(
-                                  place: place,
-                                ),
+                            builder: (_) => PlaceDetailScreen(
+                              place: place,
+                            ),
                           ),
                         );
 
                         if (!context.mounted) return;
 
-                        // Chỉ chọn địa điểm để đưa về Map
-                        // khi người dùng quay lại từ chi tiết.
-                        Navigator.pop(
-                          context,
-                          place,
-                        );
+                        if (routeRequested == true) {
+                          Navigator.pop(
+                            context,
+                            place,
+                          );
+                        }
                       },
                     );
                   },
@@ -1166,109 +1538,4 @@ class _SearchEmptyState extends StatelessWidget {
       ),
     );
   }
-}
-
-// ============================================================================
-// MAP PAINTERS - UI MOCK ONLY
-// ============================================================================
-
-class _MapPainter extends CustomPainter {
-  @override
-  void paint(
-      Canvas canvas,
-      Size size,
-      ) {
-    final mainRoad = Paint()
-      ..color = const Color(0xFFD7E6EF)
-      ..strokeWidth = 5
-      ..style = PaintingStyle.stroke;
-
-    final subRoad = Paint()
-      ..color = const Color(0xFFE7F0F5)
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke;
-
-    for (int i = 0; i < 6; i++) {
-      final y = 100.0 + i * 110;
-      canvas.drawLine(
-        Offset(0, y),
-        Offset(size.width, y + 35),
-        i.isEven ? mainRoad : subRoad,
-      );
-    }
-
-    for (int i = 0; i < 5; i++) {
-      final x = 30.0 + i * 85;
-      canvas.drawLine(
-        Offset(x, 0),
-        Offset(x + 40, size.height),
-        i.isEven ? subRoad : mainRoad,
-      );
-    }
-
-    final park = Paint()
-      ..color = const Color(0xFFDFF2E3)
-      ..style = PaintingStyle.fill;
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          size.width * 0.66,
-          size.height * 0.12,
-          size.width * 0.26,
-          size.height * 0.32,
-        ),
-        const Radius.circular(24),
-      ),
-      park,
-    );
-  }
-
-  @override
-  bool shouldRepaint(
-      covariant CustomPainter oldDelegate,
-      ) => false;
-}
-
-class _RoutePainter extends CustomPainter {
-  @override
-  void paint(
-      Canvas canvas,
-      Size size,
-      ) {
-    final routePaint = Paint()
-      ..color = AppColors.blue500
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = 4
-      ..style = PaintingStyle.stroke;
-
-    final path = Path()
-      ..moveTo(
-        size.width * 0.18,
-        size.height * 0.80,
-      )
-      ..lineTo(
-        size.width * 0.22,
-        size.height * 0.66,
-      )
-      ..lineTo(
-        size.width * 0.40,
-        size.height * 0.58,
-      )
-      ..lineTo(
-        size.width * 0.55,
-        size.height * 0.40,
-      )
-      ..lineTo(
-        size.width * 0.62,
-        size.height * 0.25,
-      );
-
-    canvas.drawPath(path, routePaint);
-  }
-
-  @override
-  bool shouldRepaint(
-      covariant CustomPainter oldDelegate,
-      ) => false;
 }

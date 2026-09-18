@@ -50,6 +50,7 @@ public class SecurityConfig {
   http.csrf(c->c.disable()).cors(c->c.configurationSource(source)).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
    .authorizeHttpRequests(a->a.requestMatchers("/swagger-ui/**","/swagger-ui.html","/v3/api-docs/**","/health","/api/v1/health").permitAll()
     .requestMatchers(HttpMethod.POST,"/api/v1/auth/register","/api/v1/auth/login","/api/v1/auth/refresh","/api/v1/auth/google").permitAll()
+    .requestMatchers(HttpMethod.POST,"/api/v1/routes/compute","/api/v1/routes/directions").permitAll()
     .requestMatchers("/api/v1/admin/**").hasRole("ADMIN").anyRequest().authenticated())
    .oauth2ResourceServer(o->o.jwt(j->j.jwtAuthenticationConverter(jwt->{
     String role=(String)repo.profile(UUID.fromString(jwt.getSubject())).get("role");

@@ -20,7 +20,7 @@ class _MainShellState extends State<MainShell> {
   final List<Widget> _pages = const [
     HomeScreen(),
     ExploreScreen(),
-    MapScreen(),
+    GoMateMapScreen(),
     TripScreen(),
     ProfileScreen(),
   ];
@@ -29,10 +29,7 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
-      ),
+      body: IndexedStack(index: _currentIndex, children: _pages),
       bottomNavigationBar: _buildBottomNav(),
     );
   }
@@ -58,17 +55,9 @@ class _MainShellState extends State<MainShell> {
                     height: 60,
                     child: Row(
                       children: [
+                        Expanded(child: _buildNavItem(0, Icons.home_rounded)),
                         Expanded(
-                          child: _buildNavItem(
-                            0,
-                            Icons.home_rounded,
-                          ),
-                        ),
-                        Expanded(
-                          child: _buildNavItem(
-                            1,
-                            Icons.explore_outlined,
-                          ),
+                          child: _buildNavItem(1, Icons.explore_outlined),
                         ),
                         const SizedBox(width: 58),
                         Expanded(
@@ -78,10 +67,7 @@ class _MainShellState extends State<MainShell> {
                           ),
                         ),
                         Expanded(
-                          child: _buildNavItem(
-                            4,
-                            Icons.person_outline_rounded,
-                          ),
+                          child: _buildNavItem(4, Icons.person_outline_rounded),
                         ),
                       ],
                     ),
@@ -135,10 +121,7 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  Widget _buildNavItem(
-    int index,
-    IconData icon,
-  ) {
+  Widget _buildNavItem(int index, IconData icon) {
     final active = _currentIndex == index;
 
     return GestureDetector(
@@ -157,16 +140,12 @@ class _MainShellState extends State<MainShell> {
             height: 38,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: active
-                  ? AppColors.blue50
-                  : Colors.transparent,
+              color: active ? AppColors.blue50 : Colors.transparent,
             ),
             child: Icon(
               icon,
               size: 23,
-              color: active
-                  ? AppColors.blue500
-                  : AppColors.textSecondary,
+              color: active ? AppColors.blue500 : AppColors.textSecondary,
             ),
           ),
         ),

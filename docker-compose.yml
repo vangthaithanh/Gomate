@@ -28,6 +28,7 @@ services:
       GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS:-}
       JWT_SECRET: ${JWT_SECRET:?Run backend/scripts/setup-env.ps1 first}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      MAPBOX_SERVER_TOKEN: ${MAPBOX_SERVER_TOKEN:?MAPBOX_SERVER_TOKEN is required}
     ports:
       - "${API_PORT:-8081}:8080"
     volumes:

@@ -39,6 +39,8 @@ dependencies:
   firebase_core: ^4.15.0
   firebase_auth: ^6.7.0
   google_sign_in: ^7.2.0
+  mapbox_maps_flutter: ^2.31.0
+  geolocator: ^14.0.3
 
 dev_dependencies:
   flutter_test:
@@ -64,7 +66,7 @@ flutter:
 
   assets:
     - assets/images/
-
+    - assets/map/
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg
