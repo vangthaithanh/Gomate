@@ -8,6 +8,10 @@ Khi chay app tren dien thoai Android that, `localhost`/`127.0.0.1` tren dien tho
 
 Dung IP LAN cua PC thi dien thoai goi duoc backend. Tuy nhien khong nen hardcode IP nay vao source, vi doi Wi-Fi, doi PC, doi dien thoai se lai hong.
 
+Ngay 2026-09-19, phan chi duong tren Map gap loi `No route to host, address = 10.0.2.2`. Nguyen nhan la route service con hard-code URL emulator `http://10.0.2.2:8081/api/v1`, trong khi may that khong truy cap duoc IP nay. Da sua `SpringRouteService` dung chung `ApiConfig.candidateBaseUrls` voi Auth/Place API.
+
+Sau khi Map chuyen sang Place API that, backend route cung can resolve placeId dang so tu PostgreSQL. `RouteService` hien dung `PlaceCoordinateResolver -> PlaceRepository.activeCoordinate(...)` va khong fallback ngam ve demo coordinate nua.
+
 ## Giai phap da cau hinh
 
 - Source Flutter khong con chua IP Wi-Fi co dinh.
@@ -59,6 +63,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run-android-dev.ps1 -HostIp <
 - `adb install -r app-debug.apk` qua script thanh cong.
 - Script mo app `com.example.gomate` thanh cong.
 - Kiem tra tu shell Android goi LAN health tra `HTTP 200` va `{"status":"UP"}`.
+- Route API sau fix tra du lieu that voi placeId PostgreSQL: default `POST /api/v1/routes/directions` voi GPS runtime `originLatitude` + `originLongitude` + `destinationPlaceId`; option doi diem bat dau dung `originPlaceId` + `destinationPlaceId`. Ca hai deu tra distance/duration/geometry thanh cong.
 
 ## Luu y quan trong
 

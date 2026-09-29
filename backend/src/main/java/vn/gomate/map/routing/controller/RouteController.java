@@ -32,7 +32,9 @@ public class RouteController {
     ) {
         return ResponseEntity.ok(
             routeService.calculateDirections(
-                request.origin(),
+                request.originPlaceId(),
+                request.originLatitude(),
+                request.originLongitude(),
                 request.destinationPlaceId()
             )
         );

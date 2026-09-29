@@ -36,6 +36,8 @@ migrate_working_dir/
 
 # Backend / local runtime
 backend/target/
+.m2-cache/
+backups/
 .env
 .env.*
 !.env.example
@@ -57,3 +59,4 @@ app.*.map.json
 /android/app/google-services.json
 /backend/secrets/*.json
 !/backend/secrets/README.md
+lib/main.dart

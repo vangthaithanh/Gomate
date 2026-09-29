@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/map_place.dart';
 import '../theme/map_ui_tokens.dart';
+import '../utils/cloudinary_image_url.dart';
 
 class GoMatePlaceBottomSheet extends StatelessWidget {
   final GoMateMapPlace place;
@@ -31,18 +32,9 @@ class GoMatePlaceBottomSheet extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 78,
-                height: 78,
-                decoration: BoxDecoration(
-                  color: AppColors.blue50,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Icon(
-                  _icon(place.category),
-                  size: 36,
-                  color: AppColors.blue500,
-                ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: SizedBox(width: 78, height: 78, child: _thumbnail()),
               ),
 
               const SizedBox(width: 12),
@@ -51,10 +43,7 @@ class GoMatePlaceBottomSheet extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      place.name,
-                      style: GoMateMapUi.title(context),
-                    ),
+                    Text(place.name, style: GoMateMapUi.title(context)),
 
                     const SizedBox(height: 4),
 
@@ -132,18 +121,14 @@ class GoMatePlaceBottomSheet extends StatelessWidget {
                   onPressed: onOpenDetail,
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.blue500,
-                    side: const BorderSide(
-                      color: AppColors.blue500,
-                    ),
+                    side: const BorderSide(color: AppColors.blue500),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(22),
                     ),
                   ),
                   child: const Text(
                     'Chi tiết',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
@@ -161,15 +146,10 @@ class GoMatePlaceBottomSheet extends StatelessWidget {
                       borderRadius: BorderRadius.circular(22),
                     ),
                   ),
-                  icon: const Icon(
-                    Icons.directions_rounded,
-                    size: 18,
-                  ),
+                  icon: const Icon(Icons.directions_rounded, size: 18),
                   label: const Text(
                     'Chỉ đường',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
@@ -193,5 +173,38 @@ class GoMatePlaceBottomSheet extends StatelessWidget {
       case GoMatePlaceCategory.shopping:
         return Icons.shopping_bag_rounded;
     }
+  }
+
+  Widget _thumbnail() {
+    final rawUrl =
+        place.thumbnailUrl ??
+        (place.mediaUrls.isEmpty ? null : place.mediaUrls.first);
+
+    if (rawUrl != null) {
+      final url = cloudinaryMapThumbnailUrl(rawUrl);
+
+      return Image.network(
+        url,
+        fit: BoxFit.cover,
+        cacheWidth: 180,
+        cacheHeight: 180,
+        filterQuality: FilterQuality.low,
+        gaplessPlayback: true,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return _thumbnailFallback();
+        },
+        errorBuilder: (context, error, stackTrace) => _thumbnailFallback(),
+      );
+    }
+
+    return _thumbnailFallback();
+  }
+
+  Widget _thumbnailFallback() {
+    return Container(
+      color: AppColors.blue50,
+      child: Icon(_icon(place.category), size: 36, color: AppColors.blue500),
+    );
   }
 }

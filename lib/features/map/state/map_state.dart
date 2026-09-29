@@ -41,10 +41,7 @@ class GoMateMapState extends ChangeNotifier {
     notifyListeners();
 
     try {
-      places = await gateway.loadPlaces(
-        query: query,
-        category: category,
-      );
+      places = await gateway.loadPlaces(query: query, category: category);
     } catch (_) {
       errorMessage = 'Không tải được địa điểm.';
     } finally {
@@ -64,8 +61,19 @@ class GoMateMapState extends ChangeNotifier {
   }
 
   Future<void> selectPlace(String placeId) async {
-    selectedPlace = await gateway.loadPlaceDetail(placeId);
+    loading = true;
+    errorMessage = null;
     notifyListeners();
+
+    try {
+      selectedPlace = await gateway.loadPlaceDetail(placeId);
+    } catch (e) {
+      selectedPlace = null;
+      errorMessage = 'Không tải được chi tiết địa điểm: $e';
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
   }
 
   void clearSelection() {
@@ -88,11 +96,24 @@ class GoMateMapState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void beginDirectionsTo(GoMateMapPlace destination) {
+    route = null;
+    directionsOrigin = null;
+    directionsOriginLabel = 'Chọn địa điểm bắt đầu';
+    directionsOriginIsCurrentLocation = false;
+    choosingDirectionsOrigin = true;
+    directionsDestination = destination;
+    selectedPlace = null;
+    mode = GoMateMapMode.directions;
+    tripStops = [];
+    members = [];
+    errorMessage = null;
+    notifyListeners();
+  }
+
   Future<bool> showDirections({
-    required Position origin,
+    required GoMateMapPlace origin,
     required GoMateMapPlace destination,
-    required bool originIsCurrentLocation,
-    required String originLabel,
   }) async {
     loading = true;
     errorMessage = null;
@@ -101,14 +122,52 @@ class GoMateMapState extends ChangeNotifier {
 
     try {
       final calculated = await gateway.loadDirections(
-        origin: origin,
+        originPlaceId: origin.placeId,
+        destinationPlaceId: destination.placeId,
+      );
+
+      route = calculated;
+      directionsOrigin = origin.position;
+      directionsOriginLabel = origin.name;
+      directionsOriginIsCurrentLocation = false;
+      directionsDestination = destination;
+
+      mode = GoMateMapMode.directions;
+      selectedPlace = null;
+
+      tripStops = [];
+      members = [];
+
+      return true;
+    } catch (e) {
+      errorMessage = 'Không tải được chỉ đường: $e';
+      return false;
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> showDirectionsFromCurrentLocation({
+    required Position origin,
+    required GoMateMapPlace destination,
+  }) async {
+    loading = true;
+    errorMessage = null;
+    choosingDirectionsOrigin = false;
+    notifyListeners();
+
+    try {
+      final calculated = await gateway.loadDirections(
+        originLatitude: origin.lat.toDouble(),
+        originLongitude: origin.lng.toDouble(),
         destinationPlaceId: destination.placeId,
       );
 
       route = calculated;
       directionsOrigin = origin;
-      directionsOriginLabel = originLabel;
-      directionsOriginIsCurrentLocation = originIsCurrentLocation;
+      directionsOriginLabel = 'Vị trí của tôi';
+      directionsOriginIsCurrentLocation = true;
       directionsDestination = destination;
 
       mode = GoMateMapMode.directions;
@@ -138,20 +197,37 @@ class GoMateMapState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> changeDirectionsOrigin({
-    required Position origin,
-    required bool originIsCurrentLocation,
-    required String originLabel,
-  }) async {
+  Future<bool> changeDirectionsOriginPlace(String originPlaceId) async {
     final destination = directionsDestination;
     if (destination == null) return false;
 
-    return showDirections(
-      origin: origin,
-      destination: destination,
-      originIsCurrentLocation: originIsCurrentLocation,
-      originLabel: originLabel,
-    );
+    if (originPlaceId == destination.placeId) {
+      errorMessage = 'Điểm bắt đầu phải khác điểm đến.';
+      notifyListeners();
+      return false;
+    }
+
+    loading = true;
+    errorMessage = null;
+    notifyListeners();
+
+    try {
+      final origin = await gateway.loadPlaceDetail(originPlaceId);
+      return showDirections(origin: origin, destination: destination);
+    } catch (e) {
+      errorMessage = 'Không tải được chỉ đường: $e';
+      return false;
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> recalculateDirectionsFrom(GoMateMapPlace origin) {
+    final destination = directionsDestination;
+    if (destination == null) return Future.value(false);
+
+    return showDirections(origin: origin, destination: destination);
   }
 
   Future<void> showTrip(String tripId) async {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../utils/cloudinary_image_url.dart';
 
 class MapPlaceUi {
   final String id;
@@ -15,6 +16,8 @@ class MapPlaceUi {
   final int likeCount;
   final List<String> tags;
   final String? imageAsset;
+  final String? imageUrl;
+  final List<String> mediaUrls;
 
   const MapPlaceUi({
     required this.id,
@@ -29,9 +32,10 @@ class MapPlaceUi {
     required this.likeCount,
     required this.tags,
     this.imageAsset,
+    this.imageUrl,
+    this.mediaUrls = const <String>[],
   });
 }
-
 
 /// Store UI tạm thời để chia sẻ thư mục Ưa thích giữa Map và Lịch trình.
 /// Khi có backend, thay phần này bằng repository/provider/API.
@@ -45,63 +49,36 @@ class FavoritePlaceStore {
   static List<String> get folderNames => folders.keys.toList();
 
   static List<MapPlaceUi> placesIn(String folder) {
-    return List<MapPlaceUi>.from(
-      folders[folder] ?? const <MapPlaceUi>[],
-    );
+    return List<MapPlaceUi>.from(folders[folder] ?? const <MapPlaceUi>[]);
   }
 
   static void ensureFolder(String folder) {
-    folders.putIfAbsent(
-      folder,
-          () => <MapPlaceUi>[],
-    );
+    folders.putIfAbsent(folder, () => <MapPlaceUi>[]);
   }
 
-  static void addToFolder(
-      String folder,
-      MapPlaceUi place,
-      ) {
+  static void addToFolder(String folder, MapPlaceUi place) {
     ensureFolder(folder);
 
     final list = folders[folder]!;
 
-    final exists = list.any(
-          (item) => item.id == place.id,
-    );
+    final exists = list.any((item) => item.id == place.id);
 
     if (!exists) {
       list.add(place);
     }
   }
 
-  static void removeFromFolder(
-      String folder,
-      MapPlaceUi place,
-      ) {
-    folders[folder]?.removeWhere(
-          (item) => item.id == place.id,
-    );
+  static void removeFromFolder(String folder, MapPlaceUi place) {
+    folders[folder]?.removeWhere((item) => item.id == place.id);
   }
 
-  static bool contains(
-      String folder,
-      MapPlaceUi place,
-      ) {
-    return folders[folder]?.any(
-          (item) => item.id == place.id,
-    ) ??
-        false;
+  static bool contains(String folder, MapPlaceUi place) {
+    return folders[folder]?.any((item) => item.id == place.id) ?? false;
   }
 
-  static Set<String> foldersContaining(
-      MapPlaceUi place,
-      ) {
+  static Set<String> foldersContaining(MapPlaceUi place) {
     return folders.entries
-        .where(
-          (entry) => entry.value.any(
-            (item) => item.id == place.id,
-      ),
-    )
+        .where((entry) => entry.value.any((item) => item.id == place.id))
         .map((entry) => entry.key)
         .toSet();
   }
@@ -110,10 +87,7 @@ class FavoritePlaceStore {
 class PlaceDetailScreen extends StatefulWidget {
   final MapPlaceUi place;
 
-  const PlaceDetailScreen({
-    super.key,
-    required this.place,
-  });
+  const PlaceDetailScreen({super.key, required this.place});
 
   @override
   State<PlaceDetailScreen> createState() => _PlaceDetailScreenState();
@@ -130,8 +104,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
     super.initState();
 
     _favoriteFolders = FavoritePlaceStore.folderNames;
-    _selectedFolders =
-        FavoritePlaceStore.foldersContaining(place);
+    _selectedFolders = FavoritePlaceStore.foldersContaining(place);
   }
 
   @override
@@ -143,54 +116,39 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
         children: [
           CustomScrollView(
             slivers: [
-              SliverToBoxAdapter(
-                child: _buildHero(),
-              ),
+              SliverToBoxAdapter(child: _buildHero()),
 
               SliverPadding(
-                padding:
-                const EdgeInsets.fromLTRB(
-                  20,
-                  18,
-                  20,
-                  110,
-                ),
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 110),
 
                 sliver: SliverList(
-                  delegate:
-                  SliverChildListDelegate(
-                    [
-                      _buildTitle(),
+                  delegate: SliverChildListDelegate([
+                    _buildTitle(),
 
-                      const SizedBox(height: 22),
+                    const SizedBox(height: 22),
 
-                      _buildInfo(),
+                    _buildInfo(),
 
-                      const SizedBox(height: 22),
+                    const SizedBox(height: 22),
 
-                      _buildReviewSummary(),
+                    _buildReviewSummary(),
 
-                      const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-                      const Text(
-                        'Đánh giá gần đây',
+                    const Text(
+                      'Đánh giá gần đây',
 
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color:
-                          AppColors.textPrimary,
-                        ),
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
                       ),
+                    ),
 
-                      const SizedBox(height: 12),
+                    const SizedBox(height: 12),
 
-                      ...List.generate(
-                        3,
-                        _buildReview,
-                      ),
-                    ],
-                  ),
+                    ...List.generate(3, _buildReview),
+                  ]),
                 ),
               ),
             ],
@@ -198,19 +156,13 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
 
           SafeArea(
             child: Padding(
-              padding:
-              const EdgeInsets.fromLTRB(
-                16,
-                10,
-                16,
-                0,
-              ),
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
 
               child: Row(
                 children: [
                   _circleButton(
                     Icons.arrow_back_rounded,
-                        () => Navigator.pop(context),
+                    () => Navigator.pop(context),
                   ),
 
                   const Spacer(),
@@ -227,47 +179,31 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
         top: false,
 
         child: Padding(
-          padding:
-          const EdgeInsets.fromLTRB(
-            20,
-            8,
-            20,
-            18,
-          ),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
 
           child: SizedBox(
             height: 54,
 
             child: ElevatedButton.icon(
               onPressed: () {
-                Navigator.pop(
-                  context,
-                  true,
-                );
+                Navigator.pop(context, true);
               },
 
-              icon: const Icon(
-                Icons.route_rounded,
-              ),
+              icon: const Icon(Icons.route_rounded),
 
               label: const Text(
                 'Chỉ đường đến đây',
 
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                ),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
               ),
 
               style: ElevatedButton.styleFrom(
                 elevation: 0,
-                backgroundColor:
-                AppColors.blue500,
+                backgroundColor: AppColors.blue500,
                 foregroundColor: Colors.white,
 
                 shape: RoundedRectangleBorder(
-                  borderRadius:
-                  BorderRadius.circular(27),
+                  borderRadius: BorderRadius.circular(27),
                 ),
               ),
             ),
@@ -282,6 +218,13 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
   // ============================================================
 
   Widget _buildHero() {
+    final rawHeroUrl = place.mediaUrls.isNotEmpty
+        ? place.mediaUrls.first
+        : place.imageUrl;
+    final heroUrl = rawHeroUrl == null
+        ? null
+        : cloudinaryPlaceHeroUrl(rawHeroUrl);
+
     return SizedBox(
       height: 330,
 
@@ -289,13 +232,24 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
         fit: StackFit.expand,
 
         children: [
-          if (place.imageAsset != null)
+          if (heroUrl != null)
+            Image.network(
+              heroUrl,
+              fit: BoxFit.cover,
+              cacheWidth: 1080,
+              filterQuality: FilterQuality.medium,
+              gaplessPlayback: true,
+              loadingBuilder: (context, child, progress) {
+                if (progress == null) return child;
+                return _heroLoading();
+              },
+              errorBuilder: (context, error, stackTrace) => _heroFallback(),
+            )
+          else if (place.imageAsset != null)
             Image.asset(
               place.imageAsset!,
               fit: BoxFit.cover,
-              errorBuilder:
-                  (_, __, ___) =>
-                  _heroFallback(),
+              errorBuilder: (context, error, stackTrace) => _heroFallback(),
             )
           else
             _heroFallback(),
@@ -313,16 +267,23 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                   Colors.white,
                 ],
 
-                stops: [
-                  0,
-                  0.48,
-                  0.82,
-                  1,
-                ],
+                stops: [0, 0.48, 0.82, 1],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _heroLoading() {
+    return Container(
+      color: AppColors.blue50,
+      alignment: Alignment.center,
+      child: const SizedBox(
+        width: 26,
+        height: 26,
+        child: CircularProgressIndicator(strokeWidth: 2.6),
       ),
     );
   }
@@ -334,18 +295,11 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
 
-          colors: [
-            AppColors.blue100,
-            AppColors.blue300,
-          ],
+          colors: [AppColors.blue100, AppColors.blue300],
         ),
       ),
 
-      child: const Icon(
-        Icons.place_rounded,
-        size: 70,
-        color: Colors.white,
-      ),
+      child: const Icon(Icons.place_rounded, size: 70, color: Colors.white),
     );
   }
 
@@ -355,8 +309,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
 
   Widget _buildTitle() {
     return Column(
-      crossAxisAlignment:
-      CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
 
       children: [
         Text(
@@ -373,11 +326,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
 
         Row(
           children: [
-            const Icon(
-              Icons.star_rounded,
-              size: 20,
-              color: Color(0xFFFFB547),
-            ),
+            const Icon(Icons.star_rounded, size: 20, color: Color(0xFFFFB547)),
 
             const SizedBox(width: 5),
 
@@ -421,31 +370,11 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
 
   Widget _buildInfo() {
     final data = [
-      (
-      Icons.place_outlined,
-      'Địa chỉ',
-      place.address,
-      ),
-      (
-      Icons.route_outlined,
-      'Khoảng cách',
-      place.distanceText,
-      ),
-      (
-      Icons.schedule_outlined,
-      'Thời gian',
-      place.openInfo,
-      ),
-      (
-      Icons.attach_money_rounded,
-      'Chi phí',
-      place.priceInfo,
-      ),
-      (
-      Icons.local_offer_outlined,
-      'Phù hợp',
-      place.tags.join(' • '),
-      ),
+      (Icons.place_outlined, 'Địa chỉ', place.address),
+      (Icons.route_outlined, 'Khoảng cách', place.distanceText),
+      (Icons.schedule_outlined, 'Thời gian', place.openInfo),
+      (Icons.attach_money_rounded, 'Chi phí', place.priceInfo),
+      (Icons.local_offer_outlined, 'Phù hợp', place.tags.join(' • ')),
     ];
 
     return Container(
@@ -455,47 +384,26 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
 
-        border: Border.all(
-          color:
-          AppColors.blue100.withOpacity(0.55),
-        ),
+        border: Border.all(color: AppColors.blue100.withOpacity(0.55)),
       ),
 
       child: Column(
-        children: List.generate(
-          data.length,
+        children: List.generate(data.length, (index) {
+          final item = data[index];
 
-              (index) {
-            final item = data[index];
+          return Padding(
+            padding: EdgeInsets.only(bottom: index == data.length - 1 ? 0 : 14),
 
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom:
-                index == data.length - 1
-                    ? 0
-                    : 14,
-              ),
-
-              child: _infoRow(
-                item.$1,
-                item.$2,
-                item.$3,
-              ),
-            );
-          },
-        ),
+            child: _infoRow(item.$1, item.$2, item.$3),
+          );
+        }),
       ),
     );
   }
 
-  Widget _infoRow(
-      IconData icon,
-      String title,
-      String value,
-      ) {
+  Widget _infoRow(IconData icon, String title, String value) {
     return Row(
-      crossAxisAlignment:
-      CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
 
       children: [
         Container(
@@ -504,23 +412,17 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
 
           decoration: BoxDecoration(
             color: AppColors.blue50,
-            borderRadius:
-            BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(12),
           ),
 
-          child: Icon(
-            icon,
-            size: 20,
-            color: AppColors.blue500,
-          ),
+          child: Icon(icon, size: 20, color: AppColors.blue500),
         ),
 
         const SizedBox(width: 12),
 
         Expanded(
           child: Column(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
 
             children: [
               Text(
@@ -528,8 +430,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
 
                 style: const TextStyle(
                   fontSize: 12.5,
-                  color:
-                  AppColors.textSecondary,
+                  color: AppColors.textSecondary,
                 ),
               ),
 
@@ -542,8 +443,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                   fontSize: 14,
                   height: 1.4,
                   fontWeight: FontWeight.w700,
-                  color:
-                  AppColors.textPrimary,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ],
@@ -562,8 +462,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
       padding: const EdgeInsets.all(18),
 
       decoration: BoxDecoration(
-        color:
-        AppColors.blue50.withOpacity(0.40),
+        color: AppColors.blue50.withOpacity(0.40),
         borderRadius: BorderRadius.circular(22),
       ),
 
@@ -571,8 +470,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
         children: [
           Expanded(
             child: Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
 
               children: [
                 const Text(
@@ -581,8 +479,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
-                    color:
-                    AppColors.textPrimary,
+                    color: AppColors.textPrimary,
                   ),
                 ),
 
@@ -594,8 +491,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color:
-                    AppColors.textPrimary,
+                    color: AppColors.textPrimary,
                   ),
                 ),
 
@@ -606,8 +502,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
 
                   style: const TextStyle(
                     fontSize: 13,
-                    color:
-                    AppColors.textSecondary,
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -619,22 +514,18 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
 
             style: ElevatedButton.styleFrom(
               elevation: 0,
-              backgroundColor:
-              AppColors.blue500,
+              backgroundColor: AppColors.blue500,
               foregroundColor: Colors.white,
 
               shape: RoundedRectangleBorder(
-                borderRadius:
-                BorderRadius.circular(15),
+                borderRadius: BorderRadius.circular(15),
               ),
             ),
 
             child: const Text(
               'Đánh giá',
 
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-              ),
+              style: TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -644,9 +535,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
 
   Widget _buildReview(int index) {
     return Padding(
-      padding: const EdgeInsets.only(
-        bottom: 12,
-      ),
+      padding: const EdgeInsets.only(bottom: 12),
 
       child: Container(
         padding: const EdgeInsets.all(15),
@@ -655,36 +544,27 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
 
-          border: Border.all(
-            color:
-            AppColors.blue100.withOpacity(0.40),
-          ),
+          border: Border.all(color: AppColors.blue100.withOpacity(0.40)),
         ),
 
         child: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
 
           children: [
             Row(
               children: [
                 const CircleAvatar(
                   radius: 21,
-                  backgroundColor:
-                  AppColors.blue200,
+                  backgroundColor: AppColors.blue200,
 
-                  child: Icon(
-                    Icons.person,
-                    color: Colors.white,
-                  ),
+                  child: Icon(Icons.person, color: Colors.white),
                 ),
 
                 const SizedBox(width: 11),
 
                 const Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
 
                     children: [
                       Text(
@@ -692,10 +572,8 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
 
                         style: TextStyle(
                           fontSize: 15,
-                          fontWeight:
-                          FontWeight.w800,
-                          color:
-                          AppColors.textPrimary,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
                         ),
                       ),
 
@@ -704,8 +582,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
 
                         style: TextStyle(
                           fontSize: 12,
-                          color:
-                          AppColors.textSecondary,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ],
@@ -748,17 +625,11 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
 
               Row(
                 children: [
-                  Expanded(
-                    child:
-                    _reviewImagePlaceholder(),
-                  ),
+                  Expanded(child: _reviewImagePlaceholder()),
 
                   const SizedBox(width: 8),
 
-                  Expanded(
-                    child:
-                    _reviewImagePlaceholder(),
-                  ),
+                  Expanded(child: _reviewImagePlaceholder()),
                 ],
               ),
             ],
@@ -777,10 +648,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
         borderRadius: BorderRadius.circular(14),
       ),
 
-      child: const Icon(
-        Icons.image_outlined,
-        color: AppColors.blue500,
-      ),
+      child: const Icon(Icons.image_outlined, color: AppColors.blue500),
     );
   }
 
@@ -805,13 +673,9 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
           ],
         ),
         child: Icon(
-          isFavorite
-              ? Icons.favorite_rounded
-              : Icons.favorite_border_rounded,
+          isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
           size: 20,
-          color: isFavorite
-              ? AppColors.blue500
-              : AppColors.textPrimary,
+          color: isFavorite ? AppColors.blue500 : AppColors.textPrimary,
         ),
       ),
     );
@@ -839,28 +703,18 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
 
       for (final folder in result) {
         FavoritePlaceStore.ensureFolder(folder);
-        FavoritePlaceStore.addToFolder(
-          folder,
-          place,
-        );
+        FavoritePlaceStore.addToFolder(folder, place);
       }
 
       for (final folder in oldFolders.difference(result)) {
-        FavoritePlaceStore.removeFromFolder(
-          folder,
-          place,
-        );
+        FavoritePlaceStore.removeFromFolder(folder, place);
       }
 
-      _favoriteFolders =
-          FavoritePlaceStore.folderNames;
+      _favoriteFolders = FavoritePlaceStore.folderNames;
     });
   }
 
-  Widget _circleButton(
-      IconData icon,
-      VoidCallback onTap,
-      ) {
+  Widget _circleButton(IconData icon, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(22),
@@ -882,16 +736,11 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
           ],
         ),
 
-        child: Icon(
-          icon,
-          size: 20,
-          color: AppColors.textPrimary,
-        ),
+        child: Icon(icon, size: 20, color: AppColors.textPrimary),
       ),
     );
   }
 }
-
 
 class _FavoriteFolderSheet extends StatefulWidget {
   final List<String> folders;
@@ -929,9 +778,7 @@ class _FavoriteFolderSheetState extends State<_FavoriteFolderSheet> {
         return Container(
           decoration: const BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.vertical(
-              top: Radius.circular(30),
-            ),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
           ),
           child: Column(
             children: [
@@ -949,15 +796,12 @@ class _FavoriteFolderSheetState extends State<_FavoriteFolderSheet> {
               const SizedBox(height: 16),
 
               Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
                   children: [
                     const Expanded(
                       child: Column(
-                        crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Thêm vào Ưa thích',
@@ -981,9 +825,7 @@ class _FavoriteFolderSheetState extends State<_FavoriteFolderSheet> {
 
                     IconButton(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(
-                        Icons.close_rounded,
-                      ),
+                      icon: const Icon(Icons.close_rounded),
                     ),
                   ],
                 ),
@@ -994,16 +836,9 @@ class _FavoriteFolderSheetState extends State<_FavoriteFolderSheet> {
               Expanded(
                 child: ListView(
                   controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(
-                    20,
-                    0,
-                    20,
-                    18,
-                  ),
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
                   children: [
-                    ..._folders.map(
-                          (folder) => _folderTile(folder),
-                    ),
+                    ..._folders.map((folder) => _folderTile(folder)),
 
                     const SizedBox(height: 8),
 
@@ -1015,9 +850,7 @@ class _FavoriteFolderSheetState extends State<_FavoriteFolderSheet> {
                         decoration: BoxDecoration(
                           color: AppColors.blue50.withOpacity(0.45),
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: AppColors.blue100,
-                          ),
+                          border: Border.all(color: AppColors.blue100),
                         ),
                         child: const Row(
                           children: [
@@ -1036,10 +869,7 @@ class _FavoriteFolderSheetState extends State<_FavoriteFolderSheet> {
                                 ),
                               ),
                             ),
-                            Icon(
-                              Icons.add_rounded,
-                              color: AppColors.blue500,
-                            ),
+                            Icon(Icons.add_rounded, color: AppColors.blue500),
                           ],
                         ),
                       ),
@@ -1049,12 +879,7 @@ class _FavoriteFolderSheetState extends State<_FavoriteFolderSheet> {
               ),
 
               Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  20,
-                  8,
-                  20,
-                  18,
-                ),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
                 child: SafeArea(
                   top: false,
                   child: SizedBox(
@@ -1062,10 +887,7 @@ class _FavoriteFolderSheetState extends State<_FavoriteFolderSheet> {
                     height: 50,
                     child: ElevatedButton(
                       onPressed: () {
-                        Navigator.pop(
-                          context,
-                          Set<String>.from(_selected),
-                        );
+                        Navigator.pop(context, Set<String>.from(_selected));
                       },
                       style: ElevatedButton.styleFrom(
                         elevation: 0,
@@ -1113,14 +935,10 @@ class _FavoriteFolderSheetState extends State<_FavoriteFolderSheet> {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: selected
-                ? AppColors.blue50
-                : const Color(0xFFF8FAFB),
+            color: selected ? AppColors.blue50 : const Color(0xFFF8FAFB),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: selected
-                  ? AppColors.blue300
-                  : Colors.transparent,
+              color: selected ? AppColors.blue300 : Colors.transparent,
             ),
           ),
           child: Row(
@@ -1133,9 +951,7 @@ class _FavoriteFolderSheetState extends State<_FavoriteFolderSheet> {
                   borderRadius: BorderRadius.circular(13),
                 ),
                 child: Icon(
-                  selected
-                      ? Icons.folder_rounded
-                      : Icons.folder_outlined,
+                  selected ? Icons.folder_rounded : Icons.folder_outlined,
                   color: AppColors.blue500,
                 ),
               ),
@@ -1157,15 +973,15 @@ class _FavoriteFolderSheetState extends State<_FavoriteFolderSheet> {
                 duration: const Duration(milliseconds: 160),
                 child: selected
                     ? const Icon(
-                  Icons.check_circle_rounded,
-                  key: ValueKey('selected'),
-                  color: AppColors.blue500,
-                )
+                        Icons.check_circle_rounded,
+                        key: ValueKey('selected'),
+                        color: AppColors.blue500,
+                      )
                     : const Icon(
-                  Icons.circle_outlined,
-                  key: ValueKey('empty'),
-                  color: AppColors.blue200,
-                ),
+                        Icons.circle_outlined,
+                        key: ValueKey('empty'),
+                        color: AppColors.blue200,
+                      ),
               ),
             ],
           ),
@@ -1186,17 +1002,12 @@ class _FavoriteFolderSheetState extends State<_FavoriteFolderSheet> {
             controller: controller,
             autofocus: true,
             textInputAction: TextInputAction.done,
-            decoration: const InputDecoration(
-              hintText: 'Tên thư mục',
-            ),
+            decoration: const InputDecoration(hintText: 'Tên thư mục'),
             onSubmitted: (value) {
               final result = value.trim();
 
               if (result.isNotEmpty) {
-                Navigator.pop(
-                  dialogContext,
-                  result,
-                );
+                Navigator.pop(dialogContext, result);
               }
             },
           ),
@@ -1212,10 +1023,7 @@ class _FavoriteFolderSheetState extends State<_FavoriteFolderSheet> {
                 final result = controller.text.trim();
 
                 if (result.isNotEmpty) {
-                  Navigator.pop(
-                    dialogContext,
-                    result,
-                  );
+                  Navigator.pop(dialogContext, result);
                 }
               },
               child: const Text('Tạo'),
@@ -1227,9 +1035,7 @@ class _FavoriteFolderSheetState extends State<_FavoriteFolderSheet> {
 
     controller.dispose();
 
-    if (name == null ||
-        name.isEmpty ||
-        _folders.contains(name)) {
+    if (name == null || name.isEmpty || _folders.contains(name)) {
       return;
     }
 

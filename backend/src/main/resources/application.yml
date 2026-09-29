@@ -12,7 +12,14 @@ spring:
     password: ${DB_PASSWORD}
   sql:
     init:
-      mode: always
+      mode: never
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+    baseline-description: Auth current schema baseline
+    locations: classpath:db/migration
+    validate-on-migrate: true
   jackson:
     deserialization:
       fail-on-unknown-properties: true
@@ -21,6 +28,21 @@ app:
     enabled: ${FIREBASE_ENABLED:false}
     project-id: ${FIREBASE_PROJECT_ID:}
     credentials-path: ${GOOGLE_APPLICATION_CREDENTIALS:}
+  cloudinary:
+    enabled: ${CLOUDINARY_ENABLED:false}
+    url: ${CLOUDINARY_URL:}
+  place:
+    seed:
+      enabled: ${PLACE_SEED_ENABLED:false}
+      path: ${PLACE_SEED_PATH:classpath:data/place_seed_dalat.csv}
+      limit: ${PLACE_SEED_LIMIT:10}
+      cloudinary-folder-prefix: ${PLACE_SEED_CLOUDINARY_FOLDER_PREFIX:gomate/dev/places}
+      media-retry-attempts: ${PLACE_SEED_MEDIA_RETRY_ATTEMPTS:3}
+      media-retry-delay-ms: ${PLACE_SEED_MEDIA_RETRY_DELAY_MS:10000}
+      remote-image-user-agent: "${PLACE_SEED_REMOTE_IMAGE_USER_AGENT:GoMateMediaImporter/1.0 (local development; contact: gomate-local@example.com)}"
+      remote-image-timeout-ms: ${PLACE_SEED_REMOTE_IMAGE_TIMEOUT_MS:20000}
+      remote-image-max-bytes: ${PLACE_SEED_REMOTE_IMAGE_MAX_BYTES:8388608}
+      exit-after-run: ${PLACE_SEED_EXIT_AFTER_RUN:false}
   jwt-secret: ${JWT_SECRET}
   issuer: gomate-api
   access-token-seconds: 900

@@ -19,9 +19,10 @@ GoMate/
 - Mobile: Flutter.
 - Auth dang hoat dong: email/password, refresh token, logout, change password, Google sign-in auto-register/auto-link extension, `GET /users/me`, onboarding dang luu trong `user_settings`.
 - Database runtime hien tai van la 4 bang auth dang chay: `users`, `user_profiles`, `user_settings`, `refresh_sessions`.
+- Database schema da chuyen sang Flyway baseline V1 tai `backend/src/main/resources/db/migration/V1__auth_current_baseline.sql`.
 - Tai lieu chuan cua du an da nam trong `AGENTS.md` va `docs/`.
 
-Chua chuyen sang Flyway trong lan refactor nay de tranh tron thay doi cau truc thu muc voi thay doi schema/business. Canonical target van duoc ghi trong `docs/DATABASE_CONTRACT.md`.
+V1 hien tai chi baseline Auth dang chay; chua tao Place trong buoc nay. Canonical target van duoc ghi trong `docs/DATABASE_CONTRACT.md`.
 
 ## Chay backend bang Docker
 
@@ -61,16 +62,11 @@ password: xem file .env o root
 
 Khong dung `docker compose down -v` neu muon giu du lieu.
 
-## Du lieu demo
+## Du lieu local
 
-`backend/src/main/resources/data.sql` seed du lieu mau idempotent khi backend khoi dong voi PostgreSQL:
+Repo hien khong co `data.sql` auto-seed. Tai khoan local duoc tao qua register/login flow, hoac ton tai san trong Docker volume cua tung may.
 
-| Email | Mat khau | Vai tro |
-|---|---|---|
-| `admin@gomate.local` | `GoMate123!` | `ADMIN` |
-| `demo@gomate.local` | `GoMate123!` | `USER` |
-
-Seed nay khong chay trong profile test, de test backend van dung database sach.
+Khi clone tren may moi, Flyway se tu tao 4 bang Auth tu V1 tren database sach. Khong copy Docker volume giua cac may.
 
 ## Chay Flutter
 

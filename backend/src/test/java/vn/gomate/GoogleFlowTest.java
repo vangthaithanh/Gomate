@@ -13,9 +13,11 @@ class GoogleFlowTest {
  @Autowired AuthService auth; @Autowired Db db;
  FirebaseGoogleVerifier.Identity identity() {String id=UUID.randomUUID().toString();return new FirebaseGoogleVerifier.Identity("firebase-"+id,id,id+"@example.com","Google Test");}
  @SuppressWarnings("unchecked") UUID uid(Map<String,Object> session) {return (UUID)((Map<String,Object>)session.get("user")).get("id");}
- @Test void exactlyFourTables() {
+ @Test void hasAuthBusinessTables() {
   var tables=db.list("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'",Map.of());
-  assertEquals(Set.of("users","user_profiles","user_settings","refresh_sessions"),new HashSet<>(tables.stream().map(t->(String)t.get("tableName")).toList()));
+  var allTables=new HashSet<>(tables.stream().map(t->(String)t.get("tableName")).toList());
+  var authTables=Set.of("users","user_profiles","user_settings","refresh_sessions");
+  assertTrue(allTables.containsAll(authTables));
  }
  @Test void googleCreatesAndReusesAccount() {
   var identity=identity();var first=auth.google(identity);UUID id=uid(first);

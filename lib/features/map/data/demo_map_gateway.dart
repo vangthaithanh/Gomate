@@ -1,5 +1,3 @@
-import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
-
 import '../models/map_member.dart';
 import '../models/map_place.dart';
 import '../models/map_route.dart';
@@ -15,8 +13,8 @@ class DemoGoMateMapGateway implements GoMateMapGateway {
   DemoGoMateMapGateway({
     DemoPlaceDataSource? places,
     SpringRouteService? routes,
-  })  : _places = places ?? DemoPlaceDataSource(),
-        _routes = routes ?? const SpringRouteService();
+  }) : _places = places ?? DemoPlaceDataSource(),
+       _routes = routes ?? const SpringRouteService();
 
   @override
   Future<List<GoMateMapPlace>> loadPlaces({
@@ -33,11 +31,15 @@ class DemoGoMateMapGateway implements GoMateMapGateway {
 
   @override
   Future<GoMateMapRoute> loadDirections({
-    required Position origin,
+    String? originPlaceId,
+    double? originLatitude,
+    double? originLongitude,
     required String destinationPlaceId,
   }) {
     return _routes.calculateDirections(
-      origin: origin,
+      originPlaceId: originPlaceId,
+      originLatitude: originLatitude,
+      originLongitude: originLongitude,
       destinationPlaceId: destinationPlaceId,
     );
   }
@@ -45,9 +47,7 @@ class DemoGoMateMapGateway implements GoMateMapGateway {
   @override
   Future<GoMateMapRoute> loadTripRoute(String tripId) async {
     try {
-      return await _routes.calculate(
-        placeIds: demoTripStopIds,
-      );
+      return await _routes.calculate(placeIds: demoTripStopIds);
     } catch (e) {
       final stops = <GoMateMapPlace>[];
       for (final id in demoTripStopIds) {

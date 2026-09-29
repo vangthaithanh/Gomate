@@ -1,4 +1,3 @@
-
 class MapPlaceUi {
   final String id;
   final String name;
@@ -12,6 +11,8 @@ class MapPlaceUi {
   final int likeCount;
   final List<String> tags;
   final String? imageAsset;
+  final String? imageUrl;
+  final List<String> mediaUrls;
 
   const MapPlaceUi({
     required this.id,
@@ -26,5 +27,7 @@ class MapPlaceUi {
     required this.likeCount,
     required this.tags,
     this.imageAsset,
+    this.imageUrl,
+    this.mediaUrls = const <String>[],
   });
 }

@@ -15,10 +15,13 @@ Codex always reads root `AGENTS.md`.
 | PostgreSQL/Flyway/schema/index/seed | `DATABASE_CONTRACT.md` |
 | Flutter API integration/router/network/storage | `PROJECT_CONTRACT.md` + feature-specific current code |
 | Place/search/review/save | `PROJECT_CONTRACT.md` + `DATABASE_CONTRACT.md` |
+| Place catalog/data alignment | `PROJECT_CONTRACT.md` + `DATABASE_CONTRACT.md` + `PLACE_CATALOG_V11_ALIGNMENT.md` + `PLACE_DB_ALIGNMENT_DALAT_ENRICHMENT.md` + `PLACE_CATALOG_V11_COMPLETION.md` when V11 catalog/import status matters |
+| Place media/Cloudinary seed | `DATABASE_CONTRACT.md` + `PLACE_CATALOG_V11_COMPLETION.md` + `PLACE_MEDIA_COMPLETION.md` + `PLACE_SEED_CLOUDINARY_IMPORT.md` |
+| Map/place/routing | `PROJECT_CONTRACT.md` + `DATABASE_CONTRACT.md` + relevant map/place step note |
 | Trip/group/invite/location/check-in | `PROJECT_CONTRACT.md` + `DATABASE_CONTRACT.md` |
 | Social/follow/post/chat | `PROJECT_CONTRACT.md` + `DATABASE_CONTRACT.md` |
 | Notification/FCM | `PROJECT_CONTRACT.md` + `DATABASE_CONTRACT.md` |
-| AI/recommendation | `PROJECT_CONTRACT.md` + `ROADMAP_AND_DONE.md` |
+| AI/recommendation | `PROJECT_CONTRACT.md` + `ROADMAP_AND_DONE.md` + `PLACE_CATALOG_V11_COMPLETION.md` when recommending Places |
 | Sprint planning / what to build next | `ROADMAP_AND_DONE.md` |
 | Acceptance, demo, code freeze | `ROADMAP_AND_DONE.md` |
 

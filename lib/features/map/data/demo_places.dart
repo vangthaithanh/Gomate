@@ -2,7 +2,13 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 import '../models/map_place.dart';
 
-/// DATA CỨNG CHỈ DÙNG CHO GIAI ĐOẠN TEST MAP FOUNDATION.
+/// Deprecated: DATA CỨNG CHỈ DÙNG CHO GIAI ĐOẠN TEST MAP FOUNDATION.
+///
+/// Map explore/search/detail hiện dùng Place API thật qua
+/// SpringPostgresPlaceDataSource. Giữ file này tạm thời cho các màn/luồng demo
+/// cũ chưa được thay.
+///
+/// Không thêm dependency mới vào `demoPlaces` cho dữ liệu production.
 ///
 /// Production theo GOMATE_MAP_ARCHITECTURE_ROADMAP.md:
 /// Flutter -> Spring Boot -> PostgreSQL places -> Place DTO -> marker.
@@ -98,6 +104,28 @@ final List<GoMateMapPlace> demoPlaces = [
     category: GoMatePlaceCategory.attraction,
     position: Position(108.4298, 11.9302),
   ),
+  GoMateMapPlace(
+    placeId: 'place-109',
+    name: 'Thung lũng Tình Yêu',
+    categoryLabel: 'Thiên nhiên',
+    address: 'Mai Anh Đào, Phường 8, Đà Lạt',
+    rating: 4.4,
+    reviewCount: 1260,
+    isSaved: false,
+    category: GoMatePlaceCategory.nature,
+    position: Position(108.4505, 11.9803),
+  ),
+  GoMateMapPlace(
+    placeId: 'place-110',
+    name: 'Đồi chè Cầu Đất',
+    categoryLabel: 'Thiên nhiên',
+    address: 'Cầu Đất, Xuân Trường, Đà Lạt',
+    rating: 4.7,
+    reviewCount: 1840,
+    isSaved: false,
+    category: GoMatePlaceCategory.nature,
+    position: Position(108.5763, 11.9173),
+  ),
 ];
 
 /// Thứ tự Trip test.
@@ -108,4 +136,5 @@ const List<String> demoTripStopIds = [
   'place-101',
   'place-102',
   'place-107',
+  'place-109',
 ];

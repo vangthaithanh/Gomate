@@ -93,10 +93,7 @@ class GoMateDirectionsRouteSheet extends StatelessWidget {
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 11,
-                vertical: 9,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
               decoration: BoxDecoration(
                 color: scheme.primaryContainer.withOpacity(.75),
                 borderRadius: BorderRadius.circular(12),
@@ -111,14 +108,11 @@ class GoMateDirectionsRouteSheet extends StatelessWidget {
                   const SizedBox(width: 7),
                   Expanded(
                     child: Text(
-                      'Chạm lên bản đồ để chọn điểm bắt đầu mới.',
-                      style: Theme.of(context)
-                          .textTheme
-                          .labelMedium
-                          ?.copyWith(
-                            color: scheme.onPrimaryContainer,
-                            fontWeight: FontWeight.w700,
-                          ),
+                      'Chạm một marker để chọn điểm bắt đầu mới.',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: scheme.onPrimaryContainer,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
@@ -131,23 +125,16 @@ class GoMateDirectionsRouteSheet extends StatelessWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: onChooseOrigin,
-                  icon: const Icon(
-                    Icons.edit_location_alt_rounded,
-                    size: 18,
-                  ),
+                  icon: const Icon(Icons.edit_location_alt_rounded, size: 18),
                   label: const Text('Đổi điểm đầu'),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: FilledButton.icon(
-                  onPressed:
-                      originIsCurrentLocation ? null : onUseCurrentLocation,
-                  icon: const Icon(
-                    Icons.my_location_rounded,
-                    size: 18,
-                  ),
-                  label: const Text('Vị trí của tôi'),
+                  onPressed: onUseCurrentLocation,
+                  icon: const Icon(Icons.my_location_rounded, size: 18),
+                  label: const Text('Vị trí tôi'),
                 ),
               ),
             ],
@@ -185,18 +172,14 @@ class _LocationRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: Theme.of(context).textTheme.labelSmall,
-              ),
+              Text(title, style: Theme.of(context).textTheme.labelSmall),
               Text(
                 value,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context)
-                    .textTheme
-                    .labelLarge
-                    ?.copyWith(fontWeight: FontWeight.w700),
+                style: Theme.of(
+                  context,
+                ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
             ],
           ),
