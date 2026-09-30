@@ -14,15 +14,18 @@ Set-Location $RepoRoot
 
 function Require-Command {
   param([string]$Name)
+
   $command = Get-Command $Name -ErrorAction SilentlyContinue
   if (-not $command) {
     throw "Khong tim thay lenh '$Name' trong PATH."
   }
+
   return $command.Source
 }
 
 function Find-Adb {
   $defaultAdb = Join-Path $env:LOCALAPPDATA "Android\sdk\platform-tools\adb.exe"
+
   if (Test-Path $defaultAdb) {
     return $defaultAdb
   }
@@ -42,6 +45,7 @@ function Get-ConnectedDevice {
   )
 
   $lines = & $AdbPath devices | Select-Object -Skip 1
+
   $devices = @(
     $lines |
       Where-Object { $_ -match "\tdevice$" } |
@@ -53,6 +57,7 @@ function Get-ConnectedDevice {
       $known = if ($devices.Count -gt 0) { $devices -join ", " } else { "(khong co device nao)" }
       throw "Khong thay Android device '$RequestedDeviceId'. Device dang ket noi: $known"
     }
+
     return $RequestedDeviceId
   }
 
@@ -79,9 +84,11 @@ function Get-HostLanIp {
 
   foreach ($route in $routes) {
     $adapter = Get-NetAdapter -InterfaceIndex $route.InterfaceIndex -ErrorAction SilentlyContinue
+
     if (-not $adapter -or $adapter.Status -ne "Up") {
       continue
     }
+
     if ($adapter.Name -match $virtualNamePattern -or $adapter.InterfaceDescription -match $virtualNamePattern) {
       continue
     }
@@ -89,6 +96,7 @@ function Get-HostLanIp {
     $ip = Get-NetIPAddress -AddressFamily IPv4 -InterfaceIndex $route.InterfaceIndex -ErrorAction SilentlyContinue |
       Where-Object { $_.IPAddress -notmatch "^(127\.|169\.254\.)" } |
       Select-Object -First 1
+
     if ($ip) {
       return $ip.IPAddress
     }
@@ -109,30 +117,46 @@ function Get-HostLanIp {
 }
 
 Require-Command "flutter" | Out-Null
+Require-Command "docker" | Out-Null
+
 $adbPath = Find-Adb
 $device = Get-ConnectedDevice -AdbPath $adbPath -RequestedDeviceId $DeviceId
 
 if (-not $NoDockerStart) {
-  Write-Host "Starting Docker services..."
+  Write-Host "Building and starting Docker services: postgres + ai + api..."
   $env:API_PORT = "$ApiPort"
-  docker compose up -d --build
+
+  docker compose build ai api
+  docker compose up -d postgres ai api
 }
 
 $healthUrl = "http://localhost:$ApiPort/api/v1/health"
+
 try {
   $health = Invoke-RestMethod -Uri $healthUrl -TimeoutSec 8
   Write-Host "Backend health on host: $($health.status)"
 } catch {
-  Write-Warning "Chua goi duoc $healthUrl. Hay kiem tra docker compose ps/logs neu app van bao loi ket noi."
+  Write-Warning "Chua goi duoc $healthUrl. Hay kiem tra docker compose ps/logs api neu app van bao loi ket noi."
+}
+
+$aiHealthUrl = "http://localhost:8000/health"
+
+try {
+  $aiHealth = Invoke-RestMethod -Uri $aiHealthUrl -TimeoutSec 8
+  Write-Host "KPDL AI health on host: $($aiHealth.status), modelVersion=$($aiHealth.modelVersion)"
+} catch {
+  Write-Warning "Chua goi duoc $aiHealthUrl. Hay kiem tra docker compose ps/logs ai."
 }
 
 $lanIp = Get-HostLanIp -ExplicitHostIp $HostIp
 $apiBaseUrl = "http://${lanIp}:$ApiPort/api/v1"
+
 $fallbackUrls = @(
   $apiBaseUrl,
   "http://127.0.0.1:$ApiPort/api/v1",
   "http://10.0.2.2:$ApiPort/api/v1"
 )
+
 $apiBaseUrls = $fallbackUrls -join ","
 
 Write-Host "Android device: $device"
@@ -148,6 +172,7 @@ if ($ApiPort -ne 8080) {
 
 try {
   & $adbPath -s $device reverse "tcp:$ApiPort" "tcp:$ApiPort" | Out-Host
+
   Write-Host "ADB reverse fallback:"
   & $adbPath -s $device reverse --list | Out-Host
 } catch {
@@ -156,9 +181,11 @@ try {
 
 if ($InstallOnly) {
   Write-Host "Building debug APK with API_BASE_URLS=$apiBaseUrls"
+
   flutter build apk --debug "--dart-define=API_BASE_URLS=$apiBaseUrls"
 
   $apkPath = Join-Path $RepoRoot "build\app\outputs\flutter-apk\app-debug.apk"
+
   Write-Host "Installing $apkPath"
   & $adbPath -s $device install -r $apkPath | Out-Host
 
@@ -166,5 +193,6 @@ if ($InstallOnly) {
   & $adbPath -s $device shell monkey -p $ApplicationId -c android.intent.category.LAUNCHER 1 | Out-Host
 } else {
   Write-Host "Running Flutter with API_BASE_URLS=$apiBaseUrls"
+
   flutter run -d $device "--dart-define=API_BASE_URLS=$apiBaseUrls"
 }
