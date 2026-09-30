@@ -49,6 +49,8 @@ app:
   refresh-token-days: 30
   cors-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:5173}
   auth-requests-per-minute: 20
+  ai:
+    recommendation-url: ${AI_RECOMMENDATION_URL:http://localhost:8000}
 springdoc:
   swagger-ui:
     persist-authorization: false

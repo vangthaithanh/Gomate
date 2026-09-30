@@ -166,6 +166,9 @@ class _SurveyScreenState extends State<SurveyScreen>
   // ============================================================
 
   void _skip() {
+    for (final selected in _selectedOptions.values) {
+      selected.clear();
+    }
     _goToHome();
   }
 
@@ -174,8 +177,32 @@ class _SurveyScreenState extends State<SurveyScreen>
   // ============================================================
 
   bool _saving = false;
+
+  bool get _hasAnsweredAllPages {
+    for (var page = 0; page < _questions.length; page++) {
+      if (_selectedOptions[page]!.isEmpty) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   Future<void> _goToHome() async {
     if (_saving) return;
+
+    final skipAll = _selectedOptions.values.every((selected) {
+      return selected.isEmpty;
+    });
+
+    if (!skipAll && !_hasAnsweredAllPages) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng chọn đủ 3 nhóm câu hỏi hoặc bấm Bỏ qua.'),
+        ),
+      );
+      return;
+    }
+
     _saving = true;
     const codes = [
       [
@@ -206,11 +233,13 @@ class _SurveyScreenState extends State<SurveyScreen>
     ];
     try {
       final selected = <String>[];
-      for (var page = 0; page < codes.length; page++) {
-        final options = _questions[page].options;
-        for (final value in _selectedOptions[page]!) {
-          final index = options.indexOf(value);
-          if (index >= 0) selected.add(codes[page][index]);
+      if (!skipAll) {
+        for (var page = 0; page < codes.length; page++) {
+          final options = _questions[page].options;
+          for (final value in _selectedOptions[page]!) {
+            final index = options.indexOf(value);
+            if (index >= 0) selected.add(codes[page][index]);
+          }
         }
       }
       await AuthService.instance.saveOnboarding(selected);

@@ -31,6 +31,7 @@ services:
       MAPBOX_SERVER_TOKEN: ${MAPBOX_SERVER_TOKEN:-}
       CLOUDINARY_ENABLED: ${CLOUDINARY_ENABLED:-false}
       CLOUDINARY_URL: ${CLOUDINARY_URL:-}
+      AI_RECOMMENDATION_URL: http://host.docker.internal:8000
     ports:
       - "${API_PORT:-8081}:8080"
     volumes:

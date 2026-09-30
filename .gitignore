@@ -60,3 +60,9 @@ app.*.map.json
 /backend/secrets/*.json
 !/backend/secrets/README.md
 lib/main.dart
+KPDL/.venv/
+KPDL/.venv_ai/
+KPDL/__pycache__/
+KPDL/.pytest_cache/
+*.pyc
+KPDL/.venv_local/

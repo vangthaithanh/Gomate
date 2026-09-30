@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../recommendation/data/recommendation_repository.dart';
+import '../../recommendation/models/recommendation_models.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -47,6 +49,21 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
   ];
 
+  final RecommendationRepository _recommendations = RecommendationRepository();
+  late Future<RecommendationResponse> _recommendationsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _recommendationsFuture = _recommendations.getMine(topK: 10);
+  }
+
+  void _reloadRecommendations() {
+    setState(() {
+      _recommendationsFuture = _recommendations.getMine(topK: 10);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -88,7 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: 12),
 
-              _buildMainFeatureCard(),
+              _buildRecommendationSection(),
 
               const SizedBox(height: 24),
 
@@ -458,128 +475,402 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ============================================================
-  // FEATURE CARD
+  // RECOMMENDATIONS FROM KPDL MODEL
   // ============================================================
 
-  Widget _buildMainFeatureCard() {
+  Widget _buildRecommendationSection() {
+    return FutureBuilder<RecommendationResponse>(
+      future: _recommendationsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildRecommendationLoading();
+        }
+
+        if (snapshot.hasError) {
+          return _buildRecommendationError(snapshot.error);
+        }
+
+        final data = snapshot.data;
+        if (data == null || data.items.isEmpty) {
+          return _buildRecommendationEmpty();
+        }
+
+        return _buildRecommendationList(data);
+      },
+    );
+  }
+
+  Widget _buildRecommendationLoading() {
     return Container(
       width: double.infinity,
 
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(18),
 
       decoration: BoxDecoration(
         color: AppColors.blue50.withOpacity(0.45),
         borderRadius: BorderRadius.circular(24),
       ),
 
-      child: Column(
+      child: const Row(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(20),
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2.6),
+          ),
 
-            child: SizedBox(
-              width: double.infinity,
-              height: 188,
+          SizedBox(width: 12),
 
-              child: const _SafeAssetImage(
-                path: 'assets/images/home_feature.jpg',
-                fit: BoxFit.cover,
-                fallbackIcon: Icons.travel_explore_rounded,
+          Expanded(
+            child: Text(
+              'Đang tải địa điểm đề xuất từ KPDL...',
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
 
-          const SizedBox(height: 14),
-
+  Widget _buildRecommendationError(Object? error) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.blue50.withOpacity(0.45),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           const Text(
-            'Night Mood',
-            textAlign: TextAlign.center,
-
+            'Chưa tải được gợi ý',
             style: TextStyle(
-              fontSize: 18,
-              height: 1.2,
+              fontSize: 16,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,
             ),
           ),
 
-          const SizedBox(height: 7),
+          const SizedBox(height: 6),
 
-          const Text(
-            'Một chuyến đi nhẹ nhàng, nhiều khoảnh khắc đẹp và lịch trình vừa đủ.',
-            textAlign: TextAlign.center,
-
-            style: TextStyle(
+          Text(
+            error?.toString() ??
+                'Kiểm tra backend và KPDL AI service đã chạy chưa.',
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
               fontSize: 13,
-              height: 1.45,
+              height: 1.4,
               color: AppColors.textSecondary,
             ),
           ),
 
           const SizedBox(height: 14),
 
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-
-            children: [
-              _buildInfoChip(
-                icon: Icons.place_outlined,
-                text: 'Đà Lạt',
-              ),
-
-              const SizedBox(width: 8),
-
-              _buildInfoChip(
-                icon: Icons.schedule_rounded,
-                text: '2N1Đ',
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
           SizedBox(
-            width: double.infinity,
-            height: 48,
-
-            child: ElevatedButton(
-              onPressed: () {},
-
+            height: 42,
+            child: ElevatedButton.icon(
+              onPressed: _reloadRecommendations,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text(
+                'Thử lại',
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+              ),
               style: ElevatedButton.styleFrom(
                 elevation: 0,
                 backgroundColor: AppColors.blue500,
                 foregroundColor: Colors.white,
-
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(21),
                 ),
-              ),
-
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-
-                children: [
-                  Text(
-                    'Xem gợi ý',
-
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-
-                  SizedBox(width: 7),
-
-                  Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 19,
-                  ),
-                ],
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildRecommendationEmpty() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.blue50.withOpacity(0.45),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Chưa có địa điểm phù hợp',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+
+          SizedBox(height: 6),
+
+          Text(
+            'Backend chưa trả địa điểm hiển thị. Kiểm tra dữ liệu places active hoặc log map externalId.',
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.4,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecommendationList(RecommendationResponse data) {
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.blue50.withOpacity(0.45),
+            borderRadius: BorderRadius.circular(22),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 20,
+                  color: AppColors.blue500,
+                ),
+              ),
+
+              const SizedBox(width: 10),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Model ${data.modelVersion} đang đề xuất',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+
+                    const SizedBox(height: 2),
+
+                    Text(
+                      data.scoringMode == null
+                          ? 'Dựa trên 3 nhóm câu hỏi đã chọn'
+                          : 'Chế độ: ${data.scoringMode}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              IconButton(
+                onPressed: _reloadRecommendations,
+                icon: const Icon(Icons.refresh_rounded),
+                color: AppColors.blue500,
+                tooltip: 'Tải lại gợi ý',
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        ...data.items.take(5).map(
+              (place) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildRecommendedPlaceCard(place),
+              ),
+            ),
+      ],
+    );
+  }
+
+  Widget _buildRecommendedPlaceCard(RecommendedPlace place) {
+    final scorePercent = (place.score * 100).clamp(0, 100).round();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.blue100.withOpacity(0.65)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.035),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: SizedBox(
+              width: 96,
+              height: 104,
+              child: _buildPlaceImage(place),
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  place.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    height: 1.25,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+
+                const SizedBox(height: 5),
+
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.location_on_outlined,
+                      size: 14,
+                      color: AppColors.blue500,
+                    ),
+
+                    const SizedBox(width: 4),
+
+                    Expanded(
+                      child: Text(
+                        place.locationText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 7),
+
+                Text(
+                  place.displayReason,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    height: 1.35,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                Wrap(
+                  spacing: 7,
+                  runSpacing: 7,
+                  children: [
+                    _buildInfoChip(
+                      icon: Icons.category_outlined,
+                      text: place.displayCategory,
+                    ),
+                    if (place.rating > 0)
+                      _buildInfoChip(
+                        icon: Icons.star_rounded,
+                        text: place.rating.toStringAsFixed(1),
+                      ),
+                    _buildInfoChip(
+                      icon: Icons.percent_rounded,
+                      text: '$scorePercent%',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlaceImage(RecommendedPlace place) {
+    final url = place.thumbnailUrl;
+    if (url == null) {
+      return Container(
+        color: AppColors.blue50,
+        alignment: Alignment.center,
+        child: const Icon(
+          Icons.place_rounded,
+          size: 30,
+          color: AppColors.blue300,
+        ),
+      );
+    }
+
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      cacheWidth: 360,
+      filterQuality: FilterQuality.medium,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          color: AppColors.blue50,
+          alignment: Alignment.center,
+          child: const Icon(
+            Icons.place_rounded,
+            size: 30,
+            color: AppColors.blue300,
+          ),
+        );
+      },
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return Container(
+          color: AppColors.blue50,
+          alignment: Alignment.center,
+          child: const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2.3),
+          ),
+        );
+      },
     );
   }
 
