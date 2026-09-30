@@ -31,7 +31,7 @@ services:
       MAPBOX_SERVER_TOKEN: ${MAPBOX_SERVER_TOKEN:-}
       CLOUDINARY_ENABLED: ${CLOUDINARY_ENABLED:-false}
       CLOUDINARY_URL: ${CLOUDINARY_URL:-}
-      AI_RECOMMENDATION_URL: http://host.docker.internal:8000
+      AI_RECOMMENDATION_URL: http://ai:8000
     ports:
       - "${API_PORT:-8081}:8080"
     volumes:
@@ -39,6 +39,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    restart: unless-stopped
+  ai:
+    build: ./KPDL
+    ports:
+      - "8000:8000"
     restart: unless-stopped
 volumes:
   postgres_data:
