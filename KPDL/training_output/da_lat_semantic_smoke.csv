@@ -1,0 +1,42 @@
+﻿external_id,canonical_name,destination_key,category,semantic_status,runtime_eligible,selected_interest_codes,unmapped_interest_codes,semantic_score,semantic_score_upper,semantic_coverage,semantic_signal_available
+da_lat:doi_che_cau_dat,Đồi Chè Cầu Đất,da_lat,nature,READY,True,THIEN_NHIEN,,0.4416666666666667,0.4416666666666667,1.0,True
+da_lat:thac_bobla,Thác Bobla,da_lat,nature,READY,True,THIEN_NHIEN,,0.4416666666666667,0.4416666666666667,1.0,True
+da_lat:thac_cam_ly,Thác Cam Ly,da_lat,nature,READY,True,THIEN_NHIEN,,0.4416666666666667,0.4416666666666667,1.0,True
+da_lat:thac_datanla,Thác Datanla,da_lat,nature,READY,True,THIEN_NHIEN,,0.4416666666666667,0.4416666666666667,1.0,True
+da_lat:thac_pongour,Thác Pongour,da_lat,nature,READY,True,THIEN_NHIEN,,0.4416666666666667,0.4416666666666667,1.0,True
+da_lat:thac_prenn,Thác Prenn,da_lat,nature,READY,True,THIEN_NHIEN,,0.4416666666666667,0.4416666666666667,1.0,True
+da_lat:thac_voi,Thác Voi,da_lat,nature,READY,True,THIEN_NHIEN,,0.4416666666666667,0.4416666666666667,1.0,True
+da_lat:ho_tuyen_lam,Hồ Tuyền Lâm,da_lat,lake,READY,True,THIEN_NHIEN,,0.43333333333333335,0.43333333333333335,1.0,True
+da_lat:ho_vo_cuc,Hồ Vô Cực,da_lat,lake,READY,True,THIEN_NHIEN,,0.43333333333333335,0.43333333333333335,1.0,True
+da_lat:ho_xuan_huong,Hồ Xuân Hương,da_lat,lake,READY,True,THIEN_NHIEN,,0.43333333333333335,0.43333333333333335,1.0,True
+da_lat:langbiang,Langbiang,da_lat,nature,READY,True,THIEN_NHIEN,,0.4166666666666667,0.4166666666666667,1.0,True
+da_lat:lang_cu_lan,Làng Cù Lần,da_lat,nature,READY,True,THIEN_NHIEN,,0.2833333333333333,0.2833333333333333,1.0,True
+da_lat:nac_thang_thien_duong,Nấc Thang Thiên Đường,da_lat,nature,PARTIAL,True,THIEN_NHIEN,,0.2833333333333333,0.95,0.33333333333333337,True
+da_lat:thung_lung_tinh_yeu,Thung Lũng Tình Yêu,da_lat,nature,READY,True,THIEN_NHIEN,,0.2833333333333333,0.2833333333333333,1.0,True
+da_lat:thung_lung_vang,Thung Lũng Vàng,da_lat,nature,READY,True,THIEN_NHIEN,,0.2833333333333333,0.2833333333333333,1.0,True
+da_lat:lang_hoa_van_thanh,Làng Hoa Vạn Thành,da_lat,landmark,READY,True,THIEN_NHIEN,,0.26666666666666666,0.26666666666666666,1.0,True
+da_lat:vuon_dau_da_lat,Vườn Dâu Đà Lạt,da_lat,landmark,READY,True,THIEN_NHIEN,,0.26666666666666666,0.26666666666666666,1.0,True
+da_lat:vuon_hoa_thanh_pho,Vườn Hoa Thành Phố,da_lat,landmark,READY,True,THIEN_NHIEN,,0.26666666666666666,0.26666666666666666,1.0,True
+da_lat:doi_mong_mo,Đồi Mộng Mơ,da_lat,landmark,READY,True,THIEN_NHIEN,,0.23333333333333336,0.23333333333333336,1.0,True
+da_lat:cafe_me_linh,Cafe Mê Linh,da_lat,food,READY,True,THIEN_NHIEN,,0.0,0.0,1.0,True
+da_lat:cho_da_lat,Chợ Đà Lạt,da_lat,market,READY,True,THIEN_NHIEN,,0.0,0.0,1.0,True
+da_lat:chua_linh_an,Chùa Linh Ẩn,da_lat,heritage,PARTIAL,True,THIEN_NHIEN,,0.0,1.0,0.0,False
+da_lat:chua_linh_phuoc,Chùa Linh Phước,da_lat,heritage,PARTIAL,True,THIEN_NHIEN,,0.0,1.0,0.0,False
+da_lat:chua_thien_vuong_co_sat,Chùa Thiên Vương Cổ Sát,da_lat,heritage,PARTIAL,True,THIEN_NHIEN,,0.0,1.0,0.0,False
+da_lat:crazy_house,Crazy House,da_lat,heritage,PARTIAL,True,THIEN_NHIEN,,0.0,1.0,0.0,False
+da_lat:dinh_bao_dai,Dinh Bảo Đại,da_lat,heritage,PARTIAL,True,THIEN_NHIEN,,0.0,1.0,0.0,False
+da_lat:dinh_i,Dinh I,da_lat,heritage,PARTIAL,True,THIEN_NHIEN,,0.0,1.0,0.0,False
+da_lat:duong_ham_dat_set,Đường Hầm Đất Sét,da_lat,landmark,PARTIAL,True,THIEN_NHIEN,,0.0,1.0,0.0,False
+da_lat:mongo_land,Mongo Land,da_lat,landmark,PARTIAL,True,THIEN_NHIEN,,0.0,1.0,0.0,False
+da_lat:nha_ga_da_lat,Nhà Ga Đà Lạt,da_lat,landmark,READY,True,THIEN_NHIEN,,0.0,0.0,1.0,True
+da_lat:nha_tho_domain_de_marie,Nhà Thờ Domain De Marie,da_lat,heritage,PARTIAL,True,THIEN_NHIEN,,0.0,1.0,0.0,False
+da_lat:quang_truong_lam_vien,Quảng Trường Lâm Viên,da_lat,landmark,READY,True,THIEN_NHIEN,,0.0,0.0,1.0,True
+da_lat:royal_garden,Royal Garden,da_lat,landmark,PARTIAL,True,THIEN_NHIEN,,0.0,1.0,0.0,False
+da_lat:samten_hills,Samten Hills,da_lat,landmark,PARTIAL,True,THIEN_NHIEN,,0.0,1.0,0.0,False
+da_lat:thien_vien_truc_lam,Thiền Viện Trúc Lâm,da_lat,heritage,PARTIAL,True,THIEN_NHIEN,,0.0,1.0,0.0,False
+da_lat:thien_vien_van_hanh,Thiền Viện Vạn Hạnh,da_lat,heritage,PARTIAL,True,THIEN_NHIEN,,0.0,1.0,0.0,False
+da_lat:trai_mat,Trại Mát,da_lat,landmark,PARTIAL,True,THIEN_NHIEN,,0.0,1.0,0.0,False
+da_lat:xuong_to_lua,Xưởng Tơ Lụa,da_lat,landmark,PARTIAL,True,THIEN_NHIEN,,0.0,1.0,0.0,False
+da_lat:happy_hill,Happy Hill,da_lat,food,NEED_REVIEW,True,THIEN_NHIEN,,,,0.0,False
+da_lat:nha_tho_con_ga,Nhà Thờ Con Gà,da_lat,lake,NEED_REVIEW,True,THIEN_NHIEN,,,,0.0,False
+da_lat:puppy_farm,Puppy Farm,da_lat,food,NEED_REVIEW,True,THIEN_NHIEN,,,,0.0,False

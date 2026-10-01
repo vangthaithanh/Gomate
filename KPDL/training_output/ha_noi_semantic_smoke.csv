@@ -1,0 +1,32 @@
+﻿external_id,canonical_name,destination_key,category,semantic_status,runtime_eligible,selected_interest_codes,unmapped_interest_codes,semantic_score,semantic_score_upper,semantic_coverage,semantic_signal_available
+ha_noi:ban_cat_cat,Bản Cát Cát,ha_noi,landmark,READY,True,AM_THUC,,0.07272727272727272,0.07272727272727272,1.0,True
+ha_noi:ban_lac,Bản Lác,ha_noi,landmark,READY,True,AM_THUC,,0.07272727272727272,0.07272727272727272,1.0,True
+ha_noi:lang_gom_bat_trang,Làng Gốm Bát Tràng,ha_noi,heritage,READY,True,AM_THUC,,0.07272727272727272,0.07272727272727272,1.0,True
+ha_noi:bao_tang_dan_toc_hoc,Bảo Tàng Dân Tộc Học,ha_noi,heritage,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+ha_noi:cau_the_huc,Cầu Thê Húc,ha_noi,landmark,READY,True,AM_THUC,,0.0,0.0,1.0,True
+ha_noi:chua_bai_dinh,Chùa Bái Đính,ha_noi,heritage,READY,True,AM_THUC,,0.0,0.0,1.0,True
+ha_noi:chua_huong,Chùa Hương,ha_noi,heritage,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+ha_noi:chua_mot_cot,Chùa Một Cột,ha_noi,heritage,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+ha_noi:chua_tran_quoc,Chùa Trấn Quốc,ha_noi,heritage,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+ha_noi:den_ngoc_son,Đền Ngọc Sơn,ha_noi,heritage,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+ha_noi:dong_thien_cung,Động Thiên Cung,ha_noi,nature,READY,True,AM_THUC,,0.0,0.0,1.0,True
+ha_noi:fansipan,Fansipan,ha_noi,landmark,READY,True,AM_THUC,,0.0,0.0,1.0,True
+ha_noi:hang_mua,Hang Múa,ha_noi,nature,READY,True,AM_THUC,,0.0,0.0,1.0,True
+ha_noi:hang_sung_sot,Hang Sửng Sốt,ha_noi,nature,READY,True,AM_THUC,,0.0,0.0,1.0,True
+ha_noi:ho_dai_lai,Hồ Đại Lải,ha_noi,lake,READY,True,AM_THUC,,0.0,0.0,1.0,True
+ha_noi:ho_hoan_kiem,Hồ Hoàn Kiếm,ha_noi,lake,READY,True,AM_THUC,,0.0,0.0,1.0,True
+ha_noi:ho_tay,Hồ Tây,ha_noi,lake,READY,True,AM_THUC,,0.0,0.0,1.0,True
+ha_noi:hoa_lu,Hoa Lư,ha_noi,heritage,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+ha_noi:mai_chau,Mai Châu,ha_noi,landmark,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+ha_noi:moana_sapa,Moana Sapa,ha_noi,landmark,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+ha_noi:nha_hat_lon_ha_noi,Nhà Hát Lớn Hà Nội,ha_noi,heritage,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+ha_noi:nha_tu_hoa_lo,Nhà Tù Hỏa Lò,ha_noi,heritage,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+ha_noi:tam_coc,Tam Cốc,ha_noi,nature,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+ha_noi:trang_an,Tràng An,ha_noi,nature,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+ha_noi:tuan_chau,Tuần Châu,ha_noi,landmark,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+ha_noi:van_mieu_quoc_tu_giam,Văn Miếu Quốc Tử Giám,ha_noi,heritage,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+ha_noi:vinh_ha_long,Vịnh Hạ Long,ha_noi,nature,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+ha_noi:vuon_quoc_gia_ba_vi,Vườn Quốc Gia Ba Vì,ha_noi,nature,READY,True,AM_THUC,,0.0,0.0,1.0,True
+ha_noi:yen_tu,Yên Tử,ha_noi,landmark,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+ha_noi:lang_chu_tich_ho_chi_minh,Lăng Chủ Tịch Hồ Chí Minh,ha_noi,lake,NEED_REVIEW,True,AM_THUC,,,,0.0,False
+ha_noi:pho_co_ha_noi,Phố Cổ Hà Nội,ha_noi,lake,NEED_REVIEW,True,AM_THUC,,,,0.0,False
