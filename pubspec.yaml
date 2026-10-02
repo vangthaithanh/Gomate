@@ -41,6 +41,8 @@ dependencies:
   google_sign_in: ^7.2.0
   mapbox_maps_flutter: ^2.31.0
   geolocator: ^14.0.3
+  flutter_lucide: ^1.49.0
+
 
 dev_dependencies:
   flutter_test:
