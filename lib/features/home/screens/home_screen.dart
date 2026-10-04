@@ -1,7 +1,14 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 
+import '../../../core/services/auth_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../map/screens/place_detail_screen.dart';
+import '../../map/services/location_service.dart';
+import '../../recommendation/data/recommendation_repository.dart';
+import '../../recommendation/models/recommendation_models.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,18 +29,9 @@ class _HomeScreenState extends State<HomeScreen> {
       image: 'assets/images/home/moment_chithanh.jpg',
       highlighted: true,
     ),
-    _MomentItem(
-      name: 'Thune',
-      image: 'assets/images/home/moment_thune.jpg',
-    ),
-    _MomentItem(
-      name: 'Buji',
-      image: 'assets/images/home/moment_buji.jpg',
-    ),
-    _MomentItem(
-      name: 'Bum',
-      image: 'assets/images/home/moment_4.jpg',
-    ),
+    _MomentItem(name: 'Thune', image: 'assets/images/home/moment_thune.jpg'),
+    _MomentItem(name: 'Buji', image: 'assets/images/home/moment_buji.jpg'),
+    _MomentItem(name: 'Bum', image: 'assets/images/home/moment_4.jpg'),
   ];
 
   final List<_HomePost> _posts = const [
@@ -41,8 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
       authorName: 'Thune',
       location: 'Thành phố Hồ Chí Minh',
       avatar: 'assets/images/home/moment_thune.jpg',
-      caption:
-      '#Hashtag Caption CaptionCaption Caption Caption CaptionCaption',
+      caption: '#Hashtag Caption CaptionCaption Caption Caption CaptionCaption',
       media: [
         'assets/images/home/post_1_1.jpg',
         'assets/images/home/post_1_2.jpg',
@@ -55,8 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
       authorName: 'ChiThanh',
       location: 'Thành phố Hồ Chí Minh',
       avatar: 'assets/images/home/moment_chithanh.jpg',
-      caption:
-      '#Hashtag Caption CaptionCaption Caption Caption CaptionCaption',
+      caption: '#Hashtag Caption CaptionCaption Caption Caption CaptionCaption',
       media: [
         'assets/images/home/post_2_1.jpg',
         'assets/images/home/post_2_2.jpg',
@@ -68,8 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
       authorName: 'Buji',
       location: 'Đà Nẵng',
       avatar: 'assets/images/home/moment_buji.jpg',
-      caption:
-      '#Hashtag Một chuyến đi đẹp với rất nhiều khoảnh khắc đáng nhớ.',
+      caption: '#Hashtag Một chuyến đi đẹp với rất nhiều khoảnh khắc đáng nhớ.',
       media: [
         'assets/images/home/post_3_1.jpg',
         'assets/images/home/post_3_2.jpg',
@@ -81,36 +76,17 @@ class _HomeScreenState extends State<HomeScreen> {
       authorName: 'Thune',
       location: 'Thành phố Hồ Chí Minh',
       avatar: 'assets/images/home/moment_thune.jpg',
-      caption:
-      '#Hashtag Caption CaptionCaption Caption Caption CaptionCaption',
-      media: [
-        'assets/images/home/post_4_1.jpg',
-      ],
+      caption: '#Hashtag Caption CaptionCaption Caption Caption CaptionCaption',
+      media: ['assets/images/home/post_4_1.jpg'],
       likeCount: 3,
       commentCount: 1,
     ),
   ];
 
-  final List<_PlaceSuggestion> _placeSuggestions = const [
-    _PlaceSuggestion(
-      title: 'Cầu Vàng, Bà Nà Hills',
-      subtitle: 'Đà Nẵng',
-      rating: 4.8,
-      image: 'assets/images/home/place_1.jpg',
-    ),
-    _PlaceSuggestion(
-      title: 'Động Phong Nha, Kẻ Bàng',
-      subtitle: 'Quảng Bình',
-      rating: 4.8,
-      image: 'assets/images/home/place_2.jpg',
-    ),
-    _PlaceSuggestion(
-      title: 'Hồ Tuyền Lâm',
-      subtitle: 'Đà Lạt',
-      rating: 4.8,
-      image: 'assets/images/home/place_3.jpg',
-    ),
-  ];
+  final RecommendationRepository _recommendationRepository =
+      RecommendationRepository();
+  final GoMateLocationService _locationService = GoMateLocationService();
+  late Future<RecommendationResponse> _recommendations;
 
   final List<_UserSuggestion> _userSuggestions = const [
     _UserSuggestion(
@@ -131,8 +107,106 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   bool _hasHighlightedMoment(String name) {
-    return _moments.any(
-          (moment) => moment.name == name && moment.highlighted,
+    return _moments.any((moment) => moment.name == name && moment.highlighted);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _recommendations = _loadRecommendations();
+  }
+
+  void _retryRecommendations() {
+    setState(() {
+      _recommendations = _loadRecommendations();
+    });
+  }
+
+  Future<RecommendationResponse> _loadRecommendations() async {
+    double? latitude;
+    double? longitude;
+    if (_selectedContextCodes().contains('GAN_TOI')) {
+      try {
+        final result = await _locationService.getCurrentLocation();
+        if (result.state == GoMateLocationState.ready &&
+            result.position != null) {
+          latitude = result.position!.latitude;
+          longitude = result.position!.longitude;
+        }
+      } catch (_) {
+        // Home recommendation must stay usable when GPS is unavailable.
+      }
+    }
+
+    return _recommendationRepository.getMine(
+      topK: 10,
+      latitude: latitude,
+      longitude: longitude,
+    );
+  }
+
+  Set<String> _selectedContextCodes() {
+    final raw = AuthService.instance.user?['interestCodes'];
+    final values = <String>[];
+    if (raw is List) {
+      values.addAll(raw.map((item) => item.toString()));
+    } else if (raw is String && raw.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          values.addAll(decoded.map((item) => item.toString()));
+        }
+      } catch (_) {
+        values.addAll(raw.split(','));
+      }
+    }
+    return values.map((value) => value.trim()).where((value) {
+      return value == 'GAN_TOI' ||
+          value == 'LOCAL' ||
+          value == 'DANG_HOT' ||
+          value == 'DI_TRONG_NGAY' ||
+          value == 'CO_REVIEW' ||
+          value == 'UU_TIEN_KHAC';
+    }).toSet();
+  }
+
+  Future<void> _openRecommendedPlace(RecommendedPlace place) async {
+    if (place.placeId <= 0) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PlaceDetailScreen(place: _toMapPlaceUi(place)),
+      ),
+    );
+  }
+
+  MapPlaceUi _toMapPlaceUi(RecommendedPlace place) {
+    final address = [place.address, place.district, place.province]
+        .where((part) => part != null && part.trim().isNotEmpty)
+        .cast<String>()
+        .join(', ');
+
+    return MapPlaceUi(
+      id: place.placeId.toString(),
+      name: place.name,
+      subtitle: place.description ?? place.displayReason,
+      address: address.isEmpty ? place.locationText : address,
+      distanceText: 'Xem trên bản đồ',
+      openInfo: 'Đang cập nhật',
+      priceInfo: 'Đang cập nhật',
+      rating: place.rating,
+      reviewCount: place.reviewCount,
+      likeCount: place.saveCount,
+      tags: [
+        place.displayCategory,
+        if (place.district != null) place.district!,
+        if (place.province != null) place.province!,
+      ],
+      imageUrl: place.thumbnailUrl,
+      mediaUrls: [
+        if (place.thumbnailUrl != null && place.thumbnailUrl!.isNotEmpty)
+          place.thumbnailUrl!,
+      ],
     );
   }
 
@@ -144,9 +218,7 @@ class _HomeScreenState extends State<HomeScreen> {
         bottom: false,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final ui = _HomeMetrics.fromWidth(
-              constraints.maxWidth,
-            );
+            final ui = _HomeMetrics.fromWidth(constraints.maxWidth);
 
             return ListView(
               physics: const BouncingScrollPhysics(),
@@ -156,37 +228,31 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               children: [
                 Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: ui.contentPadding,
-                  ),
+                  padding: EdgeInsets.symmetric(horizontal: ui.contentPadding),
                   child: _HomeHeader(ui: ui),
                 ),
 
                 SizedBox(height: ui.gapSmall),
 
-                _MomentStrip(
-                  items: _moments,
-                  ui: ui,
-                ),
+                _MomentStrip(items: _moments, ui: ui),
 
                 SizedBox(height: ui.gapMedium),
 
                 _FeedPostCard(
                   post: _posts[0],
-                  highlighted:
-                  _hasHighlightedMoment(_posts[0].authorName),
+                  highlighted: _hasHighlightedMoment(_posts[0].authorName),
                   ui: ui,
                 ),
 
                 SizedBox(height: ui.gapSection),
 
                 Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: ui.contentPadding,
-                  ),
+                  padding: EdgeInsets.symmetric(horizontal: ui.contentPadding),
                   child: _PlaceSuggestionSection(
-                    items: _placeSuggestions,
+                    future: _recommendations,
                     ui: ui,
+                    onRetry: _retryRecommendations,
+                    onTap: _openRecommendedPlace,
                   ),
                 ),
 
@@ -194,17 +260,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 _FeedPostCard(
                   post: _posts[1],
-                  highlighted:
-                  _hasHighlightedMoment(_posts[1].authorName),
+                  highlighted: _hasHighlightedMoment(_posts[1].authorName),
                   ui: ui,
                 ),
 
                 SizedBox(height: ui.gapSection),
 
                 Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: ui.contentPadding,
-                  ),
+                  padding: EdgeInsets.symmetric(horizontal: ui.contentPadding),
                   child: _UserSuggestionSection(
                     items: _userSuggestions,
                     ui: ui,
@@ -215,8 +278,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 _FeedPostCard(
                   post: _posts[2],
-                  highlighted:
-                  _hasHighlightedMoment(_posts[2].authorName),
+                  highlighted: _hasHighlightedMoment(_posts[2].authorName),
                   ui: ui,
                 ),
 
@@ -224,8 +286,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 _FeedPostCard(
                   post: _posts[3],
-                  highlighted:
-                  _hasHighlightedMoment(_posts[3].authorName),
+                  highlighted: _hasHighlightedMoment(_posts[3].authorName),
                   ui: ui,
                 ),
               ],
@@ -338,8 +399,7 @@ class _HomeMetrics {
       momentActiveSize: momentActive,
       momentNormalSize: momentNormal,
       momentItemWidth: momentItemWidth,
-      momentStripHeight:
-      momentActive + c(width * 0.085, 30, 36),
+      momentStripHeight: momentActive + c(width * 0.085, 30, 36),
 
       postAvatarSize: c(width * 0.105, 38, 44),
       postIconSize: c(width * 0.05, 18, 21),
@@ -347,14 +407,12 @@ class _HomeMetrics {
       placeCardWidth: placeCardWidth,
       placeCardHeight: placeCardHeight,
       placeCardRadius: c(placeCardWidth * 0.14, 16, 21),
-      placeRailHeight:
-      placeCardHeight + c(width * 0.045, 16, 20),
+      placeRailHeight: placeCardHeight + c(width * 0.045, 16, 20),
 
       userCardWidth: userCardWidth,
       userCardHeight: userCardHeight,
       userAvatarSize: userCardWidth * 0.57,
-      userRailHeight:
-      userCardHeight + c(width * 0.055, 18, 24),
+      userRailHeight: userCardHeight + c(width * 0.055, 18, 24),
 
       gapSmall: c(width * 0.027, 9, 12),
       gapMedium: c(width * 0.045, 15, 19),
@@ -370,9 +428,7 @@ class _HomeMetrics {
 class _HomeHeader extends StatelessWidget {
   final _HomeMetrics ui;
 
-  const _HomeHeader({
-    required this.ui,
-  });
+  const _HomeHeader({required this.ui});
 
   @override
   Widget build(BuildContext context) {
@@ -432,11 +488,7 @@ class _HeaderButton extends StatelessWidget {
         width: iconSize + 22,
         height: iconSize + 22,
         child: Center(
-          child: Icon(
-            icon,
-            size: iconSize,
-            color: AppColors.black,
-          ),
+          child: Icon(icon, size: iconSize, color: AppColors.black),
         ),
       ),
     );
@@ -451,25 +503,18 @@ class _MomentStrip extends StatelessWidget {
   final List<_MomentItem> items;
   final _HomeMetrics ui;
 
-  const _MomentStrip({
-    required this.items,
-    required this.ui,
-  });
+  const _MomentStrip({required this.items, required this.ui});
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: ui.momentStripHeight,
       child: ListView.separated(
-        padding: EdgeInsets.symmetric(
-          horizontal: ui.contentPadding,
-        ),
+        padding: EdgeInsets.symmetric(horizontal: ui.contentPadding),
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         itemCount: items.length,
-        separatorBuilder: (_, __) => SizedBox(
-          width: ui.width * 0.016,
-        ),
+        separatorBuilder: (_, __) => SizedBox(width: ui.width * 0.016),
         itemBuilder: (context, index) {
           final item = items[index];
 
@@ -529,8 +574,7 @@ class _FeedPostCardState extends State<_FeedPostCard> {
   late final PageController _pageController;
   int _currentPage = 0;
 
-  List<String> get _media =>
-      widget.post.media.take(12).toList(growable: false);
+  List<String> get _media => widget.post.media.take(12).toList(growable: false);
 
   @override
   void initState() {
@@ -556,9 +600,7 @@ class _FeedPostCardState extends State<_FeedPostCard> {
         // Metadata có padding
         // ------------------------------------------------------------
         Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: ui.contentPadding,
-          ),
+          padding: EdgeInsets.symmetric(horizontal: ui.contentPadding),
           child: Row(
             children: [
               _GradientAvatar(
@@ -623,13 +665,8 @@ class _FeedPostCardState extends State<_FeedPostCard> {
         // Caption có padding
         // ------------------------------------------------------------
         Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: ui.contentPadding,
-          ),
-          child: _PostCaption(
-            text: post.caption,
-            width: ui.width,
-          ),
+          padding: EdgeInsets.symmetric(horizontal: ui.contentPadding),
+          child: _PostCaption(text: post.caption, width: ui.width),
         ),
 
         SizedBox(height: ui.width * 0.025),
@@ -652,10 +689,7 @@ class _FeedPostCardState extends State<_FeedPostCard> {
               });
             },
             itemBuilder: (context, index) {
-              return _SafeAssetImage(
-                path: _media[index],
-                fit: BoxFit.cover,
-              );
+              return _SafeAssetImage(path: _media[index], fit: BoxFit.cover);
             },
           ),
         ),
@@ -675,9 +709,7 @@ class _FeedPostCardState extends State<_FeedPostCard> {
         // Action có padding
         // ------------------------------------------------------------
         Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: ui.contentPadding,
-          ),
+          padding: EdgeInsets.symmetric(horizontal: ui.contentPadding),
           child: Row(
             children: [
               _ActionIcon(
@@ -715,10 +747,7 @@ class _PostCaption extends StatelessWidget {
   final String text;
   final double width;
 
-  const _PostCaption({
-    required this.text,
-    required this.width,
-  });
+  const _PostCaption({required this.text, required this.width});
 
   @override
   Widget build(BuildContext context) {
@@ -739,10 +768,7 @@ class _PostCaption extends StatelessWidget {
 
     return RichText(
       text: TextSpan(
-        style: TextStyle(
-          fontSize: _font(width, 12.5),
-          height: 1.22,
-        ),
+        style: TextStyle(fontSize: _font(width, 12.5), height: 1.22),
         children: [
           const TextSpan(
             text: '#Hashtag ',
@@ -779,32 +805,24 @@ class _MediaIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     final visibleCount = count > 12 ? 12 : count;
 
-    final normalSize =
-    (width * 0.014).clamp(4.5, 6.0).toDouble();
+    final normalSize = (width * 0.014).clamp(4.5, 6.0).toDouble();
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(
-        visibleCount,
-            (index) {
-          final active = index == currentIndex;
+      children: List.generate(visibleCount, (index) {
+        final active = index == currentIndex;
 
-          return AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            margin: EdgeInsets.symmetric(
-              horizontal: width * 0.005,
-            ),
-            width: active ? normalSize * 1.35 : normalSize,
-            height: active ? normalSize * 1.35 : normalSize,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: active
-                  ? AppColors.primaryIcon
-                  : AppColors.grayBorder,
-            ),
-          );
-        },
-      ),
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          margin: EdgeInsets.symmetric(horizontal: width * 0.005),
+          width: active ? normalSize * 1.35 : normalSize,
+          height: active ? normalSize * 1.35 : normalSize,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: active ? AppColors.primaryIcon : AppColors.grayBorder,
+          ),
+        );
+      }),
     );
   }
 }
@@ -826,11 +844,7 @@ class _ActionIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: iconSize,
-          color: AppColors.primaryIcon,
-        ),
+        Icon(icon, size: iconSize, color: AppColors.primaryIcon),
         SizedBox(width: width * 0.013),
         Text(
           text,
@@ -850,12 +864,16 @@ class _ActionIcon extends StatelessWidget {
 // ============================================================================
 
 class _PlaceSuggestionSection extends StatelessWidget {
-  final List<_PlaceSuggestion> items;
+  final Future<RecommendationResponse> future;
   final _HomeMetrics ui;
+  final VoidCallback onRetry;
+  final ValueChanged<RecommendedPlace> onTap;
 
   const _PlaceSuggestionSection({
-    required this.items,
+    required this.future,
     required this.ui,
+    required this.onRetry,
+    required this.onTap,
   });
 
   @override
@@ -863,119 +881,221 @@ class _PlaceSuggestionSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionHeader(
-          title: 'Gợi ý cho bạn',
-          ui: ui,
-        ),
+        _SectionHeader(title: 'Gợi ý cho bạn', ui: ui),
 
         SizedBox(height: ui.width * 0.03),
 
-        SizedBox(
-          height: ui.placeRailHeight,
-          child: ListView.separated(
-            clipBehavior: Clip.none,
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            itemCount: items.length,
-            separatorBuilder: (_, __) =>
-                SizedBox(width: ui.width * 0.034),
-            itemBuilder: (context, index) {
-              final item = items[index];
+        FutureBuilder<RecommendationResponse>(
+          future: future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return _buildLoadingRail();
+            }
 
-              return Align(
-                alignment: Alignment.topCenter,
-                child: Container(
-                  width: ui.placeCardWidth,
-                  height: ui.placeCardHeight,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(
-                      ui.placeCardRadius,
-                    ),
-                    boxShadow: AppColors.elevatedShadow,
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(
-                      ui.placeCardRadius,
-                    ),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        _SafeAssetImage(
-                          path: item.image,
-                          fit: BoxFit.cover,
-                        ),
+            if (snapshot.hasError) {
+              return _buildMessageRail(
+                icon: LucideIcons.refresh_cw,
+                message: 'Chưa tải được gợi ý.',
+                actionLabel: 'Thử lại',
+                onAction: onRetry,
+              );
+            }
 
-                        // Chỉ gradient đọc chữ, không phải inner shadow.
-                        const DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              stops: [0.52, 0.73, 1],
-                              colors: [
-                                Colors.transparent,
-                                Color(0x20000000),
-                                Color(0xA5000000),
-                              ],
-                            ),
-                          ),
-                        ),
+            final places =
+                snapshot.data?.items
+                    .where((place) => place.placeId > 0)
+                    .take(10)
+                    .toList(growable: false) ??
+                const <RecommendedPlace>[];
 
-                        Positioned(
-                          top: ui.placeCardWidth * 0.065,
-                          right: ui.placeCardWidth * 0.065,
-                          child: _RatingBadge(
-                            rating: item.rating,
-                            cardWidth: ui.placeCardWidth,
-                          ),
-                        ),
+            if (places.isEmpty) {
+              return _buildMessageRail(
+                icon: LucideIcons.map_pin,
+                message: 'Chưa có gợi ý phù hợp.',
+              );
+            }
 
-                        Positioned(
-                          left: ui.placeCardWidth * 0.08,
-                          right: ui.placeCardWidth * 0.08,
-                          bottom: ui.placeCardWidth * 0.08,
-                          child: Column(
-                            crossAxisAlignment:
-                            CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.title,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: _font(ui.width, 10.5),
-                                  height: 1.12,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              SizedBox(
-                                height: ui.placeCardWidth * 0.018,
-                              ),
-                              Text(
-                                item.subtitle,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: _font(ui.width, 9.5),
-                                  height: 1.1,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.white,
-                                ),
-                              ),
+            return _buildPlaceRail(
+              places
+                  .map(_PlaceSuggestion.fromRecommended)
+                  .toList(growable: false),
+              places,
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPlaceRail(
+    List<_PlaceSuggestion> items,
+    List<RecommendedPlace> sourcePlaces,
+  ) {
+    return SizedBox(
+      height: ui.placeRailHeight,
+      child: ListView.separated(
+        clipBehavior: Clip.none,
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => SizedBox(width: ui.width * 0.034),
+        itemBuilder: (context, index) {
+          final item = items[index];
+
+          return Align(
+            alignment: Alignment.topCenter,
+            child: GestureDetector(
+              onTap: () => onTap(sourcePlaces[index]),
+              child: Container(
+                width: ui.placeCardWidth,
+                height: ui.placeCardHeight,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(ui.placeCardRadius),
+                  boxShadow: AppColors.elevatedShadow,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(ui.placeCardRadius),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _SafeNetworkImage(url: item.imageUrl, fit: BoxFit.cover),
+
+                      // Chỉ gradient đọc chữ, không phải inner shadow.
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            stops: [0.52, 0.73, 1],
+                            colors: [
+                              Colors.transparent,
+                              Color(0x20000000),
+                              Color(0xA5000000),
                             ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+
+                      Positioned(
+                        top: ui.placeCardWidth * 0.065,
+                        right: ui.placeCardWidth * 0.065,
+                        child: _RatingBadge(
+                          rating: item.rating,
+                          cardWidth: ui.placeCardWidth,
+                        ),
+                      ),
+
+                      Positioned(
+                        left: ui.placeCardWidth * 0.08,
+                        right: ui.placeCardWidth * 0.08,
+                        bottom: ui.placeCardWidth * 0.08,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: _font(ui.width, 10.5),
+                                height: 1.12,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                            SizedBox(height: ui.placeCardWidth * 0.018),
+                            Text(
+                              item.subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: _font(ui.width, 9.5),
+                                height: 1.1,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              );
-            },
-          ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildLoadingRail() {
+    return SizedBox(
+      height: ui.placeRailHeight,
+      child: ListView.separated(
+        clipBehavior: Clip.none,
+        scrollDirection: Axis.horizontal,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: 3,
+        separatorBuilder: (_, __) => SizedBox(width: ui.width * 0.034),
+        itemBuilder: (_, __) {
+          return Container(
+            width: ui.placeCardWidth,
+            height: ui.placeCardHeight,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE7EBF3),
+              borderRadius: BorderRadius.circular(ui.placeCardRadius),
+            ),
+            alignment: Alignment.center,
+            child: SizedBox(
+              width: ui.placeCardWidth * 0.18,
+              height: ui.placeCardWidth * 0.18,
+              child: const CircularProgressIndicator(strokeWidth: 2.4),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildMessageRail({
+    required IconData icon,
+    required String message,
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
+    return SizedBox(
+      height: ui.placeRailHeight,
+      child: Container(
+        height: ui.placeCardHeight,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF6F8FB),
+          borderRadius: BorderRadius.circular(ui.placeCardRadius),
+          border: Border.all(color: AppColors.grayBorder),
         ),
-      ],
+        padding: EdgeInsets.symmetric(horizontal: ui.width * 0.04),
+        child: Row(
+          children: [
+            Icon(icon, size: ui.width * 0.055, color: AppColors.grayText),
+            SizedBox(width: ui.width * 0.03),
+            Expanded(
+              child: Text(
+                message,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: _font(ui.width, 12),
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+            if (actionLabel != null && onAction != null)
+              TextButton(onPressed: onAction, child: Text(actionLabel)),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -984,10 +1104,7 @@ class _RatingBadge extends StatelessWidget {
   final double rating;
   final double cardWidth;
 
-  const _RatingBadge({
-    required this.rating,
-    required this.cardWidth,
-  });
+  const _RatingBadge({required this.rating, required this.cardWidth});
 
   @override
   Widget build(BuildContext context) {
@@ -998,9 +1115,7 @@ class _RatingBadge extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.94),
-        borderRadius: BorderRadius.circular(
-          cardWidth * 0.075,
-        ),
+        borderRadius: BorderRadius.circular(cardWidth * 0.075),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1042,20 +1157,14 @@ class _UserSuggestionSection extends StatelessWidget {
   final List<_UserSuggestion> items;
   final _HomeMetrics ui;
 
-  const _UserSuggestionSection({
-    required this.items,
-    required this.ui,
-  });
+  const _UserSuggestionSection({required this.items, required this.ui});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionHeader(
-          title: 'Gợi ý cho bạn',
-          ui: ui,
-        ),
+        _SectionHeader(title: 'Gợi ý cho bạn', ui: ui),
 
         SizedBox(height: ui.width * 0.03),
 
@@ -1066,8 +1175,7 @@ class _UserSuggestionSection extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
             itemCount: items.length,
-            separatorBuilder: (_, __) =>
-                SizedBox(width: ui.width * 0.045),
+            separatorBuilder: (_, __) => SizedBox(width: ui.width * 0.045),
             itemBuilder: (context, index) {
               final item = items[index];
 
@@ -1096,9 +1204,7 @@ class _UserSuggestionSection extends StatelessWidget {
                         size: ui.userAvatarSize,
                       ),
 
-                      SizedBox(
-                        height: ui.userCardWidth * 0.04,
-                      ),
+                      SizedBox(height: ui.userCardWidth * 0.04),
 
                       Text(
                         item.name,
@@ -1111,9 +1217,7 @@ class _UserSuggestionSection extends StatelessWidget {
                         ),
                       ),
 
-                      SizedBox(
-                        height: ui.userCardWidth * 0.035,
-                      ),
+                      SizedBox(height: ui.userCardWidth * 0.035),
 
                       Text(
                         item.mutualText,
@@ -1166,10 +1270,7 @@ class _SectionHeader extends StatelessWidget {
   final String title;
   final _HomeMetrics ui;
 
-  const _SectionHeader({
-    required this.title,
-    required this.ui,
-  });
+  const _SectionHeader({required this.title, required this.ui});
 
   @override
   Widget build(BuildContext context) {
@@ -1243,18 +1344,14 @@ class _GradientAvatar extends StatelessWidget {
                   shape: BoxShape.circle,
                   color: Colors.white,
                 ),
-                child: _AvatarCore(
-                  imagePath: imagePath,
-                ),
+                child: _AvatarCore(imagePath: imagePath),
               ),
             )
           else
             SizedBox(
               width: normalSize,
               height: normalSize,
-              child: _AvatarCore(
-                imagePath: imagePath,
-              ),
+              child: _AvatarCore(imagePath: imagePath),
             ),
 
           if (showAddBadge)
@@ -1288,9 +1385,7 @@ class _GradientAvatar extends StatelessWidget {
 class _AvatarCore extends StatelessWidget {
   final String imagePath;
 
-  const _AvatarCore({
-    required this.imagePath,
-  });
+  const _AvatarCore({required this.imagePath});
 
   @override
   Widget build(BuildContext context) {
@@ -1298,16 +1393,10 @@ class _AvatarCore extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: const Color(0xFFE7EBF3),
-        border: Border.all(
-          color: AppColors.grayBorder,
-          width: 1,
-        ),
+        border: Border.all(color: AppColors.grayBorder, width: 1),
       ),
       clipBehavior: Clip.antiAlias,
-      child: _SafeAssetImage(
-        path: imagePath,
-        fit: BoxFit.cover,
-      ),
+      child: _SafeAssetImage(path: imagePath, fit: BoxFit.cover),
     );
   }
 }
@@ -1316,10 +1405,7 @@ class _SimpleAvatar extends StatelessWidget {
   final String imagePath;
   final double size;
 
-  const _SimpleAvatar({
-    required this.imagePath,
-    required this.size,
-  });
+  const _SimpleAvatar({required this.imagePath, required this.size});
 
   @override
   Widget build(BuildContext context) {
@@ -1329,16 +1415,10 @@ class _SimpleAvatar extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: const Color(0xFFE7EBF3),
-        border: Border.all(
-          color: AppColors.grayBorder,
-          width: 1,
-        ),
+        border: Border.all(color: AppColors.grayBorder, width: 1),
       ),
       clipBehavior: Clip.antiAlias,
-      child: _SafeAssetImage(
-        path: imagePath,
-        fit: BoxFit.cover,
-      ),
+      child: _SafeAssetImage(path: imagePath, fit: BoxFit.cover),
     );
   }
 }
@@ -1347,10 +1427,7 @@ class _SafeAssetImage extends StatelessWidget {
   final String path;
   final BoxFit fit;
 
-  const _SafeAssetImage({
-    required this.path,
-    this.fit = BoxFit.cover,
-  });
+  const _SafeAssetImage({required this.path, this.fit = BoxFit.cover});
 
   @override
   Widget build(BuildContext context) {
@@ -1361,13 +1438,65 @@ class _SafeAssetImage extends StatelessWidget {
         return Container(
           color: const Color(0xFFE7EBF3),
           alignment: Alignment.center,
-          child: Icon(
-            LucideIcons.image,
-            size: 26,
-            color: AppColors.grayText,
-          ),
+          child: Icon(LucideIcons.image, size: 26, color: AppColors.grayText),
         );
       },
+    );
+  }
+}
+
+class _SafeNetworkImage extends StatelessWidget {
+  final String? url;
+  final BoxFit fit;
+
+  const _SafeNetworkImage({required this.url, this.fit = BoxFit.cover});
+
+  @override
+  Widget build(BuildContext context) {
+    final source = url?.trim();
+    if (source == null || source.isEmpty) {
+      return const _ImageFallback();
+    }
+
+    return Image.network(
+      source,
+      fit: fit,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const _ImageFallback(),
+            Center(
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.2,
+                  value: progress.expectedTotalBytes == null
+                      ? null
+                      : progress.cumulativeBytesLoaded /
+                            progress.expectedTotalBytes!,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+      errorBuilder: (_, __, ___) => const _ImageFallback(),
+    );
+  }
+}
+
+class _ImageFallback extends StatelessWidget {
+  const _ImageFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFE7EBF3),
+      alignment: Alignment.center,
+      child: Icon(LucideIcons.image, size: 26, color: AppColors.grayText),
     );
   }
 }
@@ -1375,9 +1504,7 @@ class _SafeAssetImage extends StatelessWidget {
 double _font(double width, double baseAt360) {
   final value = baseAt360 * (width / 360);
 
-  return value
-      .clamp(baseAt360 * 0.93, baseAt360 * 1.12)
-      .toDouble();
+  return value.clamp(baseAt360 * 0.93, baseAt360 * 1.12).toDouble();
 }
 
 // ============================================================================
@@ -1422,14 +1549,24 @@ class _PlaceSuggestion {
   final String title;
   final String subtitle;
   final double rating;
-  final String image;
+  final String? imageUrl;
 
   const _PlaceSuggestion({
     required this.title,
     required this.subtitle,
     required this.rating,
-    required this.image,
+    required this.imageUrl,
   });
+
+  factory _PlaceSuggestion.fromRecommended(RecommendedPlace place) {
+    final rating = place.rating > 0 ? place.rating : place.score.clamp(0, 5);
+    return _PlaceSuggestion(
+      title: place.name,
+      subtitle: place.locationText,
+      rating: rating.toDouble(),
+      imageUrl: place.thumbnailUrl,
+    );
+  }
 }
 
 class _UserSuggestion {

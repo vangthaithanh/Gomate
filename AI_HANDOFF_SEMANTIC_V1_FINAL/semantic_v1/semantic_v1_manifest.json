@@ -1,0 +1,26 @@
+{
+  "semanticDataVersion": "semantic-v1",
+  "releaseStatus": "FINAL",
+  "placeCatalogVersion": "tour_places_v11",
+  "generatedAt": "2026-10-01T06:43:53.970516+00:00",
+  "canonicalPlaceCount": 188,
+  "runtimeEligibleCount": 146,
+  "runtimeIneligibleCount": 42,
+  "readyCount": 114,
+  "partialCount": 65,
+  "needReviewCount": 9,
+  "interestCount": 19,
+  "semanticInterestCount": 13,
+  "contextStrategyCount": 6,
+  "tagCount": 36,
+  "interestTagMappingCount": 53,
+  "placeTagLinkCount": 831,
+  "sanityScenarioCount": 30,
+  "sanityIssueCount": 2,
+  "notes": [
+    "semantic-v1 FINAL uses category rules, catalog-name rules, and limited manual review overrides.",
+    "No external web sources were used in this pass.",
+    "Screen 3 options are exported as context strategy, not long-term semantic profile.",
+    "Missing tags on PARTIAL places mean unknown or insufficient evidence, not confirmed negative preference."
+  ]
+}

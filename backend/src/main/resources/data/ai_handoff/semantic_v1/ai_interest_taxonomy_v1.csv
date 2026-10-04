@@ -1,0 +1,20 @@
+interest_code,interest_name,interest_group,interest_type,definition
+KET_BAN,Ket ban,TRAVEL_INTENT,SEMANTIC,User wants social/group-friendly travel experiences.
+NGHI_DUONG,Nghi duong,TRAVEL_INTENT,SEMANTIC,"User wants relaxing, quiet, resort-like experiences."
+CHECKIN_HOT,Check-in hot,TRAVEL_INTENT,SEMANTIC,"User wants photogenic, iconic, trendy places."
+THIEN_NHIEN,Thien nhien,TRAVEL_INTENT,SEMANTIC,"User wants nature, lake, mountain, waterfall or forest experiences."
+VAN_HOA,Van hoa lich su,TRAVEL_INTENT,SEMANTIC,"User wants cultural, historical, heritage and museum places."
+AM_THUC,Am thuc,TRAVEL_INTENT,SEMANTIC,"User wants food, local food, market and cafe experiences."
+MUC_DICH_KHAC,Muc dich khac,TRAVEL_INTENT,SEMANTIC,Survey compatibility option without semantic tag mapping in semantic-v1.
+BIEN_NUI,Bien nui,ENVIRONMENT_PREFERENCE,SEMANTIC,"User prefers sea, mountain and scenic nature environments."
+TRUNG_TAM,Trung tam,ENVIRONMENT_PREFERENCE,SEMANTIC,User prefers city center and urban environments.
+DIA_DANH_NOI_TIENG,Dia danh noi tieng,ENVIRONMENT_PREFERENCE,SEMANTIC,User prefers famous landmarks and iconic places.
+LANG_NGHE_DI_TICH,Lang nghe di tich,ENVIRONMENT_PREFERENCE,SEMANTIC,"User prefers heritage, cultural and historical places."
+NGOAI_O_DONG_QUE,Ngoai o dong que,ENVIRONMENT_PREFERENCE,SEMANTIC,"User prefers countryside, local and nature-oriented environments."
+LOAI_KHAC,Loai khac,ENVIRONMENT_PREFERENCE,SEMANTIC,Survey compatibility option without semantic tag mapping in semantic-v1.
+GAN_TOI,Gan toi,CONTEXT_STRATEGY,CONTEXT,Runtime distance/GPS re-ranking strategy.
+LOCAL,Dia diem local,CONTEXT_STRATEGY,CONTEXT,Shared context strategy using local tags plus backend re-ranking.
+DANG_HOT,Dang hot,CONTEXT_STRATEGY,CONTEXT,Popularity/trend re-ranking strategy.
+DI_TRONG_NGAY,Di trong ngay,CONTEXT_STRATEGY,CONTEXT,"Route duration, distance and available time re-ranking strategy."
+CO_REVIEW,Co review,CONTEXT_STRATEGY,CONTEXT,Review count and rating re-ranking strategy.
+UU_TIEN_KHAC,Uu tien khac,CONTEXT_STRATEGY,CONTEXT,Survey compatibility context option.

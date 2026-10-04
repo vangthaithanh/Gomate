@@ -1,0 +1,153 @@
+{
+  "semanticDataVersion": "semantic-v1",
+  "releaseStatus": "FINAL",
+  "placeCatalogVersion": "tour_places_v11",
+  "generatedAt": "2026-10-01T06:43:53.970516+00:00",
+  "canonicalPlaces": 188,
+  "runtimeEligible": 146,
+  "runtimeIneligible": 42,
+  "ready": 114,
+  "partial": 65,
+  "needReview": 9,
+  "placeTagLinks": 831,
+  "tagCount": 36,
+  "interestCount": 19,
+  "semanticInterestCount": 13,
+  "contextStrategyCount": 6,
+  "interestTagMappingCount": 53,
+  "averageTagsPerPlace": 4.42,
+  "medianTagsPerPlace": 4.0,
+  "weightDistribution": {
+    "0.3": 8,
+    "0.6": 220,
+    "0.8": 377,
+    "1.0": 226
+  },
+  "sourceDistribution": {
+    "CATALOG_NAME_RULE": 391,
+    "CATEGORY_RULE": 431,
+    "MANUAL_REVIEW": 9
+  },
+  "semanticStatusDistribution": {
+    "NEED_REVIEW": 9,
+    "PARTIAL": 65,
+    "READY": 114
+  },
+  "runtimeEligibilityDistribution": {
+    "false": 42,
+    "true": 146
+  },
+  "runtimeSemanticStatusDistribution": {
+    "NEED_REVIEW": 8,
+    "PARTIAL": 50,
+    "READY": 88
+  },
+  "runtimeIneligibleSemanticStatusDistribution": {
+    "NEED_REVIEW": 1,
+    "PARTIAL": 15,
+    "READY": 26
+  },
+  "tagCoverage": {
+    "photo_spot": 107,
+    "scenic": 86,
+    "nature": 85,
+    "cultural": 61,
+    "iconic": 59,
+    "heritage": 58,
+    "historical": 58,
+    "landmark": 52,
+    "relaxing": 47,
+    "beach": 25,
+    "lake": 21,
+    "local": 19,
+    "countryside": 19,
+    "local_culture": 19,
+    "social": 16,
+    "walking_area": 16,
+    "mountain": 14,
+    "waterfall": 12,
+    "food": 9,
+    "group_friendly": 8,
+    "local_food": 6,
+    "urban": 6,
+    "forest": 4,
+    "museum": 3,
+    "cafe": 3,
+    "cafe_meeting": 3,
+    "local_market": 3,
+    "market": 3,
+    "city_center": 3,
+    "resort_spa": 3,
+    "crowded": 2,
+    "night_activity": 1
+  },
+  "interestMappingCoverage": {
+    "AM_THUC": 5,
+    "BIEN_NUI": 4,
+    "CHECKIN_HOT": 5,
+    "DIA_DANH_NOI_TIENG": 3,
+    "KET_BAN": 7,
+    "LANG_NGHE_DI_TICH": 4,
+    "NGHI_DUONG": 7,
+    "NGOAI_O_DONG_QUE": 4,
+    "THIEN_NHIEN": 6,
+    "TRUNG_TAM": 3,
+    "VAN_HOA": 5
+  },
+  "semanticInterestCoverage": [
+    {
+      "interest_code": "NGHI_DUONG",
+      "matching_place_count": 92,
+      "runtime_matching_place_count": 74,
+      "avg_semantic_match": 1.518
+    },
+    {
+      "interest_code": "KET_BAN",
+      "matching_place_count": 28,
+      "runtime_matching_place_count": 19,
+      "avg_semantic_match": 0.725
+    },
+    {
+      "interest_code": "CHECKIN_HOT",
+      "matching_place_count": 135,
+      "runtime_matching_place_count": 103,
+      "avg_semantic_match": 1.476
+    },
+    {
+      "interest_code": "THIEN_NHIEN",
+      "matching_place_count": 90,
+      "runtime_matching_place_count": 73,
+      "avg_semantic_match": 1.714
+    },
+    {
+      "interest_code": "VAN_HOA",
+      "matching_place_count": 64,
+      "runtime_matching_place_count": 53,
+      "avg_semantic_match": 2.357
+    },
+    {
+      "interest_code": "AM_THUC",
+      "matching_place_count": 24,
+      "runtime_matching_place_count": 19,
+      "avg_semantic_match": 0.85
+    }
+  ],
+  "sanityScenarioCount": 30,
+  "sanityScenarioRows": 248,
+  "sanityIssueCount": 2,
+  "sanityIssues": [
+    {
+      "destination": "vung_tau",
+      "interest": "AM_THUC",
+      "issue": "top5_missing_expected_semantic_family",
+      "observed_tags": "local"
+    },
+    {
+      "destination": "ha_noi",
+      "interest": "AM_THUC",
+      "issue": "top5_missing_expected_semantic_family",
+      "observed_tags": "local"
+    }
+  ],
+  "validationErrors": []
+}

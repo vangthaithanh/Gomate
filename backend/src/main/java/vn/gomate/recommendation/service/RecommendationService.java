@@ -3,6 +3,7 @@ package vn.gomate.recommendation.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.*;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import vn.gomate.auth.AuthRepository;
 import vn.gomate.common.ApiException;
@@ -15,35 +16,85 @@ public class RecommendationService {
     private final AuthRepository auth;
     private final AiRecommendationClient ai;
     private final RecommendationPlaceRepository places;
+    private final ContextualRecommendationReranker reranker;
     private final ObjectMapper mapper;
+    private final int candidateK;
+    private final int homeLimit;
 
     public RecommendationService(
         AuthRepository auth,
         AiRecommendationClient ai,
         RecommendationPlaceRepository places,
-        ObjectMapper mapper
+        ContextualRecommendationReranker reranker,
+        ObjectMapper mapper,
+        @Value("${app.ai.recommendation-candidate-k:50}") int candidateK,
+        @Value("${app.ai.recommendation-home-limit:10}") int homeLimit
     ) {
         this.auth = auth;
         this.ai = ai;
         this.places = places;
+        this.reranker = reranker;
         this.mapper = mapper;
+        this.candidateK = Math.max(1, Math.min(candidateK, 100));
+        this.homeLimit = Math.max(1, Math.min(homeLimit, 50));
     }
 
-    public Map<String, Object> mine(UUID userId, Double latitude, Double longitude, int topK) {
-        int limit = Math.max(1, Math.min(topK, 50));
+    public Map<String, Object> mine(
+        UUID userId,
+        String destinationKey,
+        Double latitude,
+        Double longitude,
+        Integer topK
+    ) {
+        int limit = topK == null || topK <= 0 ? homeLimit : Math.max(1, Math.min(topK, 50));
+        String effectiveDestination = normalizeDestination(destinationKey);
         Map<String, Object> profile = auth.profile(userId);
-        List<String> optionCodes = readOptionCodes(profile.get("interestCodes"));
+        List<String> allOptionCodes = readOptionCodes(profile.get("interestCodes"));
+        List<String> semanticInterestCodes = places.findSemanticInterestCodes(userId);
+        if (semanticInterestCodes.isEmpty()) {
+            List<String> contextCodes = places.filterContextCodes(allOptionCodes);
+            semanticInterestCodes = allOptionCodes.stream()
+                .filter(code -> !contextCodes.contains(code))
+                .distinct()
+                .toList();
+        }
+        List<String> contextCodes = places.filterContextCodes(allOptionCodes);
 
-        RecommendationDtos.AiResponse response = ai.coldStart(
-            optionCodes,
-            latitude,
-            longitude,
-            limit
-        );
+        if (semanticInterestCodes.isEmpty()) {
+            return fallbackOnly(
+                effectiveDestination,
+                semanticInterestCodes,
+                contextCodes,
+                limit,
+                latitude,
+                longitude,
+                "Người dùng chưa có lựa chọn semantic từ khảo sát; dùng fallback PostgreSQL."
+            );
+        }
 
-        List<RecommendationDtos.AiRecommendation> aiItems = response.recommendations() == null
+        RecommendationDtos.AiResponse response;
+        try {
+            response = ai.coldStart(
+                effectiveDestination,
+                semanticInterestCodes,
+                contextCodes,
+                Math.max(candidateK, limit)
+            );
+        } catch (ApiException error) {
+            return fallbackOnly(
+                effectiveDestination,
+                semanticInterestCodes,
+                contextCodes,
+                limit,
+                latitude,
+                longitude,
+                error.getMessage()
+            );
+        }
+
+        List<RecommendationDtos.AiRecommendation> aiItems = response.items() == null
             ? List.of()
-            : response.recommendations();
+            : response.items();
         List<String> externalIds = aiItems.stream()
             .map(RecommendationDtos.AiRecommendation::externalId)
             .filter(Objects::nonNull)
@@ -69,32 +120,96 @@ public class RecommendationService {
             Map<String, Object> row = dbByExternalId.get(externalId);
             if (row == null) {
                 missing.add(externalId);
-                items.add(toAiOnlyItem(recommendation));
                 continue;
             }
             items.add(toItem(row, recommendation));
+            if (items.size() >= limit) {
+                break;
+            }
         }
 
         List<String> warnings = new ArrayList<>();
-        if (response.warnings() != null) warnings.addAll(response.warnings());
+        if (response.contextNote() != null && !response.contextNote().isBlank()) {
+            warnings.add(response.contextNote());
+        }
+        addContextWarnings(contextCodes, latitude, longitude, warnings);
         if (!missing.isEmpty()) {
             warnings.add("Một số externalId của AI chưa có trong PostgreSQL: " + missing);
         }
-        fillWithPopularPlaces(items, warnings, limit);
+        fillWithPopularPlaces(items, warnings, effectiveDestination, Math.max(candidateK, limit));
+        items = new ArrayList<>(reranker.rerank(items, contextCodes, latitude, longitude));
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("modelVersion", response.modelVersion());
-        result.put("coldStart", response.coldStart());
-        result.put("optionCodes", optionCodes);
-        result.put("scoringMode", response.scoringMode());
-        result.put("items", items);
+        result.put("coldStart", true);
+        result.put("destinationKey", effectiveDestination);
+        result.put("optionCodes", semanticInterestCodes);
+        result.put("contextCodes", contextCodes);
+        result.put("scoringMode", response.selectedStrategy());
+        result.put("totalCandidates", response.totalCandidates());
+        result.put("items", items.stream().limit(limit).toList());
         result.put("warnings", warnings);
         return result;
+    }
+
+    private Map<String, Object> fallbackOnly(
+        String destinationKey,
+        List<String> semanticInterestCodes,
+        List<String> contextCodes,
+        int limit,
+        Double latitude,
+        Double longitude,
+        String warning
+    ) {
+        List<Map<String, Object>> items = new ArrayList<>();
+        List<String> warnings = new ArrayList<>();
+        warnings.add(warning);
+        addContextWarnings(contextCodes, latitude, longitude, warnings);
+        fillWithPopularPlaces(items, warnings, destinationKey, Math.max(candidateK, limit));
+        items = new ArrayList<>(reranker.rerank(items, contextCodes, latitude, longitude));
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("modelVersion", "postgres-popular-fallback");
+        result.put("coldStart", true);
+        result.put("destinationKey", destinationKey);
+        result.put("optionCodes", semanticInterestCodes);
+        result.put("contextCodes", contextCodes);
+        result.put("scoringMode", "fallback");
+        result.put("totalCandidates", items.size());
+        result.put("items", items.stream().limit(limit).toList());
+        result.put("warnings", warnings);
+        return result;
+    }
+
+    private void addContextWarnings(
+        List<String> contextCodes,
+        Double latitude,
+        Double longitude,
+        List<String> warnings
+    ) {
+        if (contextCodes == null || !contextCodes.contains("GAN_TOI")) {
+            return;
+        }
+        if (!validCoordinate(latitude, longitude)) {
+            warnings.add("Người dùng chọn GAN_TOI nhưng Home không có GPS hợp lệ; giữ ranking semantic, không boost khoảng cách.");
+        }
+    }
+
+    private boolean validCoordinate(Double latitude, Double longitude) {
+        return latitude != null
+            && longitude != null
+            && Double.isFinite(latitude)
+            && Double.isFinite(longitude)
+            && latitude >= -90.0
+            && latitude <= 90.0
+            && longitude >= -180.0
+            && longitude <= 180.0;
     }
 
     private void fillWithPopularPlaces(
         List<Map<String, Object>> items,
         List<String> warnings,
+        String destinationKey,
         int limit
     ) {
         if (items.size() >= limit) return;
@@ -106,7 +221,14 @@ public class RecommendationService {
         }
 
         int before = items.size();
-        for (Map<String, Object> row : places.findPopularActive(Math.max(limit * 2, limit + 5))) {
+        List<Map<String, Object>> fallbackRows = places.findPopularActiveByDestination(
+            destinationKey,
+            Math.max(limit * 2, limit + 5)
+        );
+        if (fallbackRows.isEmpty()) {
+            fallbackRows = places.findPopularActive(Math.max(limit * 2, limit + 5));
+        }
+        for (Map<String, Object> row : fallbackRows) {
             Object placeId = row.get("placeId");
             if (placeId != null && usedPlaceIds.contains(placeId)) {
                 continue;
@@ -118,7 +240,7 @@ public class RecommendationService {
             }
         }
 
-        if (items.size() > before) {
+        if (before == 0 && items.size() > before) {
             warnings.add("Đã bù thêm địa điểm hot/nhiều tương tác từ PostgreSQL để không trả danh sách rỗng.");
         }
     }
@@ -149,62 +271,32 @@ public class RecommendationService {
         );
         item.put(
             "score",
-            recommendation == null ? row.get("score") : recommendation.score()
+            recommendation == null ? row.get("score") : recommendation.semanticScore()
         );
         item.put(
             "reason",
             recommendation == null
                 ? "Địa điểm đang hot, nhiều lượt lưu/đánh giá nên được dùng làm gợi ý fallback."
-                : recommendation.reason()
+                : aiReason(recommendation)
         );
         item.put(
             "modelSource",
             recommendation == null
                 ? "postgres_popular_fallback"
-                : recommendation.modelSource()
+                : "ai_semantic_v1"
         );
         return item;
     }
 
-    private Map<String, Object> toAiOnlyItem(
+    private String aiReason(
         RecommendationDtos.AiRecommendation recommendation
     ) {
-        Map<String, Object> item = new LinkedHashMap<>();
-        item.put("placeId", 0);
-        item.put("externalId", recommendation.externalId());
-        item.put(
-            "name",
-            recommendation.name() == null || recommendation.name().isBlank()
-                ? "Địa điểm gợi ý"
-                : recommendation.name()
-        );
-        item.put("description", null);
-        item.put("category", recommendation.category());
-        item.put("categoryName", recommendation.category());
-        item.put("province", null);
-        item.put("district", null);
-        item.put("address", null);
-        item.put("latitude", recommendation.latitude());
-        item.put("longitude", recommendation.longitude());
-        item.put("avgRating", 0);
-        item.put("reviewCount", 0);
-        item.put("saveCount", 0);
-        item.put("thumbnailUrl", null);
-        item.put("destinationKey", recommendation.destinationKey());
-        item.put("score", recommendation.score());
-        item.put(
-            "reason",
-            recommendation.reason() == null || recommendation.reason().isBlank()
-                ? "Được đề xuất trực tiếp từ model KPDL v11."
-                : recommendation.reason()
-        );
-        item.put(
-            "modelSource",
-            recommendation.modelSource() == null || recommendation.modelSource().isBlank()
-                ? "ai_catalog_unmapped"
-                : recommendation.modelSource()
-        );
-        return item;
+        if (recommendation.semanticStatus() == null || recommendation.semanticStatus().isBlank()) {
+            return "Phù hợp với nhóm sở thích bạn đã chọn trong khảo sát.";
+        }
+        return "Phù hợp semantic-v1 (" + recommendation.semanticStatus() + "), điểm "
+            + String.format(Locale.ROOT, "%.2f", recommendation.semanticScore() == null ? 0.0 : recommendation.semanticScore())
+            + ".";
     }
 
     private List<String> readOptionCodes(Object value) {
@@ -218,5 +310,12 @@ public class RecommendationService {
         } catch (Exception error) {
             throw new ApiException(500, "INVALID_INTEREST_CODES", "Dữ liệu khảo sát của người dùng không hợp lệ.", error);
         }
+    }
+
+    private String normalizeDestination(String destinationKey) {
+        if (destinationKey == null || destinationKey.isBlank()) {
+            return null;
+        }
+        return destinationKey.trim();
     }
 }

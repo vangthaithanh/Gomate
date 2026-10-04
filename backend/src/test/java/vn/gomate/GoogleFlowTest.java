@@ -48,11 +48,21 @@ class GoogleFlowTest {
   db.update("UPDATE users SET status='LOCKED' WHERE id=:id",args("id",id));
   assertThrows(ApiException.class,()->auth.google(identity));
  }
- @Test void surveyUsesSettingsOnly() {
+ @Test void surveyStoresSettingsAndSemanticUserInterests() {
   UUID id=uid(auth.google(identity()));
   var profile=auth.onboarding(id,List.of("KET_BAN","GAN_TOI"));
   assertTrue((Boolean)profile.get("onboardingCompleted"));
   assertEquals("[\"KET_BAN\",\"GAN_TOI\"]",profile.get("interestCodes"));
+  assertEquals(1,db.count("""
+   SELECT COUNT(*) FROM user_interests ui
+   JOIN interest_options io ON io.id=ui.interest_option_id
+   WHERE ui.user_id=:id AND io.code='KET_BAN'
+   """,args("id",id)));
+  assertEquals(0,db.count("""
+   SELECT COUNT(*) FROM user_interests ui
+   JOIN interest_options io ON io.id=ui.interest_option_id
+   WHERE ui.user_id=:id AND io.code='GAN_TOI'
+   """,args("id",id)));
   assertThrows(ApiException.class,()->auth.onboarding(id,List.of("FAKE_CODE")));
  }
 }

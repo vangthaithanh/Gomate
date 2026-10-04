@@ -108,10 +108,23 @@ public class AuthService {
  }
  @Transactional
  public Map<String,Object> onboarding(UUID uid,List<String> codes) {
-  Set<String> allowed=Set.of("KET_BAN","NGHI_DUONG","CHECKIN_HOT","THIEN_NHIEN","VAN_HOA","AM_THUC","MUC_DICH_KHAC","BIEN_NUI","TRUNG_TAM","DIA_DANH_NOI_TIENG","LANG_NGHE_DI_TICH","NGOAI_O_DONG_QUE","LOAI_KHAC","GAN_TOI","LOCAL","DANG_HOT","DI_TRONG_NGAY","CO_REVIEW","UU_TIEN_KHAC");
-  if(!allowed.containsAll(codes)) throw ApiException.bad("Lựa chọn khảo sát không hợp lệ.");
-  String json="["+String.join(",",new LinkedHashSet<>(codes).stream().map(c->"\""+c+"\"").toList())+"]";
+  var uniqueCodes=new LinkedHashSet<>(codes);
+  if(!uniqueCodes.isEmpty()) {
+   var rows=repo.db().list("SELECT code FROM interest_options WHERE active=TRUE AND code IN (:codes)",args("codes",uniqueCodes));
+   if(rows.size()!=uniqueCodes.size()) throw ApiException.bad("Lựa chọn khảo sát không hợp lệ.");
+  }
+  String json="["+String.join(",",uniqueCodes.stream().map(c->"\""+c+"\"").toList())+"]";
   repo.db().update("UPDATE user_settings SET onboarding_completed=TRUE,interest_codes=:codes WHERE user_id=:id",args("id",uid,"codes",json));
+  repo.db().update("DELETE FROM user_interests WHERE user_id=:id",args("id",uid));
+  if(!uniqueCodes.isEmpty()) repo.db().update("""
+   INSERT INTO user_interests(user_id,interest_option_id,preference_weight,selected_at)
+   SELECT :id,io.id,CAST(1.000 AS NUMERIC(4,3)),CURRENT_TIMESTAMP
+   FROM interest_options io
+   JOIN interest_groups ig ON ig.id=io.group_id
+   WHERE io.active=TRUE
+     AND io.code IN (:codes)
+     AND ig.code<>'CONTEXT_STRATEGY'
+   """,args("id",uid,"codes",uniqueCodes));
   return repo.profile(uid);
  }
 }

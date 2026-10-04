@@ -50,7 +50,14 @@ app:
   cors-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:5173}
   auth-requests-per-minute: 20
   ai:
-    recommendation-url: ${AI_RECOMMENDATION_URL:http://localhost:8000}
+    recommendation-url: ${AI_SERVICE_BASE_URL:${AI_RECOMMENDATION_URL:http://localhost:8000}}
+    recommendation-candidate-k: ${AI_RECOMMENDATION_CANDIDATE_K:50}
+    recommendation-home-limit: ${AI_RECOMMENDATION_HOME_LIMIT:10}
+    recommendation-timeout-ms: ${AI_RECOMMENDATION_TIMEOUT_MS:2500}
+  recommendation:
+    semantic-weight: ${RECOMMENDATION_SEMANTIC_WEIGHT:0.75}
+    context-weight: ${RECOMMENDATION_CONTEXT_WEIGHT:0.25}
+    distance-scale-km: ${RECOMMENDATION_DISTANCE_SCALE_KM:20}
 springdoc:
   swagger-ui:
     persist-authorization: false

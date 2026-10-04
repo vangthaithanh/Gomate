@@ -19,10 +19,21 @@ public class RecommendationController {
 
     @GetMapping("/me")
     public Map<String, Object> mine(
+        @RequestParam(required = false) String destinationKey,
         @RequestParam(required = false) Double latitude,
         @RequestParam(required = false) Double longitude,
-        @RequestParam(defaultValue = "10") int topK
+        @RequestParam(required = false) Integer topK
     ) {
-        return service.mine(CurrentUser.id(), latitude, longitude, topK);
+        return service.mine(CurrentUser.id(), destinationKey, latitude, longitude, topK);
+    }
+
+    @GetMapping("/home")
+    public Map<String, Object> home(
+        @RequestParam(required = false) String destinationKey,
+        @RequestParam(required = false) Double latitude,
+        @RequestParam(required = false) Double longitude,
+        @RequestParam(required = false) Integer topK
+    ) {
+        return service.mine(CurrentUser.id(), destinationKey, latitude, longitude, topK);
     }
 }

@@ -21,7 +21,7 @@ Codex always reads root `AGENTS.md`.
 | Trip/group/invite/location/check-in | `PROJECT_CONTRACT.md` + `DATABASE_CONTRACT.md` |
 | Social/follow/post/chat | `PROJECT_CONTRACT.md` + `DATABASE_CONTRACT.md` |
 | Notification/FCM | `PROJECT_CONTRACT.md` + `DATABASE_CONTRACT.md` |
-| AI/recommendation | `PROJECT_CONTRACT.md` + `ROADMAP_AND_DONE.md` + `PLACE_CATALOG_V11_COMPLETION.md` when recommending Places |
+| AI/recommendation | `PROJECT_CONTRACT.md` + `ROADMAP_AND_DONE.md` + `PLACE_CATALOG_V11_COMPLETION.md` + `SEMANTIC_FOUNDATION_V4.md` + `SEMANTIC_ENRICHMENT_V1_FINAL.md` + `AI_SEMANTIC_DATA_HANDOFF_V1.md` + `AI_BACKEND_INTEGRATION.md` when recommending Places |
 | Sprint planning / what to build next | `ROADMAP_AND_DONE.md` |
 | Acceptance, demo, code freeze | `ROADMAP_AND_DONE.md` |
 
