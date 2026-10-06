@@ -193,7 +193,7 @@ class _SplashScreenState extends State<SplashScreen>
           // =====================================================
           Positioned.fill(
             child: Image.asset(
-              'assets/images/login_background.png',
+              'assets/images/nen.png',
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
             ),
@@ -298,7 +298,7 @@ class _SplashScreenState extends State<SplashScreen>
 
                         child: ClipOval(
                           child: Image.asset(
-                            'assets/images/logo.png',
+                            'assets/images/logo_2.png',
                             fit: BoxFit.cover,
                           ),
                         ),

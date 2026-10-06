@@ -42,6 +42,7 @@ dependencies:
   mapbox_maps_flutter: ^2.31.0
   geolocator: ^14.0.3
   flutter_lucide: ^1.49.0
+  image_picker: ^1.2.3
 
 
 dev_dependencies:

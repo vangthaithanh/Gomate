@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../navigation/auth_flow.dart';
@@ -26,7 +27,7 @@ class _RegisterScreenState extends State<RegisterScreen>
   final TextEditingController _accountController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
-      TextEditingController();
+  TextEditingController();
 
   bool _agreeTerms = false;
   bool _isLoading = false;
@@ -56,7 +57,10 @@ class _RegisterScreenState extends State<RegisterScreen>
       curve: const Interval(0.04, 0.27, curve: Curves.easeOut),
     );
 
-    _logoScale = Tween<double>(begin: 0.88, end: 1).animate(
+    _logoScale = Tween<double>(
+      begin: 0.88,
+      end: 1,
+    ).animate(
       CurvedAnimation(
         parent: _controller,
         curve: const Interval(0.04, 0.30, curve: Curves.easeOutBack),
@@ -68,13 +72,15 @@ class _RegisterScreenState extends State<RegisterScreen>
       curve: const Interval(0.16, 0.42, curve: Curves.easeOut),
     );
 
-    _cardMove = Tween<Offset>(begin: const Offset(0, 0.14), end: Offset.zero)
-        .animate(
-          CurvedAnimation(
-            parent: _controller,
-            curve: const Interval(0.16, 0.50, curve: Curves.easeOutCubic),
-          ),
-        );
+    _cardMove = Tween<Offset>(
+      begin: const Offset(0, 0.12),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.16, 0.50, curve: Curves.easeOutCubic),
+      ),
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -84,7 +90,7 @@ class _RegisterScreenState extends State<RegisterScreen>
   }
 
   // ============================================================
-  // VALIDATION
+  // VALIDATION - GIỮ NGUYÊN LOGIC
   // ============================================================
 
   bool _isEmail(String value) {
@@ -96,7 +102,9 @@ class _RegisterScreenState extends State<RegisterScreen>
   bool _isVietnamesePhone(String value) {
     final normalized = value.replaceAll(RegExp(r'[\s.-]'), '');
 
-    return RegExp(r'^(?:\+84|84|0)(3|5|7|8|9)[0-9]{8}$').hasMatch(normalized);
+    return RegExp(
+      r'^(?:\+84|84|0)(3|5|7|8|9)[0-9]{8}$',
+    ).hasMatch(normalized);
   }
 
   bool _isStrongEnoughPassword(String value) {
@@ -153,10 +161,10 @@ class _RegisterScreenState extends State<RegisterScreen>
 
     final valid =
         nameError == null &&
-        accountError == null &&
-        passwordError == null &&
-        confirmError == null &&
-        termsError == null;
+            accountError == null &&
+            passwordError == null &&
+            confirmError == null &&
+            termsError == null;
 
     if (!valid) {
       _showMessage('Vui lòng kiểm tra lại thông tin đăng ký.');
@@ -169,12 +177,15 @@ class _RegisterScreenState extends State<RegisterScreen>
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
   }
 
   // ============================================================
-  // REGISTER
+  // REGISTER - GIỮ NGUYÊN BACKEND
   // ============================================================
 
   Future<void> _register() async {
@@ -203,9 +214,12 @@ class _RegisterScreenState extends State<RegisterScreen>
 
       _showMessage('Đăng ký thành công.');
 
-      await Future.delayed(const Duration(milliseconds: 650));
+      await Future.delayed(
+        const Duration(milliseconds: 650),
+      );
 
       if (!mounted) return;
+
       AuthFlow.goAfterAuth(context);
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -253,167 +267,106 @@ class _RegisterScreenState extends State<RegisterScreen>
     return Scaffold(
       backgroundColor: Colors.white,
       resizeToAvoidBottomInset: true,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: FadeTransition(
-              opacity: _backgroundOpacity,
-              child: Image.asset(
-                'assets/images/login_background.png',
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-              ),
-            ),
-          ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final ui = _RegisterMetrics.fromSize(
+            constraints.maxWidth,
+            constraints.maxHeight,
+          );
 
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.white.withOpacity(0.45),
-                    AppColors.blue50.withOpacity(0.45),
-                    Colors.white.withOpacity(0.67),
-                    Colors.white.withOpacity(0.90),
-                  ],
-                  stops: const [0.00, 0.33, 0.60, 1.00],
-                ),
-              ),
-            ),
-          ),
-
-          SafeArea(
-            bottom: false,
-            child: Stack(
-              children: [
-                Positioned(
-                  top: 8,
-                  left: 12,
-                  child: IconButton(
-                    onPressed: _isLoading ? null : _backToLogin,
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: 19,
-                    ),
-                    color: AppColors.textPrimary,
-                    disabledColor: AppColors.textSecondary.withOpacity(0.45),
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: FadeTransition(
+                  opacity: _backgroundOpacity,
+                  child: Image.asset(
+                    'assets/images/nen.png',
+                    fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
                   ),
                 ),
+              ),
 
-                Align(
-                  alignment: const Alignment(0, -0.77),
-                  child: FadeTransition(
-                    opacity: _logoOpacity,
-                    child: ScaleTransition(
-                      scale: _logoScale,
-                      child: Container(
-                        width: 84,
-                        height: 84,
-                        padding: const EdgeInsets.all(9),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.92),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.10),
-                              blurRadius: 18,
-                              offset: const Offset(0, 6),
+              SafeArea(
+                bottom: false,
+                child: Column(
+                  children: [
+                    SizedBox(
+                      height: ui.topAreaHeight,
+                      child: Align(
+                        alignment: Alignment.center,
+                        child: FadeTransition(
+                          opacity: _logoOpacity,
+                          child: ScaleTransition(
+                            scale: _logoScale,
+                            child: Image.asset(
+                              'assets/images/logo_2.png',
+                              width: ui.logoSize,
+                              height: ui.logoSize,
+                              fit: BoxFit.contain,
                             ),
-                          ],
-                        ),
-                        child: ClipOval(
-                          child: Image.asset(
-                            'assets/images/logo.png',
-                            fit: BoxFit.cover,
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ),
 
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: FadeTransition(
-                    opacity: _cardOpacity,
-                    child: SlideTransition(
-                      position: _cardMove,
-                      child: _buildRegisterCard(),
+                    Expanded(
+                      child: FadeTransition(
+                        opacity: _cardOpacity,
+                        child: SlideTransition(
+                          position: _cardMove,
+                          child: _buildRegisterCard(ui),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-        ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildRegisterCard() {
-    final screenHeight = MediaQuery.of(context).size.height;
-
+  Widget _buildRegisterCard(_RegisterMetrics ui) {
     return Container(
       width: double.infinity,
-      constraints: BoxConstraints(minHeight: screenHeight * 0.70),
-      padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.97),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(30),
-          topRight: Radius.circular(30),
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(ui.cardRadius),
+          topRight: Radius.circular(ui.cardRadius),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.blue500.withOpacity(0.12),
-            blurRadius: 30,
-            spreadRadius: 1,
-            offset: const Offset(0, -8),
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 14,
-            offset: const Offset(0, -3),
-          ),
-        ],
       ),
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(
+          ui.horizontalPadding,
+          ui.cardTopPadding,
+          ui.horizontalPadding,
+          ui.bottomPadding,
+        ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Center(
-              child: Column(
-                children: [
-                  Text(
-                    'Tạo tài khoản',
-                    style: TextStyle(
-                      fontSize: 25,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  SizedBox(height: 6),
-                  Text(
-                    'Bắt đầu hành trình của bạn cùng GoMate',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
+            Text(
+              'Tạo tài khoản',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: ui.titleSize,
+                height: 1.08,
+                fontWeight: FontWeight.w900,
+                color: AppColors.primaryText,
               ),
             ),
 
-            const SizedBox(height: 21),
+            SizedBox(height: ui.titleGap),
 
             AuthTextField(
               controller: _nameController,
               hintText: 'Biệt danh',
-              prefixIcon: Icons.person_outline_rounded,
+              prefixIcon: LucideIcons.user_round,
               textInputAction: TextInputAction.next,
               errorText: _nameError,
               enabled: !_isLoading,
@@ -426,12 +379,12 @@ class _RegisterScreenState extends State<RegisterScreen>
               },
             ),
 
-            const SizedBox(height: 12),
+            SizedBox(height: ui.fieldGap),
 
             AuthTextField(
               controller: _accountController,
               hintText: 'Email',
-              prefixIcon: Icons.mail_outline_rounded,
+              prefixIcon: LucideIcons.mail,
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
               errorText: _accountError,
@@ -445,18 +398,35 @@ class _RegisterScreenState extends State<RegisterScreen>
               },
             ),
 
-            const SizedBox(height: 12),
+            SizedBox(height: ui.passwordHintTopGap),
+
+            Padding(
+              padding: EdgeInsets.only(
+                left: ui.passwordHintIndent,
+              ),
+              child: Text(
+                'Mật khẩu bao gồm ít nhất 8 ký tự, gồm chữ và số',
+                style: TextStyle(
+                  fontSize: ui.passwordHintSize,
+                  height: 1.15,
+                  color: AppColors.grayText,
+                ),
+              ),
+            ),
+
+            SizedBox(height: ui.passwordHintBottomGap),
 
             AuthTextField(
               controller: _passwordController,
               hintText: 'Mật khẩu',
-              prefixIcon: Icons.lock_outline_rounded,
+              prefixIcon: LucideIcons.lock,
               isPassword: true,
               textInputAction: TextInputAction.next,
               errorText: _passwordError,
               enabled: !_isLoading,
               onChanged: (_) {
-                if (_passwordError != null || _confirmPasswordError != null) {
+                if (_passwordError != null ||
+                    _confirmPasswordError != null) {
                   setState(() {
                     _passwordError = null;
 
@@ -468,12 +438,12 @@ class _RegisterScreenState extends State<RegisterScreen>
               },
             ),
 
-            const SizedBox(height: 12),
+            SizedBox(height: ui.fieldGap),
 
             AuthTextField(
               controller: _confirmPasswordController,
               hintText: 'Nhập lại mật khẩu',
-              prefixIcon: Icons.lock_reset_rounded,
+              prefixIcon: LucideIcons.lock,
               isPassword: true,
               textInputAction: TextInputAction.done,
               errorText: _confirmPasswordError,
@@ -487,18 +457,18 @@ class _RegisterScreenState extends State<RegisterScreen>
               },
             ),
 
-            const SizedBox(height: 13),
+            SizedBox(height: ui.termsTopGap),
 
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: _isLoading
                   ? null
                   : () {
-                      setState(() {
-                        _agreeTerms = !_agreeTerms;
-                        _termsError = null;
-                      });
-                    },
+                setState(() {
+                  _agreeTerms = !_agreeTerms;
+                  _termsError = null;
+                });
+              },
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -506,47 +476,54 @@ class _RegisterScreenState extends State<RegisterScreen>
                     duration: const Duration(milliseconds: 180),
                     curve: Curves.easeOutCubic,
                     margin: const EdgeInsets.only(top: 1),
-                    width: 18,
-                    height: 18,
+                    width: ui.checkSize,
+                    height: ui.checkSize,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: _agreeTerms ? AppColors.blue500 : Colors.white,
+                      color: _agreeTerms
+                          ? AppColors.primaryIcon
+                          : Colors.white,
                       border: Border.all(
                         color: _termsError != null
                             ? const Color(0xFFE57373)
-                            : _agreeTerms
-                            ? AppColors.blue500
-                            : AppColors.blue200,
+                            : AppColors.primaryIcon,
+                        width: 1.1,
                       ),
                     ),
                     child: _agreeTerms
-                        ? const Icon(Icons.check, size: 12, color: Colors.white)
+                        ? Icon(
+                      LucideIcons.check,
+                      size: ui.checkSize * 0.62,
+                      color: Colors.white,
+                    )
                         : null,
                   ),
-                  const SizedBox(width: 9),
-                  const Expanded(
+
+                  SizedBox(width: ui.termsGap),
+
+                  Expanded(
                     child: Text.rich(
                       TextSpan(
                         style: TextStyle(
-                          fontSize: 12,
-                          height: 1.4,
-                          color: AppColors.textSecondary,
+                          fontSize: ui.termsFontSize,
+                          height: 1.35,
+                          color: AppColors.grayText,
                         ),
-                        children: [
+                        children: const [
                           TextSpan(text: 'Tôi đồng ý với '),
                           TextSpan(
-                            text: 'Điều khoản sử dụng',
+                            text: 'điều khoản sử dụng',
                             style: TextStyle(
-                              color: AppColors.blue500,
-                              fontWeight: FontWeight.w600,
+                              color: AppColors.primaryText,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                           TextSpan(text: ' và '),
                           TextSpan(
-                            text: 'Chính sách bảo mật',
+                            text: 'chính sách bảo mật',
                             style: TextStyle(
-                              color: AppColors.blue500,
-                              fontWeight: FontWeight.w600,
+                              color: AppColors.primaryText,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
@@ -558,106 +535,41 @@ class _RegisterScreenState extends State<RegisterScreen>
             ),
 
             if (_termsError != null) ...[
-              const SizedBox(height: 6),
+              SizedBox(height: ui.errorGap),
               Padding(
-                padding: const EdgeInsets.only(left: 27),
+                padding: EdgeInsets.only(
+                  left: ui.checkSize + ui.termsGap,
+                ),
                 child: Text(
                   _termsError!,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    color: Color(0xFFE05A5A),
+                  style: TextStyle(
+                    fontSize: ui.errorFontSize,
+                    color: const Color(0xFFE05A5A),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
             ],
 
-            const SizedBox(height: 20),
+            SizedBox(height: ui.buttonTopGap),
 
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Container(
-                width: double.infinity,
-                height: 52,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(26),
-                  boxShadow: !_isLoading
-                      ? [
-                          BoxShadow(
-                            color: AppColors.blue500.withOpacity(0.20),
-                            blurRadius: 18,
-                            spreadRadius: 1,
-                            offset: const Offset(0, 7),
-                          ),
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ]
-                      : [],
-                ),
-                child: ElevatedButton(
-                  /*
-                    Cho phép bấm dù chưa tích điều khoản
-                    để validation có thể thông báo rõ lỗi.
-                  */
-                  onPressed: _isLoading ? null : _register,
-                  style: ElevatedButton.styleFrom(
-                    elevation: 0,
-                    backgroundColor: AppColors.blue500,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: AppColors.blue500.withOpacity(
-                      0.82,
-                    ),
-                    disabledForegroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(26),
-                    ),
-                    padding: EdgeInsets.zero,
-                  ),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 220),
-                    child: _isLoading
-                        ? const SizedBox(
-                            key: ValueKey('register_loading'),
-                            width: 23,
-                            height: 23,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Row(
-                            key: ValueKey('register_text'),
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'Đăng ký',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              SizedBox(width: 7),
-                              Icon(Icons.arrow_forward_rounded, size: 21),
-                            ],
-                          ),
-                  ),
-                ),
-              ),
+            _RegisterGradientButton(
+              height: ui.buttonHeight,
+              radius: ui.buttonRadius,
+              loading: _isLoading,
+              onTap: _register,
             ),
 
-            const SizedBox(height: 22),
+            SizedBox(height: ui.footerTopGap),
 
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(
+                Text(
                   'Đã có tài khoản? ',
                   style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
+                    fontSize: ui.footerFontSize,
+                    color: AppColors.grayText,
                   ),
                 ),
                 GestureDetector(
@@ -665,19 +577,221 @@ class _RegisterScreenState extends State<RegisterScreen>
                   child: Text(
                     'Đăng nhập',
                     style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                      fontSize: ui.footerFontSize,
+                      fontWeight: FontWeight.w500,
                       color: _isLoading
-                          ? AppColors.textSecondary.withOpacity(0.45)
-                          : AppColors.blue500,
+                          ? AppColors.grayText.withOpacity(0.45)
+                          : AppColors.primaryText,
                     ),
                   ),
                 ),
               ],
             ),
-
-            const SizedBox(height: 4),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// REGISTER RESPONSIVE METRICS
+// ============================================================================
+
+class _RegisterMetrics {
+  final double topAreaHeight;
+  final double logoSize;
+  final double cardRadius;
+  final double horizontalPadding;
+  final double cardTopPadding;
+  final double bottomPadding;
+  final double titleSize;
+  final double titleGap;
+  final double fieldGap;
+  final double passwordHintTopGap;
+  final double passwordHintBottomGap;
+  final double passwordHintIndent;
+  final double passwordHintSize;
+  final double termsTopGap;
+  final double checkSize;
+  final double termsGap;
+  final double termsFontSize;
+  final double errorGap;
+  final double errorFontSize;
+  final double buttonTopGap;
+  final double buttonHeight;
+  final double buttonRadius;
+  final double footerTopGap;
+  final double footerFontSize;
+
+  const _RegisterMetrics({
+    required this.topAreaHeight,
+    required this.logoSize,
+    required this.cardRadius,
+    required this.horizontalPadding,
+    required this.cardTopPadding,
+    required this.bottomPadding,
+    required this.titleSize,
+    required this.titleGap,
+    required this.fieldGap,
+    required this.passwordHintTopGap,
+    required this.passwordHintBottomGap,
+    required this.passwordHintIndent,
+    required this.passwordHintSize,
+    required this.termsTopGap,
+    required this.checkSize,
+    required this.termsGap,
+    required this.termsFontSize,
+    required this.errorGap,
+    required this.errorFontSize,
+    required this.buttonTopGap,
+    required this.buttonHeight,
+    required this.buttonRadius,
+    required this.footerTopGap,
+    required this.footerFontSize,
+  });
+
+  factory _RegisterMetrics.fromSize(
+      double width,
+      double height,
+      ) {
+    // ============================================================
+    // FIGMA REFERENCE: 375 x 715
+    // ============================================================
+    // Tất cả tỉ lệ theo WIDTH, không dùng chiều cao để kéo giãn.
+    //
+    // card top: 212 / 375 = 0.565
+    // logo: 104 / 375 = 0.277
+    // form: 295 / 375 = 0.787
+    // title: 24 / 375 = 0.064
+    // field: 46 / 375 = 0.123
+    // button: 50 / 375 = 0.133
+
+    final formWidth = width * 0.787;
+    final horizontalPadding = (width - formWidth) / 2;
+
+    return _RegisterMetrics(
+      topAreaHeight: width * 0.565,
+
+      logoSize: width * 0.277,
+
+      cardRadius: width * 0.053,
+
+      horizontalPadding: horizontalPadding,
+
+      // card top 212 -> title top 246 = 34.
+      cardTopPadding: width * 0.091,
+
+      bottomPadding: width * 0.050,
+
+      titleSize: width * 0.064,
+
+      // title ~29px high, first field y=291.
+      titleGap: width * 0.043,
+
+      // name bottom 337 -> email top 350 = 13.
+      fieldGap: width * 0.035,
+
+      // email bottom 396 -> hint y407.
+      passwordHintTopGap: width * 0.020,
+
+      // hint ~11px high -> password top 422.
+      passwordHintBottomGap: width * 0.011,
+
+      // Figma hint starts x49 while field starts x40.
+      passwordHintIndent: width * 0.024,
+
+      // 10 / 375.
+      passwordHintSize: width * 0.027,
+
+      // confirm bottom 527 -> terms top about 540.
+      termsTopGap: width * 0.035,
+
+      // 15 / 375.
+      checkSize: width * 0.040,
+
+      // checkbox x47, text x74 => ~12px after 15px circle.
+      termsGap: width * 0.032,
+
+      // 12 / 375.
+      termsFontSize: width * 0.032,
+
+      errorGap: width * 0.012,
+      errorFontSize: width * 0.028,
+
+      // terms block ~27px; button y588 => about 21px.
+      buttonTopGap: width * 0.056,
+
+      buttonHeight: width * 0.133,
+
+      buttonRadius: width * 0.053,
+
+      // button bottom 638 -> footer y651 = 13.
+      footerTopGap: width * 0.035,
+
+      footerFontSize: width * 0.035,
+    );
+  }
+}
+
+// ============================================================================
+// REGISTER BUTTON
+// ============================================================================
+
+class _RegisterGradientButton extends StatelessWidget {
+  final double height;
+  final double radius;
+  final bool loading;
+  final VoidCallback onTap;
+
+  const _RegisterGradientButton({
+    required this.height,
+    required this.radius,
+    required this.loading,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        gradient: AppColors.primaryGradient,
+        borderRadius: BorderRadius.circular(radius),
+        boxShadow: !loading
+            ? AppColors.elevatedShadow
+            : const [],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(radius),
+        child: InkWell(
+          onTap: loading ? null : onTap,
+          borderRadius: BorderRadius.circular(radius),
+          child: Center(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: loading
+                  ? SizedBox(
+                key: const ValueKey('register_loading'),
+                width: height * 0.44,
+                height: height * 0.44,
+                child: const CircularProgressIndicator(
+                  strokeWidth: 2.4,
+                  color: Colors.white,
+                ),
+              )
+                  : Text(
+                'Đăng Ký',
+                key: const ValueKey('register_label'),
+                style: TextStyle(
+                  fontSize: height * 0.32,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );

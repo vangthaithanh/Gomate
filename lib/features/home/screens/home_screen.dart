@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../../core/services/auth_service.dart';
@@ -9,9 +10,30 @@ import '../../map/screens/place_detail_screen.dart';
 import '../../map/services/location_service.dart';
 import '../../recommendation/data/recommendation_repository.dart';
 import '../../recommendation/models/recommendation_models.dart';
+import '../../search/models/search_models.dart';
+import '../../search/screens/search_screen.dart';
+import '../data/post_interaction_repository.dart';
+import '../models/post_interaction_models.dart';
+import '../widgets/comment_sheet_content.dart';
+import '../widgets/share_post_content.dart';
+import '../../../core/widgets/bottom_sheet.dart';
+import '../../../core/widgets/snackbar.dart';
+import '../widgets/post_action_content.dart';
+import '../widgets/report_reason_content.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  /// MainShell truyền callback này để chuyển sang tab Map mà không push
+  /// một MapScreen mới, nhờ đó bottom navbar vẫn giữ nguyên.
+  final ValueChanged<PostLocationTarget>? onOpenPostLocation;
+
+  /// Cho phép inject repository thật khi backend Social hoàn thiện.
+  final PostInteractionRepository? interactionRepository;
+
+  const HomeScreen({
+    super.key,
+    this.onOpenPostLocation,
+    this.interactionRepository,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -36,6 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<_HomePost> _posts = const [
     _HomePost(
+      id: 'post-1',
       authorName: 'Thune',
       location: 'Thành phố Hồ Chí Minh',
       avatar: 'assets/images/home/moment_thune.jpg',
@@ -49,6 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
       commentCount: 4,
     ),
     _HomePost(
+      id: 'post-2',
       authorName: 'ChiThanh',
       location: 'Thành phố Hồ Chí Minh',
       avatar: 'assets/images/home/moment_chithanh.jpg',
@@ -61,6 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
       commentCount: 4,
     ),
     _HomePost(
+      id: 'post-3',
       authorName: 'Buji',
       location: 'Đà Nẵng',
       avatar: 'assets/images/home/moment_buji.jpg',
@@ -73,6 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
       commentCount: 2,
     ),
     _HomePost(
+      id: 'post-4',
       authorName: 'Thune',
       location: 'Thành phố Hồ Chí Minh',
       avatar: 'assets/images/home/moment_thune.jpg',
@@ -84,8 +110,9 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   final RecommendationRepository _recommendationRepository =
-      RecommendationRepository();
+  RecommendationRepository();
   final GoMateLocationService _locationService = GoMateLocationService();
+  late final PostInteractionRepository _postInteractionRepository;
   late Future<RecommendationResponse> _recommendations;
 
   final List<_UserSuggestion> _userSuggestions = const [
@@ -113,6 +140,10 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+
+    _postInteractionRepository =
+        widget.interactionRepository ?? DemoPostInteractionRepository();
+
     _recommendations = _loadRecommendations();
   }
 
@@ -210,6 +241,88 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _openSearch() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const SearchScreen(),
+      ),
+    );
+  }
+
+  Future<void> _openAllRecommendations() async {
+    // SearchScreen Discovery đã dùng cùng RecommendationRepository với Home,
+    // nên đây chính là màn "xem tất cả" của gợi ý địa điểm.
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const SearchScreen(),
+      ),
+    );
+  }
+
+  Future<void> _openHashtag(String hashtag) async {
+    final tag = hashtag.trim();
+    if (tag.isEmpty) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SearchScreen(
+          initialQuery: tag,
+          initialTab: SearchTab.posts,
+          initialHashtags: <String>{tag},
+          startSubmitted: true,
+          cancelReturnsToPrevious: true,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openComments(_HomePost post) async {
+    await GoMateBottomSheet.show(
+      context: context,
+      size: GoMateBottomSheetSize.expanded,
+      contentPadding: EdgeInsets.zero,
+      child: CommentSheetContent(
+        postId: post.id,
+        repository: _postInteractionRepository,
+      ),
+    );
+  }
+
+  Future<void> _openShare(_HomePost post) async {
+    final sentCount = await GoMateBottomSheet.show<int>(
+      context: context,
+      size: GoMateBottomSheetSize.expanded,
+      contentPadding: EdgeInsets.zero,
+      child: SharePostContent(
+        postId: post.id,
+        repository: _postInteractionRepository,
+      ),
+    );
+
+    if (!mounted || sentCount == null || sentCount <= 0) return;
+
+    GoMateSnackBar.show(
+      context,
+      message: 'Đã gửi bài viết cho $sentCount người',
+      bottomOffset: 92,
+      icon: LucideIcons.circle_check,
+    );
+  }
+
+  void _openPostLocation(_HomePost post) {
+    final callback = widget.onOpenPostLocation;
+    if (callback == null) return;
+
+    callback(
+      PostLocationTarget(
+        label: post.location,
+        placeId: post.placeId,
+        latitude: post.latitude,
+        longitude: post.longitude,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -229,7 +342,10 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: ui.contentPadding),
-                  child: _HomeHeader(ui: ui),
+                  child: _HomeHeader(
+                    ui: ui,
+                    onSearchTap: _openSearch,
+                  ),
                 ),
 
                 SizedBox(height: ui.gapSmall),
@@ -238,13 +354,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 SizedBox(height: ui.gapMedium),
 
-                _FeedPostCard(
-                  post: _posts[0],
-                  highlighted: _hasHighlightedMoment(_posts[0].authorName),
-                  ui: ui,
+                _PostSlot(
+                  hidden: _hiddenPostIndexes.contains(0),
+                  bottomGap: ui.gapSection,
+                  child: _FeedPostCard(
+                    post: _posts[0],
+                    highlighted: _hasHighlightedMoment(_posts[0].authorName),
+                    ui: ui,
+                    onMoreTap: () => _openPostActions(0),
+                    onCommentTap: () => _openComments(_posts[0]),
+                    onShareTap: () => _openShare(_posts[0]),
+                    onHashtagTap: _openHashtag,
+                    onLocationTap: () => _openPostLocation(_posts[0]),
+                  ),
                 ),
-
-                SizedBox(height: ui.gapSection),
 
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: ui.contentPadding),
@@ -253,18 +376,26 @@ class _HomeScreenState extends State<HomeScreen> {
                     ui: ui,
                     onRetry: _retryRecommendations,
                     onTap: _openRecommendedPlace,
+                    onSeeAll: _openAllRecommendations,
                   ),
                 ),
 
                 SizedBox(height: ui.gapSection),
 
-                _FeedPostCard(
-                  post: _posts[1],
-                  highlighted: _hasHighlightedMoment(_posts[1].authorName),
-                  ui: ui,
+                _PostSlot(
+                  hidden: _hiddenPostIndexes.contains(1),
+                  bottomGap: ui.gapSection,
+                  child: _FeedPostCard(
+                    post: _posts[1],
+                    highlighted: _hasHighlightedMoment(_posts[1].authorName),
+                    ui: ui,
+                    onMoreTap: () => _openPostActions(1),
+                    onCommentTap: () => _openComments(_posts[1]),
+                    onShareTap: () => _openShare(_posts[1]),
+                    onHashtagTap: _openHashtag,
+                    onLocationTap: () => _openPostLocation(_posts[1]),
+                  ),
                 ),
-
-                SizedBox(height: ui.gapSection),
 
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: ui.contentPadding),
@@ -276,24 +407,108 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 SizedBox(height: ui.gapSection),
 
-                _FeedPostCard(
-                  post: _posts[2],
-                  highlighted: _hasHighlightedMoment(_posts[2].authorName),
-                  ui: ui,
+                _PostSlot(
+                  hidden: _hiddenPostIndexes.contains(2),
+                  bottomGap: ui.gapSection,
+                  child: _FeedPostCard(
+                    post: _posts[2],
+                    highlighted: _hasHighlightedMoment(_posts[2].authorName),
+                    ui: ui,
+                    onMoreTap: () => _openPostActions(2),
+                    onCommentTap: () => _openComments(_posts[2]),
+                    onShareTap: () => _openShare(_posts[2]),
+                    onHashtagTap: _openHashtag,
+                    onLocationTap: () => _openPostLocation(_posts[2]),
+                  ),
                 ),
 
-                SizedBox(height: ui.gapSection),
-
-                _FeedPostCard(
-                  post: _posts[3],
-                  highlighted: _hasHighlightedMoment(_posts[3].authorName),
-                  ui: ui,
+                _PostSlot(
+                  hidden: _hiddenPostIndexes.contains(3),
+                  child: _FeedPostCard(
+                    post: _posts[3],
+                    highlighted: _hasHighlightedMoment(_posts[3].authorName),
+                    ui: ui,
+                    onMoreTap: () => _openPostActions(3),
+                    onCommentTap: () => _openComments(_posts[3]),
+                    onShareTap: () => _openShare(_posts[3]),
+                    onHashtagTap: _openHashtag,
+                    onLocationTap: () => _openPostLocation(_posts[3]),
+                  ),
                 ),
               ],
             );
           },
         ),
       ),
+    );
+  }
+
+  final Set<int> _hiddenPostIndexes = <int>{};
+
+  Future<void> _openPostActions(int postIndex) async {
+    final result = await GoMateBottomSheet.show<PostActionResult>(
+      context: context,
+      size: GoMateBottomSheetSize.compact,
+      child: const PostActionContent(),
+    );
+
+    if (!mounted || result == null) return;
+
+    switch (result) {
+      case PostActionResult.notInterested:
+        _hidePost(postIndex);
+        break;
+
+      case PostActionResult.report:
+        await _openReportReasons(postIndex);
+        break;
+    }
+  }
+
+  Future<void> _openReportReasons(int postIndex) async {
+    final reason = await GoMateBottomSheet.show<ReportReason>(
+      context: context,
+      size: GoMateBottomSheetSize.expanded,
+      child: const ReportReasonContent(),
+    );
+
+    if (!mounted || reason == null) return;
+
+    HapticFeedback.selectionClick();
+
+    // Hiện tại chỉ hoàn thiện flow UI.
+    // `postIndex` và `reason` sẽ dùng khi nối backend Report sau này.
+    GoMateSnackBar.show(
+      context,
+      message: 'Cảm ơn bạn đã đóng góp ý kiến',
+      bottomOffset: 92,
+      actionLabel: 'Xem báo cáo',
+      onAction: () {
+        // TODO: Mở trang / chi tiết báo cáo khi feature được triển khai.
+      },
+    );
+  }
+
+  void _hidePost(int postIndex) {
+    if (_hiddenPostIndexes.contains(postIndex)) return;
+
+    HapticFeedback.selectionClick();
+
+    setState(() {
+      _hiddenPostIndexes.add(postIndex);
+    });
+
+    GoMateSnackBar.showUndo(
+      context,
+      message: 'Đã ẩn bài viết đối với bạn',
+      bottomOffset: 92,
+      onUndo: () {
+        if (!mounted) return;
+
+        setState(() {
+          _hiddenPostIndexes.remove(postIndex);
+        });
+      },
     );
   }
 }
@@ -369,14 +584,17 @@ class _HomeMetrics {
 
     // Các tỉ lệ bên dưới lấy màn khoảng 360-390dp làm chuẩn,
     // nhưng đều có min/max để tablet không phóng quá lớn.
-    final contentPadding = c(width * 0.048, 15, 22);
+    final contentPadding = c(width * 0.053, 16, 22);
 
-    final momentActive = c(width * 0.145, 52, 62);
-    final momentNormal = momentActive * 0.84;
-    final momentItemWidth = c(width * 0.185, 64, 78);
+    // Figma reference ~375dp:
+    // active moment 60, normal 50, each moment slot ~84.
+    final momentActive = c(width * 0.160, 56, 64);
+    final momentNormal = c(width * 0.133, 47, 54);
+    final momentItemWidth = c(width * 0.224, 76, 88);
 
-    final placeCardWidth = c(width * 0.335, 118, 148);
-    final placeCardHeight = placeCardWidth * 1.62;
+    // Figma place cards ~150 x 250 on a 375-wide frame.
+    final placeCardWidth = c(width * 0.400, 132, 156);
+    final placeCardHeight = placeCardWidth * (250 / 150);
 
     // Friend suggestion cards are intentionally larger than before.
     // ~31% of screen width matches the visual proportion in the mockup
@@ -393,8 +611,8 @@ class _HomeMetrics {
       bottomPadding: c(width * 0.30, 108, 132),
 
       headerHeight: c(width * 0.12, 44, 52),
-      headerIconSize: c(width * 0.057, 20, 24),
-      logoFontSize: c(width * 0.063, 23, 27),
+      headerIconSize: c(width * 0.064, 22, 25),
+      logoFontSize: c(width * 0.064, 23, 27),
 
       momentActiveSize: momentActive,
       momentNormalSize: momentNormal,
@@ -427,8 +645,12 @@ class _HomeMetrics {
 
 class _HomeHeader extends StatelessWidget {
   final _HomeMetrics ui;
+  final VoidCallback onSearchTap;
 
-  const _HomeHeader({required this.ui});
+  const _HomeHeader({
+    required this.ui,
+    required this.onSearchTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -439,7 +661,7 @@ class _HomeHeader extends StatelessWidget {
           _HeaderButton(
             icon: LucideIcons.search,
             iconSize: ui.headerIconSize,
-            onTap: () {},
+            onTap: onSearchTap,
           ),
 
           const Spacer(),
@@ -449,8 +671,8 @@ class _HomeHeader extends StatelessWidget {
             style: TextStyle(
               fontSize: ui.logoFontSize,
               height: 1,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.6,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.5,
               color: AppColors.primaryText,
             ),
           ),
@@ -554,16 +776,53 @@ class _MomentStrip extends StatelessWidget {
 // ============================================================================
 // POST
 // ============================================================================
+class _PostSlot extends StatelessWidget {
+  final bool hidden;
+  final double bottomGap;
+  final Widget child;
+
+  const _PostSlot({
+    required this.hidden,
+    required this.child,
+    this.bottomGap = 0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Visibility(
+      visible: !hidden,
+      maintainState: true,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          child,
+          if (bottomGap > 0) SizedBox(height: bottomGap),
+        ],
+      ),
+    );
+  }
+}
 
 class _FeedPostCard extends StatefulWidget {
+  final VoidCallback onMoreTap;
+  final VoidCallback onCommentTap;
+  final VoidCallback onShareTap;
+  final ValueChanged<String> onHashtagTap;
+  final VoidCallback onLocationTap;
   final _HomePost post;
   final bool highlighted;
   final _HomeMetrics ui;
 
   const _FeedPostCard({
+    super.key,
     required this.post,
     required this.highlighted,
     required this.ui,
+    required this.onMoreTap,
+    required this.onCommentTap,
+    required this.onShareTap,
+    required this.onHashtagTap,
+    required this.onLocationTap,
   });
 
   @override
@@ -572,7 +831,14 @@ class _FeedPostCard extends StatefulWidget {
 
 class _FeedPostCardState extends State<_FeedPostCard> {
   late final PageController _pageController;
+  late int _likeCount;
+
   int _currentPage = 0;
+  int _likeBurstToken = 0;
+
+  bool _isLiked = false;
+  bool _showLikeBurst = false;
+  bool _isBookmarked = false;
 
   List<String> get _media => widget.post.media.take(12).toList(growable: false);
 
@@ -580,6 +846,65 @@ class _FeedPostCardState extends State<_FeedPostCard> {
   void initState() {
     super.initState();
     _pageController = PageController();
+    _likeCount = widget.post.likeCount;
+  }
+
+  void _toggleLike() {
+    HapticFeedback.selectionClick();
+
+    setState(() {
+      _isLiked = !_isLiked;
+      _likeCount += _isLiked ? 1 : -1;
+    });
+  }
+
+  Future<void> _likeFromDoubleTap() async {
+    HapticFeedback.lightImpact();
+
+    final token = ++_likeBurstToken;
+
+    setState(() {
+      if (!_isLiked) {
+        _isLiked = true;
+        _likeCount += 1;
+      }
+
+      _showLikeBurst = true;
+    });
+
+    await Future<void>.delayed(
+      const Duration(milliseconds: 650),
+    );
+
+    if (!mounted || token != _likeBurstToken) return;
+
+    setState(() {
+      _showLikeBurst = false;
+    });
+  }
+
+  void _toggleBookmark() {
+    HapticFeedback.selectionClick();
+
+    setState(() {
+      _isBookmarked = !_isBookmarked;
+    });
+
+    if (_isBookmarked) {
+      GoMateSnackBar.show(
+        context,
+        message: 'Đã lưu vào bộ sưu tập',
+        bottomOffset: 92,
+        icon: LucideIcons.bookmark,
+      );
+    } else {
+      GoMateSnackBar.show(
+        context,
+        message: 'Đã gỡ khỏi bộ sưu tập',
+        bottomOffset: 92,
+        icon: LucideIcons.circle_check,
+      );
+    }
   }
 
   @override
@@ -626,14 +951,23 @@ class _FeedPostCardState extends State<_FeedPostCard> {
                       ),
                     ),
                     SizedBox(height: ui.width * 0.009),
-                    Text(
-                      post.location,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: _font(ui.width, 11.5),
-                        height: 1.1,
-                        color: AppColors.grayText,
+                    InkWell(
+                      onTap: widget.onLocationTap,
+                      borderRadius: BorderRadius.circular(6),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          vertical: ui.width * 0.004,
+                        ),
+                        child: Text(
+                          post.location,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: _font(ui.width, 11.5),
+                            height: 1.1,
+                            color: AppColors.grayText,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -641,7 +975,7 @@ class _FeedPostCardState extends State<_FeedPostCard> {
               ),
 
               InkWell(
-                onTap: () {},
+                onTap: widget.onMoreTap,
                 borderRadius: BorderRadius.circular(18),
                 child: SizedBox(
                   width: ui.postAvatarSize * 0.85,
@@ -666,7 +1000,11 @@ class _FeedPostCardState extends State<_FeedPostCard> {
         // ------------------------------------------------------------
         Padding(
           padding: EdgeInsets.symmetric(horizontal: ui.contentPadding),
-          child: _PostCaption(text: post.caption, width: ui.width),
+          child: _PostCaption(
+            text: post.caption,
+            width: ui.width,
+            onHashtagTap: widget.onHashtagTap,
+          ),
         ),
 
         SizedBox(height: ui.width * 0.025),
@@ -677,20 +1015,52 @@ class _FeedPostCardState extends State<_FeedPostCard> {
         // Không Padding, không ClipRRect, không margin hai bên.
         // AspectRatio 1:1 nên tự co theo mọi màn hình.
         // ------------------------------------------------------------
-        AspectRatio(
-          aspectRatio: 1,
-          child: PageView.builder(
-            controller: _pageController,
-            physics: const BouncingScrollPhysics(),
-            itemCount: _media.length,
-            onPageChanged: (index) {
-              setState(() {
-                _currentPage = index;
-              });
-            },
-            itemBuilder: (context, index) {
-              return _SafeAssetImage(path: _media[index], fit: BoxFit.cover);
-            },
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onDoubleTap: _likeFromDoubleTap,
+          child: AspectRatio(
+            aspectRatio: 1,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                PageView.builder(
+                  controller: _pageController,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: _media.length,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentPage = index;
+                    });
+                  },
+                  itemBuilder: (context, index) {
+                    return _SafeAssetImage(
+                      path: _media[index],
+                      fit: BoxFit.cover,
+                    );
+                  },
+                ),
+
+                IgnorePointer(
+                  child: Center(
+                    child: AnimatedOpacity(
+                      opacity: _showLikeBurst ? 1 : 0,
+                      duration: const Duration(milliseconds: 130),
+                      curve: Curves.easeOut,
+                      child: AnimatedScale(
+                        scale: _showLikeBurst ? 1 : 0.58,
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOutBack,
+                        child: _FilledHeart(
+                          size: ui.width * 0.22,
+                          color: AppColors.primaryIcon,
+                          shadow: true,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
 
@@ -714,9 +1084,24 @@ class _FeedPostCardState extends State<_FeedPostCard> {
             children: [
               _ActionIcon(
                 icon: LucideIcons.heart,
-                text: '${post.likeCount}',
+                text: '$_likeCount',
                 iconSize: ui.postIconSize,
                 width: ui.width,
+
+                // Chưa like: đen
+                // Đã like: xanh
+                iconColor:
+                _isLiked
+                    ? AppColors.primaryIcon
+                    : AppColors.black,
+
+                textColor:
+                _isLiked
+                    ? AppColors.primaryIcon
+                    : AppColors.black,
+
+                filled: _isLiked,
+                onTap: _toggleLike,
               ),
 
               SizedBox(width: ui.width * 0.046),
@@ -726,14 +1111,45 @@ class _FeedPostCardState extends State<_FeedPostCard> {
                 text: '${post.commentCount}',
                 iconSize: ui.postIconSize,
                 width: ui.width,
+                iconColor: AppColors.black,
+                textColor: AppColors.black,
+                onTap: widget.onCommentTap,
+              ),
+
+              SizedBox(width: ui.width * 0.042),
+
+              InkWell(
+                onTap: widget.onShareTap,
+                borderRadius: BorderRadius.circular(ui.postIconSize),
+                child: Padding(
+                  padding: EdgeInsets.all(ui.width * 0.006),
+                  child: Icon(
+                    LucideIcons.send,
+                    size: ui.postIconSize,
+                    color: AppColors.black,
+                  ),
+                ),
               ),
 
               const Spacer(),
 
-              Icon(
-                LucideIcons.bookmark,
-                size: ui.postIconSize,
-                color: AppColors.black,
+              InkWell(
+                onTap: _toggleBookmark,
+                borderRadius: BorderRadius.circular(ui.postIconSize),
+                child: Padding(
+                  padding: EdgeInsets.all(ui.width * 0.006),
+                  child: _isBookmarked
+                      ? Icon(
+                    Icons.bookmark_rounded,
+                    size: ui.postIconSize,
+                    color: AppColors.primaryIcon,
+                  )
+                      : Icon(
+                    LucideIcons.bookmark,
+                    size: ui.postIconSize,
+                    color: AppColors.black,
+                  ),
+                ),
               ),
             ],
           ),
@@ -746,46 +1162,53 @@ class _FeedPostCardState extends State<_FeedPostCard> {
 class _PostCaption extends StatelessWidget {
   final String text;
   final double width;
+  final ValueChanged<String> onHashtagTap;
 
-  const _PostCaption({required this.text, required this.width});
+  const _PostCaption({
+    required this.text,
+    required this.width,
+    required this.onHashtagTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    const tag = '#Hashtag';
+    final tokens = text
+        .split(RegExp(r'\s+'))
+        .where((token) => token.isNotEmpty)
+        .toList(growable: false);
 
-    if (!text.startsWith(tag)) {
-      return Text(
-        text,
-        style: TextStyle(
-          fontSize: _font(width, 12.5),
-          height: 1.22,
-          color: AppColors.black,
-        ),
-      );
-    }
+    return Wrap(
+      spacing: width * 0.010,
+      runSpacing: width * 0.004,
+      children: tokens.map((token) {
+        final isHashtag = token.startsWith('#');
 
-    final rest = text.substring(tag.length).trimLeft();
-
-    return RichText(
-      text: TextSpan(
-        style: TextStyle(fontSize: _font(width, 12.5), height: 1.22),
-        children: [
-          const TextSpan(
-            text: '#Hashtag ',
+        if (!isHashtag) {
+          return Text(
+            token,
             style: TextStyle(
+              fontSize: _font(width, 12.5),
+              height: 1.22,
+              color: AppColors.black,
+              fontWeight: FontWeight.w400,
+            ),
+          );
+        }
+
+        return InkWell(
+          onTap: () => onHashtagTap(token),
+          borderRadius: BorderRadius.circular(6),
+          child: Text(
+            token,
+            style: TextStyle(
+              fontSize: _font(width, 12.5),
+              height: 1.22,
               color: AppColors.primaryText,
               fontWeight: FontWeight.w700,
             ),
           ),
-          TextSpan(
-            text: rest,
-            style: const TextStyle(
-              color: AppColors.black,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-        ],
-      ),
+        );
+      }).toList(growable: false),
     );
   }
 }
@@ -832,29 +1255,98 @@ class _ActionIcon extends StatelessWidget {
   final String text;
   final double iconSize;
   final double width;
+  final Color iconColor;
+  final Color textColor;
+  final bool filled;
+  final VoidCallback? onTap;
 
   const _ActionIcon({
     required this.icon,
     required this.text,
     required this.iconSize,
     required this.width,
+    this.iconColor = AppColors.primaryIcon,
+    this.textColor = AppColors.black,
+    this.filled = false,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final content = Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: iconSize, color: AppColors.primaryIcon),
+        if (filled && icon == LucideIcons.heart)
+          _FilledHeart(
+            size: iconSize,
+            color: iconColor,
+          )
+        else
+          Icon(
+            icon,
+            size: iconSize,
+            color: iconColor,
+          ),
         SizedBox(width: width * 0.013),
         Text(
           text,
           style: TextStyle(
-            fontSize: _font(width, 12.5),
+            fontSize: _font(width, 14),
             fontWeight: FontWeight.w600,
-            color: AppColors.black,
+            color: textColor,
           ),
         ),
       ],
+    );
+
+    if (onTap == null) {
+      return content;
+    }
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(iconSize),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          vertical: width * 0.006,
+        ),
+        child: content,
+      ),
+    );
+  }
+}
+
+class _FilledHeart extends StatelessWidget {
+  final double size;
+  final Color color;
+  final bool shadow;
+
+  const _FilledHeart({
+    required this.size,
+    required this.color,
+    this.shadow = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Icon(
+      Icons.favorite_rounded,
+      size: size,
+      color: color,
+      shadows: shadow
+          ? [
+        Shadow(
+          blurRadius: 16,
+          color: Colors.white.withOpacity(0.72),
+          offset: const Offset(0, 0),
+        ),
+        const Shadow(
+          blurRadius: 10,
+          color: Color(0x42000000),
+          offset: Offset(0, 3),
+        ),
+      ]
+          : null,
     );
   }
 }
@@ -868,12 +1360,14 @@ class _PlaceSuggestionSection extends StatelessWidget {
   final _HomeMetrics ui;
   final VoidCallback onRetry;
   final ValueChanged<RecommendedPlace> onTap;
+  final VoidCallback onSeeAll;
 
   const _PlaceSuggestionSection({
     required this.future,
     required this.ui,
     required this.onRetry,
     required this.onTap,
+    required this.onSeeAll,
   });
 
   @override
@@ -881,7 +1375,11 @@ class _PlaceSuggestionSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionHeader(title: 'Gợi ý cho bạn', ui: ui),
+        _SectionHeader(
+          title: 'Gợi ý cho bạn',
+          ui: ui,
+          onSeeAll: onSeeAll,
+        ),
 
         SizedBox(height: ui.width * 0.03),
 
@@ -906,7 +1404,7 @@ class _PlaceSuggestionSection extends StatelessWidget {
                     .where((place) => place.placeId > 0)
                     .take(10)
                     .toList(growable: false) ??
-                const <RecommendedPlace>[];
+                    const <RecommendedPlace>[];
 
             if (places.isEmpty) {
               return _buildMessageRail(
@@ -928,9 +1426,9 @@ class _PlaceSuggestionSection extends StatelessWidget {
   }
 
   Widget _buildPlaceRail(
-    List<_PlaceSuggestion> items,
-    List<RecommendedPlace> sourcePlaces,
-  ) {
+      List<_PlaceSuggestion> items,
+      List<RecommendedPlace> sourcePlaces,
+      ) {
     return SizedBox(
       height: ui.placeRailHeight,
       child: ListView.separated(
@@ -938,7 +1436,7 @@ class _PlaceSuggestionSection extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         itemCount: items.length,
-        separatorBuilder: (_, __) => SizedBox(width: ui.width * 0.034),
+        separatorBuilder: (_, __) => SizedBox(width: ui.width * 0.050),
         itemBuilder: (context, index) {
           final item = items[index];
 
@@ -1038,7 +1536,7 @@ class _PlaceSuggestionSection extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: 3,
-        separatorBuilder: (_, __) => SizedBox(width: ui.width * 0.034),
+        separatorBuilder: (_, __) => SizedBox(width: ui.width * 0.050),
         itemBuilder: (_, __) {
           return Container(
             width: ui.placeCardWidth,
@@ -1120,14 +1618,10 @@ class _RatingBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            '★',
-            style: TextStyle(
-              fontSize: cardWidth * 0.105,
-              height: 1,
-              fontWeight: FontWeight.w900,
-              color: AppColors.primaryIcon,
-            ),
+          Icon(
+            Icons.star_rounded,
+            size: cardWidth * 0.105,
+            color: AppColors.primaryIcon,
           ),
           SizedBox(width: cardWidth * 0.02),
           Text(
@@ -1269,8 +1763,13 @@ class _UserSuggestionSection extends StatelessWidget {
 class _SectionHeader extends StatelessWidget {
   final String title;
   final _HomeMetrics ui;
+  final VoidCallback? onSeeAll;
 
-  const _SectionHeader({required this.title, required this.ui});
+  const _SectionHeader({
+    required this.title,
+    required this.ui,
+    this.onSeeAll,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1286,11 +1785,11 @@ class _SectionHeader extends StatelessWidget {
         ),
         const Spacer(),
         GestureDetector(
-          onTap: () {},
+          onTap: onSeeAll,
           child: Text(
             'Xem tất cả',
             style: TextStyle(
-              fontSize: _font(ui.width, 11),
+              fontSize: _font(ui.width, 13),
               fontWeight: FontWeight.w700,
               color: AppColors.primaryText,
             ),
@@ -1476,7 +1975,7 @@ class _SafeNetworkImage extends StatelessWidget {
                   value: progress.expectedTotalBytes == null
                       ? null
                       : progress.cumulativeBytesLoaded /
-                            progress.expectedTotalBytes!,
+                      progress.expectedTotalBytes!,
                 ),
               ),
             ),
@@ -1526,8 +2025,20 @@ class _MomentItem {
 }
 
 class _HomePost {
+  final String id;
   final String authorName;
+
+  /// Backend sau này ưu tiên:
+  /// 1) tên Place được gắn vào bài;
+  /// 2) nếu không gắn Place thì dùng label GPS đã lưu lúc đăng.
   final String location;
+
+  /// Nếu post gắn Place thật thì backend trả placeId.
+  /// Nếu không có Place, backend có thể trả tọa độ GPS đã chụp lúc đăng.
+  final String? placeId;
+  final double? latitude;
+  final double? longitude;
+
   final String avatar;
   final String caption;
   final List<String> media;
@@ -1535,8 +2046,12 @@ class _HomePost {
   final int commentCount;
 
   const _HomePost({
+    required this.id,
     required this.authorName,
     required this.location,
+    this.placeId,
+    this.latitude,
+    this.longitude,
     required this.avatar,
     required this.caption,
     required this.media,

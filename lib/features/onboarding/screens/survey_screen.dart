@@ -3,6 +3,7 @@ import '../../../core/network/api_exception.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../auth/navigation/auth_flow.dart';
@@ -44,11 +45,11 @@ class _SurveyScreenState extends State<SurveyScreen>
         'Khác',
       ],
       optionImages: {
-        'Kết thêm bạn bè ở nhiều nơi': 'assets/images/survey_friend.jpg',
-        'Du lịch nghỉ dưỡng': 'assets/images/survey_resort.jpg',
-        'Check-in địa điểm hot, chụp ảnh': 'assets/images/survey_checkin.jpg',
-        'Trải nghiệm, khám phá thiên nhiên': 'assets/images/survey_nature.jpg',
-        'Khám phá văn hóa lịch sử': 'assets/images/survey_culture.jpg',
+        'Kết thêm bạn bè ở nhiều nơi': 'assets/images/ketban.jpg',
+        'Du lịch nghỉ dưỡng': 'assets/images/nghiduong.jpg',
+        'Check-in địa điểm hot, chụp ảnh': 'assets/images/checkin.jpg',
+        'Trải nghiệm, khám phá thiên nhiên': 'assets/images/thiennhien.jpg',
+        'Khám phá văn hóa lịch sử': 'assets/images/lichsu.jpg',
         'Khám phá ẩm thực vùng miền': 'assets/images/survey_food.jpg',
 
         // "Khác" không có ảnh.
@@ -71,7 +72,7 @@ class _SurveyScreenState extends State<SurveyScreen>
         'Thành phố / Trung tâm': 'assets/images/survey_city.jpg',
         'Địa danh nổi tiếng': 'assets/images/survey_landmark.jpg',
         'Làng nghề văn hóa / Di tích lịch sử':
-            'assets/images/survey_history.jpg',
+        'assets/images/survey_culture.jpg',
         'Ngoại ô / Đồng quê': 'assets/images/survey_country.jpg',
 
         // "Khác" không có ảnh.
@@ -80,7 +81,7 @@ class _SurveyScreenState extends State<SurveyScreen>
 
     SurveyQuestion(
       title: 'Bạn muốn GoMate ưu tiên gợi ý những gì?',
-      defaultImage: 'assets/images/login_top.png',
+      defaultImage: 'assets/images/nen.png',
       options: [
         'Gần tôi',
         'Địa điểm Local',
@@ -268,75 +269,108 @@ class _SurveyScreenState extends State<SurveyScreen>
   }
 
   // ============================================================
-  // BUILD
+  // BUILD - UI/UX ONLY
   // ============================================================
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FCFE),
-      body: PageView.builder(
-        controller: _pageController,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: _questions.length,
-        onPageChanged: (index) {
-          setState(() {
-            _currentPage = index;
-          });
-        },
-        itemBuilder: (context, index) {
-          return _buildPage(index);
-        },
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        bottom: false,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final ui = _SurveyUiMetrics.fromWidth(constraints.maxWidth);
+
+            return PageView.builder(
+              controller: _pageController,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _questions.length,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentPage = index;
+                });
+              },
+              itemBuilder: (context, index) {
+                return _buildPage(index, ui);
+              },
+            );
+          },
+        ),
       ),
     );
   }
 
   // ============================================================
-  // PAGE
+  // PAGE - UI/UX ONLY
   // ============================================================
 
-  Widget _buildPage(int index) {
+  Widget _buildPage(int index, _SurveyUiMetrics ui) {
     final question = _questions[index];
 
-    // Chọn "Khác" vẫn được tính là đã trả lời.
+    // GIỮ NGUYÊN logic hiện tại:
+    // có ít nhất 1 lựa chọn thì nút tiếp tục được bật.
     final hasSelection = _selectedOptions[index]!.isNotEmpty;
 
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(22, 12, 22, 18),
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(
+        ui.contentPadding,
+        ui.pageTopPadding,
+        ui.contentPadding,
+        ui.pageBottomPadding,
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minHeight:
+          MediaQuery.sizeOf(context).height -
+              MediaQuery.paddingOf(context).vertical -
+              ui.pageTopPadding -
+              ui.pageBottomPadding,
+        ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // TOP
+            // --------------------------------------------------
+            // HEADER
+            // --------------------------------------------------
             Row(
               children: [
-                if (index > 0)
-                  GestureDetector(
-                    onTap: _previousPage,
-                    child: const SizedBox(
-                      width: 40,
-                      height: 40,
+                InkWell(
+                  // Không đổi logic back:
+                  // page 0 vẫn gọi _previousPage() và method hiện tại tự return.
+                  onTap: _previousPage,
+                  borderRadius: BorderRadius.circular(ui.headerTapSize / 2),
+                  child: SizedBox(
+                    width: ui.headerTapSize,
+                    height: ui.headerTapSize,
+                    child: Center(
                       child: Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        size: 18,
-                        color: AppColors.textPrimary,
+                        LucideIcons.chevron_left,
+                        size: ui.backIconSize,
+                        color: Colors.black,
+                        weight: 900,
                       ),
                     ),
-                  )
-                else
-                  const SizedBox(width: 40, height: 40),
+                  ),
+                ),
 
                 const Spacer(),
 
                 GestureDetector(
-                  onTap: _skip,
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                  onTap: _saving ? null : _skip,
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: ui.width * 0.01,
+                      vertical: ui.width * 0.02,
+                    ),
                     child: Text(
                       'Bỏ qua',
                       style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
+                        fontSize: ui.skipFontSize,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.grayText,
                       ),
                     ),
                   ),
@@ -344,117 +378,141 @@ class _SurveyScreenState extends State<SurveyScreen>
               ],
             ),
 
-            const SizedBox(height: 8),
+            SizedBox(height: ui.titleTopGap),
 
-            // IMAGE
-            Expanded(flex: 38, child: _buildImageGallery(index, question)),
-
-            const SizedBox(height: 16),
-
-            // QUESTION
-            Text(
-              question.title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 24,
-                height: 1.18,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
+            // --------------------------------------------------
+            // TITLE
+            // --------------------------------------------------
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: ui.width * 0.78,
               ),
-            ),
-
-            const SizedBox(height: 18),
-
-            // OPTIONS
-            Expanded(
-              flex: 39,
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
-                  children: question.options.map((option) {
-                    final selected = _selectedOptions[index]!.contains(option);
-
-                    return SurveyOptionTile(
-                      text: option,
-                      selected: selected,
-                      onTap: () {
-                        _toggleOption(index, option);
-                      },
-                    );
-                  }).toList(),
+              child: Text(
+                question.title,
+                textAlign: TextAlign.left,
+                style: TextStyle(
+                  fontSize: ui.titleFontSize,
+                  height: 1.08,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.primaryText,
+                  letterSpacing: -0.35,
                 ),
               ),
             ),
 
-            const SizedBox(height: 6),
+            SizedBox(height: ui.gridTopGap),
 
-            // PROGRESS
-            _buildProgress(index),
+            // --------------------------------------------------
+            // OPTION CARDS
+            // --------------------------------------------------
+            _buildOptionGrid(
+              pageIndex: index,
+              question: question,
+              ui: ui,
+            ),
 
-            const SizedBox(height: 22),
+            SizedBox(height: ui.buttonTopGap),
 
-            // NEXT
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                width: double.infinity,
-                height: 60,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: hasSelection
-                      ? [
-                          BoxShadow(
-                            color: AppColors.blue500.withOpacity(0.20),
-                            blurRadius: 18,
-                            spreadRadius: 1,
-                            offset: const Offset(0, 7),
-                          ),
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ]
-                      : [],
-                ),
-                child: ElevatedButton(
-                  onPressed: hasSelection ? _nextPage : null,
-                  style: ElevatedButton.styleFrom(
-                    elevation: 0,
-                    backgroundColor: AppColors.blue500,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: AppColors.blue100.withOpacity(
-                      0.70,
-                    ),
-                    disabledForegroundColor: Colors.white.withOpacity(0.85),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    padding: EdgeInsets.zero,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        index == _questions.length - 1
-                            ? 'Hoàn tất'
-                            : 'Tiếp theo',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.arrow_forward_rounded, size: 22),
-                    ],
-                  ),
-                ),
-              ),
+            // --------------------------------------------------
+            // CONTINUE
+            // --------------------------------------------------
+            _SurveyGradientButton(
+              height: ui.buttonHeight,
+              radius: ui.buttonRadius,
+              enabled: hasSelection && !_saving,
+              loading: _saving,
+              label: index == _questions.length - 1 ? 'Tiếp Tục' : 'Tiếp Tục',
+              fontSize: ui.buttonFontSize,
+              onTap: _nextPage,
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildOptionGrid({
+    required int pageIndex,
+    required SurveyQuestion question,
+    required _SurveyUiMetrics ui,
+  }) {
+    // "Khác" vẫn tồn tại trong _questions và mapping backend để không làm lệch index.
+    // UI chỉ ẩn option này theo thiết kế mới.
+    final options = question.options
+        .where((option) => option != 'Khác')
+        .toList(growable: false);
+
+    return Wrap(
+      spacing: ui.cardHorizontalGap,
+      runSpacing: ui.cardVerticalGap,
+      children: options.map((option) {
+        final selected = _selectedOptions[pageIndex]!.contains(option);
+        final image = question.optionImages[option];
+
+        return SizedBox(
+          width: ui.cardWidth,
+          child: _SurveyImageOptionCard(
+            label: _surveyDisplayLabel(option),
+            imagePath: image,
+            selected: selected,
+            width: ui.cardWidth,
+            height: ui.cardHeight,
+            imageHeight: ui.cardImageHeight,
+            radius: ui.cardRadius,
+            fontSize: ui.cardFontSize,
+            onTap: () {
+              // GIỮ NGUYÊN logic chọn/bỏ chọn hiện tại.
+              _toggleOption(pageIndex, option);
+            },
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  String _surveyDisplayLabel(String option) {
+    // Chỉ rút gọn text HIỂN THỊ cho khớp Figma.
+    // Giá trị option gốc vẫn được giữ nguyên để mapping backend không thay đổi.
+    switch (option) {
+      case 'Kết thêm bạn bè ở nhiều nơi':
+        return 'Kết bạn mới';
+      case 'Du lịch nghỉ dưỡng':
+        return 'Nghỉ dưỡng';
+      case 'Check-in địa điểm hot, chụp ảnh':
+        return 'Checkin địa\nđiểm hot';
+      case 'Trải nghiệm, khám phá thiên nhiên':
+        return 'Khám phá\nthiên nhiên';
+      case 'Khám phá văn hóa lịch sử':
+        return 'Khám phá\nvăn hoá, lịch sử';
+      case 'Khám phá ẩm thực vùng miền':
+        return 'Khám phá\nẩm thực';
+
+      case 'Biển đảo / Núi rừng':
+        return 'Núi, biển';
+      case 'Thành phố / Trung tâm':
+        return 'Thành phố';
+      case 'Địa danh nổi tiếng':
+        return 'Địa danh\nnổi tiếng';
+      case 'Làng nghề văn hóa / Di tích lịch sử':
+        return 'Làng nghề, di\ntích lịch sử';
+      case 'Ngoại ô / Đồng quê':
+        return 'Ngoại ô\nđồng quê';
+
+      case 'Địa điểm Local':
+        return 'Địa điểm local';
+      case 'Đang Hot':
+        return 'Địa điểm hot';
+      case 'Dễ đi trong ngày':
+        return 'Dễ đi trong ngày';
+      case 'Có bài review đi kèm':
+        return 'Có bài review';
+      case 'Gần tôi':
+        return 'Gần tôi';
+      case 'Khác':
+        return 'Khác';
+      default:
+        return option;
+    }
   }
 
   // ============================================================
@@ -534,6 +592,326 @@ class _SurveyScreenState extends State<SurveyScreen>
           ),
         );
       }),
+    );
+  }
+}
+
+
+// ============================================================================
+// SURVEY FIGMA UI HELPERS
+// UI ONLY - không chứa API/backend/business logic.
+// ============================================================================
+
+class _SurveyUiMetrics {
+  final double width;
+
+
+  final double contentPadding;
+  final double pageTopPadding;
+  final double pageBottomPadding;
+
+  final double headerTapSize;
+  final double backIconSize;
+  final double skipFontSize;
+
+  final double titleTopGap;
+  final double titleFontSize;
+  final double gridTopGap;
+
+  final double cardHorizontalGap;
+  final double cardVerticalGap;
+  final double cardWidth;
+  final double cardHeight;
+  final double cardImageHeight;
+  final double cardRadius;
+  final double cardFontSize;
+
+  final double buttonTopGap;
+  final double buttonHeight;
+  final double buttonRadius;
+  final double buttonFontSize;
+
+  const _SurveyUiMetrics({
+    required this.width,
+    required this.contentPadding,
+    required this.pageTopPadding,
+    required this.pageBottomPadding,
+    required this.headerTapSize,
+    required this.backIconSize,
+    required this.skipFontSize,
+    required this.titleTopGap,
+    required this.titleFontSize,
+    required this.gridTopGap,
+    required this.cardHorizontalGap,
+    required this.cardVerticalGap,
+    required this.cardWidth,
+    required this.cardHeight,
+    required this.cardImageHeight,
+    required this.cardRadius,
+    required this.cardFontSize,
+    required this.buttonTopGap,
+    required this.buttonHeight,
+    required this.buttonRadius,
+    required this.buttonFontSize,
+  });
+
+  factory _SurveyUiMetrics.fromWidth(double width) {
+    double c(double value, double min, double max) {
+      return value.clamp(min, max).toDouble();
+    }
+
+    // Cùng cách responsive với Home:
+    // - nền trắng full màn hình
+    // - chỉ scale theo width
+    // - không dựng frame 375x715 giả
+    // - clamp chỉ để tablet không phóng quá lớn
+    final contentPadding = c(width * 0.053, 16, 22);
+    final gap = c(width * 0.042, 13, 18);
+
+    final availableWidth = width - (contentPadding * 2);
+    final cardWidth = (availableWidth - gap) / 2;
+
+    return _SurveyUiMetrics(
+      width: width,
+
+      contentPadding: contentPadding,
+      pageTopPadding: c(width * 0.025, 8, 12),
+      pageBottomPadding: c(width * 0.085, 28, 40),
+
+      headerTapSize: c(width * 0.105, 38, 44),
+      backIconSize: c(width * 0.060, 21, 25),
+      skipFontSize: c(width * 0.043, 15, 17),
+
+      titleTopGap: c(width * 0.035, 11, 16),
+      titleFontSize: c(width * 0.064, 23, 27),
+      gridTopGap: c(width * 0.060, 20, 27),
+
+      cardHorizontalGap: gap,
+      cardVerticalGap: c(width * 0.043, 14, 19),
+
+      // Figma ~150x140 trên frame tham chiếu, nhưng không fix cứng.
+      cardWidth: cardWidth,
+      cardHeight: cardWidth * (140 / 150),
+      cardImageHeight: cardWidth * (100 / 150),
+      cardRadius: c(cardWidth * 0.133, 16, 21),
+      cardFontSize: c(width * 0.032, 11.5, 13),
+
+      buttonTopGap: c(width * 0.065, 22, 30),
+      buttonHeight: c(width * 0.133, 48, 54),
+      buttonRadius: c(width * 0.053, 19, 22),
+      buttonFontSize: c(width * 0.043, 15.5, 17),
+    );
+  }
+}
+
+class _SurveyImageOptionCard extends StatelessWidget {
+  final String label;
+  final String? imagePath;
+  final bool selected;
+
+  final double width;
+  final double height;
+  final double imageHeight;
+  final double radius;
+  final double fontSize;
+
+  final VoidCallback onTap;
+
+  const _SurveyImageOptionCard({
+    required this.label,
+    required this.imagePath,
+    required this.selected,
+    required this.width,
+    required this.height,
+    required this.imageHeight,
+    required this.radius,
+    required this.fontSize,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(radius),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(radius),
+            border: Border.all(
+              color: selected
+                  ? AppColors.primaryIcon
+                  : Colors.transparent,
+              width: selected ? 1.2 : 0,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.10),
+                blurRadius: 6,
+                offset: const Offset(3, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(radius),
+                  topRight: Radius.circular(radius),
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: imageHeight,
+                  child: _SurveyCardImage(
+                    imagePath: imagePath,
+                    selected: selected,
+                  ),
+                ),
+              ),
+
+              Expanded(
+                child: Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: width * 0.055,
+                    ),
+                    child: Text(
+                      label,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: fontSize,
+                        height: 1.05,
+                        fontWeight: FontWeight.w700,
+                        color: selected
+                            ? AppColors.primaryText
+                            : AppColors.grayText,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SurveyCardImage extends StatelessWidget {
+  final String? imagePath;
+  final bool selected;
+
+  const _SurveyCardImage({
+    required this.imagePath,
+    required this.selected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final path = imagePath;
+
+    if (path == null || path.isEmpty) {
+      return Container(
+        color: const Color(0xFFEAF4FD),
+        alignment: Alignment.center,
+        child: Icon(
+          LucideIcons.image,
+          size: 30,
+          color: AppColors.primaryIcon.withOpacity(0.55),
+        ),
+      );
+    }
+
+    return Image.asset(
+      path,
+      fit: BoxFit.cover,
+      alignment: Alignment.center,
+      errorBuilder: (_, __, ___) {
+        return Container(
+          color: const Color(0xFFEAF4FD),
+          alignment: Alignment.center,
+          child: Icon(
+            LucideIcons.image,
+            size: 30,
+            color: AppColors.primaryIcon.withOpacity(0.55),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SurveyGradientButton extends StatelessWidget {
+  final double height;
+  final double radius;
+  final bool enabled;
+  final bool loading;
+  final String label;
+  final double fontSize;
+  final VoidCallback onTap;
+
+  const _SurveyGradientButton({
+    required this.height,
+    required this.radius,
+    required this.enabled,
+    required this.loading,
+    required this.label,
+    required this.fontSize,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final active = enabled && !loading;
+
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 160),
+      opacity: active || loading ? 1 : 0.48,
+      child: Container(
+        width: double.infinity,
+        height: height,
+        decoration: BoxDecoration(
+          gradient: AppColors.primaryGradient,
+          borderRadius: BorderRadius.circular(radius),
+          boxShadow: active ? AppColors.elevatedShadow : const [],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(radius),
+          child: InkWell(
+            onTap: active ? onTap : null,
+            borderRadius: BorderRadius.circular(radius),
+            child: Center(
+              child: loading
+                  ? SizedBox(
+                width: height * 0.42,
+                height: height * 0.42,
+                child: const CircularProgressIndicator(
+                  strokeWidth: 2.3,
+                  color: Colors.white,
+                ),
+              )
+                  : Text(
+                label,
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -707,7 +1085,7 @@ class _DynamicSurveyGalleryState extends State<DynamicSurveyGallery> {
     final active = _displayedImages.where(widget.images.contains).toList();
 
     active.sort(
-      (a, b) => widget.images.indexOf(a).compareTo(widget.images.indexOf(b)),
+          (a, b) => widget.images.indexOf(a).compareTo(widget.images.indexOf(b)),
     );
 
     final removing = _displayedImages.where(_removingImages.contains).toList();

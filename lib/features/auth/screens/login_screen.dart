@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/google_auth.dart';
@@ -7,6 +8,7 @@ import '../navigation/auth_flow.dart';
 import '../services/auth_api.dart';
 import '../widgets/auth_text_field.dart';
 import 'register_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -97,13 +99,15 @@ class _LoginScreenState extends State<LoginScreen>
       curve: const Interval(0.16, 0.30, curve: Curves.easeOut),
     );
 
-    _cardMove = Tween<Offset>(begin: const Offset(0, 0.16), end: Offset.zero)
-        .animate(
-          CurvedAnimation(
-            parent: _controller,
-            curve: const Interval(0.16, 0.42, curve: Curves.easeOutCubic),
-          ),
-        );
+    _cardMove = Tween<Offset>(
+      begin: const Offset(0, 0.12),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.16, 0.42, curve: Curves.easeOutCubic),
+      ),
+    );
 
     _titleOpacity = _opacity(0.28, 0.40);
     _titleMove = _move(0.28, 0.40);
@@ -138,7 +142,7 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   // ============================================================
-  // VALIDATION
+  // VALIDATION - GIỮ NGUYÊN LOGIC
   // ============================================================
 
   bool _isEmail(String value) {
@@ -209,12 +213,15 @@ class _LoginScreenState extends State<LoginScreen>
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
   }
 
   // ============================================================
-  // LOGIN
+  // LOGIN - GIỮ NGUYÊN BACKEND
   // ============================================================
 
   Future<void> _login() async {
@@ -263,13 +270,21 @@ class _LoginScreenState extends State<LoginScreen>
 
   Future<void> _loginWithGoogle() async {
     if (_isLoading || _isGoogleLoading) return;
+
     setState(() => _isGoogleLoading = true);
+
     try {
       final token = await GoogleAuth.idToken();
+
       if (token == null) {
         return;
       }
-      await AuthService.instance.google(token, remember: rememberMe);
+
+      await AuthService.instance.google(
+        token,
+        remember: rememberMe,
+      );
+
       if (mounted) {
         _goAfterAuth();
       }
@@ -316,7 +331,10 @@ class _LoginScreenState extends State<LoginScreen>
               begin: const Offset(1, 0),
               end: Offset.zero,
             ).animate(curved),
-            child: FadeTransition(opacity: curved, child: child),
+            child: FadeTransition(
+              opacity: curved,
+              child: child,
+            ),
           );
         },
       ),
@@ -324,8 +342,49 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   void _goToForgotPassword() {
-    _showMessage(
-      'Chức năng khôi phục mật khẩu chưa nằm trong phiên bản đăng nhập này.',
+    if (_isLoading || _isGoogleLoading) return;
+
+    FocusScope.of(context).unfocus();
+
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        transitionDuration: const Duration(
+          milliseconds: 380,
+        ),
+        reverseTransitionDuration: const Duration(
+          milliseconds: 300,
+        ),
+        pageBuilder: (
+            context,
+            animation,
+            secondaryAnimation,
+            ) {
+          return const ForgotPasswordScreen();
+        },
+        transitionsBuilder: (
+            context,
+            animation,
+            secondaryAnimation,
+            child,
+            ) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          );
+
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(1, 0),
+              end: Offset.zero,
+            ).animate(curved),
+            child: FadeTransition(
+              opacity: curved,
+              child: child,
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -336,18 +395,26 @@ class _LoginScreenState extends State<LoginScreen>
   Animation<double> _opacity(double begin, double end) {
     return CurvedAnimation(
       parent: _controller,
-      curve: Interval(begin, end, curve: Curves.easeOut),
+      curve: Interval(
+        begin,
+        end,
+        curve: Curves.easeOut,
+      ),
     );
   }
 
   Animation<Offset> _move(double begin, double end) {
     return Tween<Offset>(
-      begin: const Offset(0, 0.16),
+      begin: const Offset(0, 0.12),
       end: Offset.zero,
     ).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: Interval(begin, end, curve: Curves.easeOutCubic),
+        curve: Interval(
+          begin,
+          end,
+          curve: Curves.easeOutCubic,
+        ),
       ),
     );
   }
@@ -359,7 +426,10 @@ class _LoginScreenState extends State<LoginScreen>
   }) {
     return FadeTransition(
       opacity: opacity,
-      child: SlideTransition(position: move, child: child),
+      child: SlideTransition(
+        position: move,
+        child: child,
+      ),
     );
   }
 
@@ -380,139 +450,105 @@ class _LoginScreenState extends State<LoginScreen>
     return Scaffold(
       backgroundColor: Colors.white,
       resizeToAvoidBottomInset: true,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: FadeTransition(
-              opacity: _backgroundOpacity,
-              child: Image.asset(
-                'assets/images/login_background.png',
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-              ),
-            ),
-          ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final ui = _LoginMetrics.fromSize(
+            constraints.maxWidth,
+            constraints.maxHeight,
+          );
 
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.white.withOpacity(0.45),
-                    AppColors.blue50.withOpacity(0.45),
-                    Colors.white.withOpacity(0.65),
-                    Colors.white.withOpacity(0.88),
-                  ],
-                  stops: const [0.00, 0.35, 0.62, 1.00],
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: FadeTransition(
+                  opacity: _backgroundOpacity,
+                  child: Image.asset(
+                    'assets/images/nen.png',
+                    fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
+                  ),
                 ),
               ),
-            ),
-          ),
 
-          SafeArea(
-            bottom: false,
-            child: Stack(
-              children: [
-                Align(
-                  alignment: const Alignment(0, -0.72),
-                  child: FadeTransition(
-                    opacity: _logoOpacity,
-                    child: ScaleTransition(
-                      scale: _logoScale,
-                      child: Container(
-                        width: 92,
-                        height: 92,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.92),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.10),
-                              blurRadius: 18,
-                              offset: const Offset(0, 6),
+              SafeArea(
+                bottom: false,
+                child: Column(
+                  children: [
+                    SizedBox(
+                      height: ui.topAreaHeight,
+                      child: Align(
+                        alignment: Alignment.center,
+                        child: FadeTransition(
+                          opacity: _logoOpacity,
+                          child: ScaleTransition(
+                            scale: _logoScale,
+                            child: Image.asset(
+                              'assets/images/logo_2.png',
+                              width: ui.logoSize,
+                              height: ui.logoSize,
+                              fit: BoxFit.contain,
                             ),
-                          ],
-                        ),
-                        padding: const EdgeInsets.all(10),
-                        child: ClipOval(
-                          child: Image.asset(
-                            'assets/images/logo.png',
-                            fit: BoxFit.cover,
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ),
 
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: FadeTransition(
-                    opacity: _cardOpacity,
-                    child: SlideTransition(
-                      position: _cardMove,
-                      child: _buildLoginCard(),
+                    Expanded(
+                      child: FadeTransition(
+                        opacity: _cardOpacity,
+                        child: SlideTransition(
+                          position: _cardMove,
+                          child: _buildLoginCard(ui),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-        ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildLoginCard() {
-    final screenHeight = MediaQuery.of(context).size.height;
-
+  Widget _buildLoginCard(_LoginMetrics ui) {
     return Container(
       width: double.infinity,
-      constraints: BoxConstraints(minHeight: screenHeight * 0.62),
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 22),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.96),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(30),
-          topRight: Radius.circular(30),
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(ui.cardRadius),
+          topRight: Radius.circular(ui.cardRadius),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.blue500.withOpacity(0.12),
-            blurRadius: 30,
-            spreadRadius: 1,
-            offset: const Offset(0, -8),
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 14,
-            offset: const Offset(0, -3),
-          ),
-        ],
       ),
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(
+          ui.horizontalPadding,
+          ui.cardTopPadding,
+          ui.horizontalPadding,
+          ui.bottomPadding,
+        ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _animatedItem(
               opacity: _titleOpacity,
               move: _titleMove,
-              child: const Center(
-                child: Text(
-                  'GoMate xin chào',
-                  style: TextStyle(
-                    fontSize: 25,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
+              child: Text(
+                'GoMate xin chào',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: ui.titleSize,
+                  height: 1.08,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.primaryText,
                 ),
               ),
             ),
 
-            const SizedBox(height: 24),
+            SizedBox(height: ui.titleToFieldGap),
 
             _animatedItem(
               opacity: _emailOpacity,
@@ -520,7 +556,7 @@ class _LoginScreenState extends State<LoginScreen>
               child: AuthTextField(
                 controller: _accountController,
                 hintText: 'Email',
-                prefixIcon: Icons.mail_outline_rounded,
+                prefixIcon: LucideIcons.mail,
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
                 errorText: _accountError,
@@ -529,7 +565,7 @@ class _LoginScreenState extends State<LoginScreen>
               ),
             ),
 
-            const SizedBox(height: 13),
+            SizedBox(height: ui.fieldGap),
 
             _animatedItem(
               opacity: _passwordOpacity,
@@ -537,7 +573,7 @@ class _LoginScreenState extends State<LoginScreen>
               child: AuthTextField(
                 controller: _passwordController,
                 hintText: 'Mật khẩu',
-                prefixIcon: Icons.lock_outline_rounded,
+                prefixIcon: LucideIcons.lock,
                 isPassword: true,
                 textInputAction: TextInputAction.done,
                 errorText: _passwordError,
@@ -546,242 +582,158 @@ class _LoginScreenState extends State<LoginScreen>
               ),
             ),
 
-            const SizedBox(height: 6),
+            SizedBox(height: ui.optionTopGap),
 
             _animatedItem(
               opacity: _optionsOpacity,
               move: _optionsMove,
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: (_isLoading || _isGoogleLoading)
-                        ? null
-                        : () {
-                            setState(() {
-                              rememberMe = !rememberMe;
-                            });
-                          },
-                    child: Row(
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          width: 18,
-                          height: 18,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: rememberMe
-                                ? AppColors.blue500
-                                : Colors.white,
-                            border: Border.all(
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: (_isLoading || _isGoogleLoading)
+                          ? null
+                          : () {
+                        setState(() {
+                          rememberMe = !rememberMe;
+                        });
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            width: ui.checkSize,
+                            height: ui.checkSize,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
                               color: rememberMe
-                                  ? AppColors.blue500
-                                  : AppColors.blue200,
+                                  ? AppColors.primaryIcon
+                                  : Colors.white,
+                              border: Border.all(
+                                color: rememberMe
+                                    ? AppColors.primaryIcon
+                                    : AppColors.primaryIcon,
+                                width: 1.1,
+                              ),
+                            ),
+                            child: rememberMe
+                                ? Icon(
+                              LucideIcons.check,
+                              size: ui.checkSize * 0.62,
+                              color: Colors.white,
+                            )
+                                : null,
+                          ),
+                          SizedBox(width: ui.optionGap),
+                          Flexible(
+                            child: Text(
+                              'Ghi nhớ đăng nhập',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: ui.optionFontSize,
+                                color: AppColors.grayText,
+                              ),
                             ),
                           ),
-                          child: rememberMe
-                              ? const Icon(
-                                  Icons.check,
-                                  size: 12,
-                                  color: Colors.white,
-                                )
-                              : null,
-                        ),
-                        const SizedBox(width: 7),
-                        const Text(
-                          'Ghi nhớ đăng nhập',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-
-                  const Spacer(),
 
                   TextButton(
                     onPressed: (_isLoading || _isGoogleLoading)
                         ? null
                         : _goToForgotPassword,
-                    child: const Text(
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: ui.optionGap,
+                        vertical: 4,
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
                       'Quên mật khẩu?',
-                      style: TextStyle(fontSize: 12, color: AppColors.blue500),
+                      style: TextStyle(
+                        fontSize: ui.optionFontSize,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.primaryText,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 6),
+            SizedBox(height: ui.buttonTopGap),
 
             _animatedItem(
               opacity: _loginButtonOpacity,
               move: _loginButtonMove,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Container(
-                  width: double.infinity,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(26),
-                    boxShadow: !_isLoading && !_isGoogleLoading
-                        ? [
-                            BoxShadow(
-                              color: AppColors.blue500.withOpacity(0.20),
-                              blurRadius: 18,
-                              spreadRadius: 1,
-                              offset: const Offset(0, 7),
-                            ),
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.06),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ]
-                        : [],
-                  ),
-                  child: ElevatedButton(
-                    onPressed: (_isLoading || _isGoogleLoading) ? null : _login,
-                    style: ElevatedButton.styleFrom(
-                      elevation: 0,
-                      backgroundColor: AppColors.blue500,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: AppColors.blue500.withOpacity(
-                        0.82,
-                      ),
-                      disabledForegroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(26),
-                      ),
-                      padding: EdgeInsets.zero,
-                    ),
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 220),
-                      child: _isLoading
-                          ? const SizedBox(
-                              key: ValueKey('login_loading'),
-                              width: 23,
-                              height: 23,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Row(
-                              key: ValueKey('login_text'),
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  'Đăng nhập',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                SizedBox(width: 7),
-                                Icon(Icons.arrow_forward_rounded, size: 21),
-                              ],
-                            ),
-                    ),
-                  ),
-                ),
+              child: _GradientAuthButton(
+                height: ui.buttonHeight,
+                radius: ui.buttonRadius,
+                loading: _isLoading,
+                enabled: !_isGoogleLoading,
+                label: 'Đăng Nhập',
+                onTap: _login,
               ),
             ),
 
-            const SizedBox(height: 20),
+            SizedBox(height: ui.dividerTopGap),
 
             _animatedItem(
               opacity: _dividerOpacity,
               move: _dividerMove,
               child: Row(
                 children: [
-                  Expanded(child: Divider(color: Colors.grey.shade300)),
+                  const Expanded(
+                    child: Divider(
+                      color: AppColors.grayBorder,
+                      thickness: 1,
+                    ),
+                  ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: ui.dividerTextPadding,
+                    ),
                     child: Text(
                       'Hoặc tiếp tục với',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade500,
+                        fontSize: ui.dividerFontSize,
+                        color: AppColors.grayText,
                       ),
                     ),
                   ),
-                  Expanded(child: Divider(color: Colors.grey.shade300)),
+                  const Expanded(
+                    child: Divider(
+                      color: AppColors.grayBorder,
+                      thickness: 1,
+                    ),
+                  ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 18),
+            SizedBox(height: ui.googleTopGap),
 
             _animatedItem(
               opacity: _googleOpacity,
               move: _googleMove,
-              child: SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: Material(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(25),
-                  child: InkWell(
-                    onTap: (_isLoading || _isGoogleLoading)
-                        ? null
-                        : _loginWithGoogle,
-                    borderRadius: BorderRadius.circular(25),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(25),
-                        border: Border.all(color: AppColors.fieldBorder),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.025),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 220),
-                          child: _isGoogleLoading
-                              ? const SizedBox(
-                                  key: ValueKey('google_loading'),
-                                  width: 23,
-                                  height: 23,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.4,
-                                    color: AppColors.blue500,
-                                  ),
-                                )
-                              : Row(
-                                  key: const ValueKey('google_content'),
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Image.asset(
-                                      'assets/images/google_logo.png',
-                                      width: 21,
-                                      height: 21,
-                                    ),
-                                    const SizedBox(width: 10),
-                                    const Text(
-                                      'Tiếp tục với Google',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                        color: AppColors.textPrimary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                        ),
-                      ),
-                    ),
-                  ),
+              child: Center(
+                child: _GoogleCircleButton(
+                  size: ui.googleSize,
+                  loading: _isGoogleLoading,
+                  enabled: !_isLoading,
+                  onTap: _loginWithGoogle,
                 ),
               ),
             ),
 
-            const SizedBox(height: 22),
+            SizedBox(height: ui.registerTopGap),
 
             _animatedItem(
               opacity: _registerOpacity,
@@ -789,23 +741,23 @@ class _LoginScreenState extends State<LoginScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
+                  Text(
                     'Chưa có tài khoản? ',
                     style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
+                      fontSize: ui.footerFontSize,
+                      color: AppColors.grayText,
                     ),
                   ),
                   GestureDetector(
                     onTap: (_isLoading || _isGoogleLoading)
                         ? null
                         : _goToRegister,
-                    child: const Text(
+                    child: Text(
                       'Đăng ký',
                       style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.blue500,
+                        fontSize: ui.footerFontSize,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.primaryText,
                       ),
                     ),
                   ),
@@ -813,6 +765,289 @@ class _LoginScreenState extends State<LoginScreen>
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// LOGIN RESPONSIVE METRICS
+// ============================================================================
+
+class _LoginMetrics {
+  final double topAreaHeight;
+  final double logoSize;
+  final double cardRadius;
+  final double horizontalPadding;
+  final double cardTopPadding;
+  final double bottomPadding;
+  final double titleSize;
+  final double titleToFieldGap;
+  final double fieldGap;
+  final double optionTopGap;
+  final double optionGap;
+  final double optionFontSize;
+  final double checkSize;
+  final double buttonTopGap;
+  final double buttonHeight;
+  final double buttonRadius;
+  final double dividerTopGap;
+  final double dividerTextPadding;
+  final double dividerFontSize;
+  final double googleTopGap;
+  final double googleSize;
+  final double registerTopGap;
+  final double footerFontSize;
+
+  const _LoginMetrics({
+    required this.topAreaHeight,
+    required this.logoSize,
+    required this.cardRadius,
+    required this.horizontalPadding,
+    required this.cardTopPadding,
+    required this.bottomPadding,
+    required this.titleSize,
+    required this.titleToFieldGap,
+    required this.fieldGap,
+    required this.optionTopGap,
+    required this.optionGap,
+    required this.optionFontSize,
+    required this.checkSize,
+    required this.buttonTopGap,
+    required this.buttonHeight,
+    required this.buttonRadius,
+    required this.dividerTopGap,
+    required this.dividerTextPadding,
+    required this.dividerFontSize,
+    required this.googleTopGap,
+    required this.googleSize,
+    required this.registerTopGap,
+    required this.footerFontSize,
+  });
+
+  factory _LoginMetrics.fromSize(
+      double width,
+      double height,
+      ) {
+    // ============================================================
+    // FIGMA REFERENCE: 375 x 715
+    // ============================================================
+    // Không copy pixel cứng. Mọi kích thước chính được đổi thành
+    // tỉ lệ theo WIDTH của thiết bị:
+    //
+    // card top: 212 / 375 = 0.565
+    // logo: 104 / 375 = 0.277
+    // form: 295 / 375 = 0.787
+    // title: 24 / 375 = 0.064
+    // field: 46 / 375 = 0.123
+    // button: 50 / 375 = 0.133
+    //
+    // Máy cao hơn sẽ có thêm khoảng trắng phía dưới card,
+    // không kéo giãn các nhóm UI.
+
+    final formWidth = width * 0.787;
+    final horizontalPadding = (width - formWidth) / 2;
+
+    return _LoginMetrics(
+      // Figma card starts at y=212 on a 375-wide reference.
+      topAreaHeight: width * 0.565,
+
+      // 104 / 375.
+      logoSize: width * 0.277,
+
+      // Figma card radius 20.
+      cardRadius: width * 0.053,
+
+      horizontalPadding: horizontalPadding,
+
+      // Card y=212, title y=246 => 34px.
+      cardTopPadding: width * 0.091,
+
+      // Keep bottom flexible; card itself expands to screen bottom.
+      bottomPadding: width * 0.055,
+
+      // 24 / 375.
+      titleSize: width * 0.064,
+
+      // title top 246 + 29 high -> field top 294 => 19px.
+      titleToFieldGap: width * 0.051,
+
+      // email bottom 340 -> password top 359 => 19px.
+      fieldGap: width * 0.051,
+
+      // password bottom 405 -> option row top 424 => 19px.
+      optionTopGap: width * 0.051,
+
+      optionGap: width * 0.008,
+
+      // Figma 12px.
+      optionFontSize: width * 0.032,
+
+      // 15 / 375.
+      checkSize: width * 0.040,
+
+      // option row ~18px, button top 461 => ~19px.
+      buttonTopGap: width * 0.051,
+
+      // 50 / 375.
+      buttonHeight: width * 0.133,
+
+      // Figma radius 20, not a full pill.
+      buttonRadius: width * 0.053,
+
+      // button bottom 511 -> divider y550 => 39px.
+      dividerTopGap: width * 0.104,
+
+      dividerTextPadding: width * 0.029,
+
+      // 13 / 375.
+      dividerFontSize: width * 0.035,
+
+      // divider center around 550; Google circle starts 578.
+      googleTopGap: width * 0.050,
+
+      // 50 / 375.
+      googleSize: width * 0.133,
+
+      // Google bottom 628 -> footer top 647 => 19px.
+      registerTopGap: width * 0.051,
+
+      // 13 / 375.
+      footerFontSize: width * 0.035,
+    );
+  }
+}
+
+// ============================================================================
+// SHARED LOGIN WIDGETS
+// ============================================================================
+
+class _GradientAuthButton extends StatelessWidget {
+  final double height;
+  final double radius;
+  final bool loading;
+  final bool enabled;
+  final String label;
+  final VoidCallback onTap;
+
+  const _GradientAuthButton({
+    required this.height,
+    required this.radius,
+    required this.loading,
+    required this.enabled,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final active = enabled && !loading;
+
+    return Opacity(
+      opacity: active || loading ? 1 : 0.65,
+      child: Container(
+        height: height,
+        decoration: BoxDecoration(
+          gradient: AppColors.primaryGradient,
+          borderRadius: BorderRadius.circular(radius),
+          boxShadow: active ? AppColors.elevatedShadow : const [],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(radius),
+          child: InkWell(
+            onTap: active ? onTap : null,
+            borderRadius: BorderRadius.circular(radius),
+            child: Center(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: loading
+                    ? SizedBox(
+                  key: const ValueKey('login_loading'),
+                  width: height * 0.44,
+                  height: height * 0.44,
+                  child: const CircularProgressIndicator(
+                    strokeWidth: 2.4,
+                    color: Colors.white,
+                  ),
+                )
+                    : Text(
+                  label,
+                  key: const ValueKey('login_label'),
+                  style: TextStyle(
+                    fontSize: height * 0.32,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GoogleCircleButton extends StatelessWidget {
+  final double size;
+  final bool loading;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _GoogleCircleButton({
+    required this.size,
+    required this.loading,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: enabled ? 1 : 0.60,
+      child: Material(
+        color: Colors.white,
+        shape: const CircleBorder(),
+        child: InkWell(
+          onTap: enabled && !loading ? onTap : null,
+          customBorder: const CircleBorder(),
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+              border: Border.all(
+                color: AppColors.grayBorder,
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            alignment: Alignment.center,
+            child: loading
+                ? SizedBox(
+              width: size * 0.42,
+              height: size * 0.42,
+              child: const CircularProgressIndicator(
+                strokeWidth: 2.2,
+                color: AppColors.primaryIcon,
+              ),
+            )
+                : Image.asset(
+              'assets/images/google_logo.png',
+              width: size * 0.54,
+              height: size * 0.54,
+              fit: BoxFit.contain,
+            ),
+          ),
         ),
       ),
     );
