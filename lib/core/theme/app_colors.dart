@@ -26,7 +26,7 @@ class AppColors {
   // =========================
   // SEMANTIC
   // =========================
-  static const Color background = grayBackground;
+  static const Color background = white;
   static const Color surface = white;
 
   static const Color textPrimary = primaryText;

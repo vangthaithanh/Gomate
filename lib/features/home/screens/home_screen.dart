@@ -20,6 +20,8 @@ import '../../../core/widgets/bottom_sheet.dart';
 import '../../../core/widgets/snackbar.dart';
 import '../widgets/post_action_content.dart';
 import '../widgets/report_reason_content.dart';
+import '../../moments/data/moments_repository.dart';
+import '../../moments/widgets/moments_strip.dart';
 
 class HomeScreen extends StatefulWidget {
   /// MainShell truyền callback này để chuyển sang tab Map mà không push
@@ -40,21 +42,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final List<_MomentItem> _moments = const [
-    _MomentItem(
-      name: 'Bạn',
-      image: 'assets/images/home/moment_me.jpg',
-      isSelf: true,
-    ),
-    _MomentItem(
-      name: 'ChiThanh',
-      image: 'assets/images/home/moment_chithanh.jpg',
-      highlighted: true,
-    ),
-    _MomentItem(name: 'Thune', image: 'assets/images/home/moment_thune.jpg'),
-    _MomentItem(name: 'Buji', image: 'assets/images/home/moment_buji.jpg'),
-    _MomentItem(name: 'Bum', image: 'assets/images/home/moment_4.jpg'),
-  ];
+  final DemoMomentsRepository _momentsRepository =
+      DemoMomentsRepository.instance;
 
   final List<_HomePost> _posts = const [
     _HomePost(
@@ -134,17 +123,30 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   bool _hasHighlightedMoment(String name) {
-    return _moments.any((moment) => moment.name == name && moment.highlighted);
+    return _momentsRepository.hasAvailableMomentForName(name);
   }
 
   @override
   void initState() {
     super.initState();
 
+    _momentsRepository.addListener(_onMomentsChanged);
+
     _postInteractionRepository =
         widget.interactionRepository ?? DemoPostInteractionRepository();
 
     _recommendations = _loadRecommendations();
+  }
+
+  void _onMomentsChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _momentsRepository.removeListener(_onMomentsChanged);
+    super.dispose();
   }
 
   void _retryRecommendations() {
@@ -350,7 +352,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 SizedBox(height: ui.gapSmall),
 
-                _MomentStrip(items: _moments, ui: ui),
+                MomentsStrip(
+                  repository: _momentsRepository,
+                ),
 
                 SizedBox(height: ui.gapMedium),
 
@@ -720,58 +724,6 @@ class _HeaderButton extends StatelessWidget {
 // ============================================================================
 // MOMENTS
 // ============================================================================
-
-class _MomentStrip extends StatelessWidget {
-  final List<_MomentItem> items;
-  final _HomeMetrics ui;
-
-  const _MomentStrip({required this.items, required this.ui});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: ui.momentStripHeight,
-      child: ListView.separated(
-        padding: EdgeInsets.symmetric(horizontal: ui.contentPadding),
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: items.length,
-        separatorBuilder: (_, __) => SizedBox(width: ui.width * 0.016),
-        itemBuilder: (context, index) {
-          final item = items[index];
-
-          return SizedBox(
-            width: ui.momentItemWidth,
-            child: Column(
-              children: [
-                _GradientAvatar(
-                  imagePath: item.image,
-                  activeSize: ui.momentActiveSize,
-                  normalSize: ui.momentNormalSize,
-                  highlighted: item.highlighted,
-                  showAddBadge: item.isSelf,
-                ),
-                SizedBox(height: ui.width * 0.015),
-                Text(
-                  item.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: _font(ui.width, 12),
-                    height: 1.1,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.black,
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
 
 // ============================================================================
 // POST
@@ -2010,19 +1962,6 @@ double _font(double width, double baseAt360) {
 // MODELS
 // ============================================================================
 
-class _MomentItem {
-  final String name;
-  final String image;
-  final bool isSelf;
-  final bool highlighted;
-
-  const _MomentItem({
-    required this.name,
-    required this.image,
-    this.isSelf = false,
-    this.highlighted = false,
-  });
-}
 
 class _HomePost {
   final String id;
@@ -2095,3 +2034,4 @@ class _UserSuggestion {
     required this.avatar,
   });
 }
+

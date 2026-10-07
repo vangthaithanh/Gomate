@@ -50,18 +50,42 @@ class PostComment {
   }
 }
 
+enum ShareTargetType {
+  user,
+  group,
+}
+
+/// Target dùng chung cho Share Post.
+///
+/// Backend sau này chỉ cần map `id + type` sang userId / conversationId thật.
+/// UI không cần tách thành hai flow khác nhau.
 class ShareContact {
   final String id;
   final String name;
   final String subtitle;
   final String avatarAsset;
+  /// Nullable có chủ đích để tương thích an toàn với object cũ còn nằm trong
+  /// memory sau Hot Reload khi field `type` mới được bổ sung.
+  ///
+  /// Backend / object mới vẫn truyền enum bình thường. Nếu object cũ trả null
+  /// thì UI mặc định coi target đó là user thay vì crash đỏ.
+  final ShareTargetType? type;
+
+  /// Dùng khi group chưa có ảnh bìa: render avatar chồng như message group.
+  final List<String> memberAvatarAssets;
 
   const ShareContact({
     required this.id,
     required this.name,
     required this.subtitle,
     required this.avatarAsset,
+    this.type = ShareTargetType.user,
+    this.memberAvatarAssets = const <String>[],
   });
+
+  ShareTargetType get resolvedType => type ?? ShareTargetType.user;
+
+  bool get isGroup => resolvedType == ShareTargetType.group;
 }
 
 class PostLocationTarget {

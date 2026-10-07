@@ -194,12 +194,14 @@ class _GoMateBottomSheetShell extends StatelessWidget {
         top: false,
         left: false,
         right: false,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: screenHeight * maxHeightFactor,
-          ),
-          child: Material(
-            color: Colors.white,
+        child: SizedBox(
+          width: double.infinity,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: screenHeight * maxHeightFactor,
+            ),
+            child: Material(
+              color: Colors.white,
             elevation: 0,
             clipBehavior: Clip.antiAlias,
             borderRadius: BorderRadius.only(
@@ -252,6 +254,7 @@ class _GoMateBottomSheetShell extends StatelessWidget {
             ),
           ),
         ),
+      ),
       ),
     );
   }

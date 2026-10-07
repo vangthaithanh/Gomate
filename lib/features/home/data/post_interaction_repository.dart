@@ -1,10 +1,5 @@
 import '../models/post_interaction_models.dart';
 
-/// Contract duy nhất giữa UI tương tác bài viết và backend.
-///
-/// Hiện tại Home dùng [DemoPostInteractionRepository] để hoàn thiện UI/UX.
-/// Khi backend Social hoàn thiện, chỉ cần triển khai repository thật theo
-/// interface này; Comment/Share widget không phải viết lại.
 abstract class PostInteractionRepository {
   Future<List<PostComment>> getComments(String postId);
 
@@ -32,8 +27,11 @@ abstract class PostInteractionRepository {
 
 class DemoPostInteractionRepository implements PostInteractionRepository {
   final Map<String, List<PostComment>> _commentsByPost =
-  <String, List<PostComment>>{};
+      <String, List<PostComment>>{};
 
+  /// Demo target gồm cả user và group chat.
+  /// Group có ảnh bìa có thể để memberAvatarAssets rỗng;
+  /// group chưa có ảnh bìa dùng memberAvatarAssets để render avatar chồng.
   final List<ShareContact> _contacts = const <ShareContact>[
     ShareContact(
       id: 'u-1',
@@ -52,6 +50,28 @@ class DemoPostInteractionRepository implements PostInteractionRepository {
       name: 'Buji',
       subtitle: 'Quảng Bình',
       avatarAsset: 'assets/images/home/moment_buji.jpg',
+    ),
+    ShareContact(
+      id: 'group-da-lat',
+      name: 'Đà Lạt ơi',
+      subtitle: 'Nhóm chat · 5 thành viên',
+      avatarAsset: 'assets/images/thiennhien.jpg',
+      type: ShareTargetType.group,
+      memberAvatarAssets: <String>[
+        'assets/images/thiennhien.jpg',
+        'assets/images/nghiduong.jpg',
+      ],
+    ),
+    ShareContact(
+      id: 'group-hoi-an',
+      name: 'Hội An cuối tuần',
+      subtitle: 'Nhóm chat · 4 thành viên',
+      avatarAsset: 'assets/images/checkin.jpg',
+      type: ShareTargetType.group,
+      memberAvatarAssets: <String>[
+        'assets/images/checkin.jpg',
+        'assets/images/survey_city.jpg',
+      ],
     ),
     ShareContact(
       id: 'u-4',
@@ -121,10 +141,7 @@ class DemoPostInteractionRepository implements PostInteractionRepository {
   }
 
   List<PostComment> _forPost(String postId) {
-    return _commentsByPost.putIfAbsent(
-      postId,
-          () => _seed(postId),
-    );
+    return _commentsByPost.putIfAbsent(postId, () => _seed(postId));
   }
 
   @override
@@ -164,8 +181,8 @@ class DemoPostInteractionRepository implements PostInteractionRepository {
       final idsToRemove = list
           .where(
             (comment) =>
-        comment.id == commentId || comment.parentId == commentId,
-      )
+                comment.id == commentId || comment.parentId == commentId,
+          )
           .map((comment) => comment.id)
           .toSet();
 
@@ -187,10 +204,7 @@ class DemoPostInteractionRepository implements PostInteractionRepository {
     final list = _forPost(comment.postId);
     final index = list.indexWhere((item) => item.id == comment.id);
 
-    if (index >= 0) {
-      list[index] = next;
-    }
-
+    if (index >= 0) list[index] = next;
     return next;
   }
 
@@ -203,16 +217,14 @@ class DemoPostInteractionRepository implements PostInteractionRepository {
   Future<List<ShareContact>> searchShareContacts(String query) async {
     final normalized = query.trim().toLowerCase();
 
-    if (normalized.isEmpty) {
-      return getShareContacts();
-    }
+    if (normalized.isEmpty) return getShareContacts();
 
     return _contacts
         .where(
           (contact) =>
-      contact.name.toLowerCase().contains(normalized) ||
-          contact.subtitle.toLowerCase().contains(normalized),
-    )
+              contact.name.toLowerCase().contains(normalized) ||
+              contact.subtitle.toLowerCase().contains(normalized),
+        )
         .toList(growable: false);
   }
 
@@ -222,7 +234,6 @@ class DemoPostInteractionRepository implements PostInteractionRepository {
     required Set<String> recipientIds,
     String? message,
   }) async {
-    // UI demo only.
-    // Repository thật sẽ POST share/message theo backend contract sau này.
+    // UI demo only. Backend thật sẽ phân loại id theo ShareTargetType.
   }
 }

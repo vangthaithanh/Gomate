@@ -40,13 +40,27 @@ class _SharePostContentState extends State<SharePostContent> {
     _messageController.addListener(_refresh);
   }
 
+  List<ShareContact> _selectedFirst(List<ShareContact> source) {
+    final selected = <ShareContact>[];
+    final rest = <ShareContact>[];
+
+    for (final contact in source) {
+      if (_selectedIds.contains(contact.id)) {
+        selected.add(contact);
+      } else {
+        rest.add(contact);
+      }
+    }
+
+    return <ShareContact>[...selected, ...rest];
+  }
+
   Future<void> _loadContacts() async {
     final contacts = await widget.repository.getShareContacts();
-
     if (!mounted) return;
 
     setState(() {
-      _contacts = contacts;
+      _contacts = _selectedFirst(contacts);
       _loading = false;
     });
   }
@@ -55,15 +69,42 @@ class _SharePostContentState extends State<SharePostContent> {
     if (mounted) setState(() {});
   }
 
-  void _toggleContact(ShareContact contact) {
+  void _toggleGridTarget(ShareContact contact) {
     HapticFeedback.selectionClick();
 
     setState(() {
-      if (_selectedIds.contains(contact.id)) {
+      if (!_selectedIds.add(contact.id)) {
         _selectedIds.remove(contact.id);
-      } else {
-        _selectedIds.add(contact.id);
       }
+      _contacts = _selectedFirst(_contacts);
+    });
+  }
+
+  Future<void> _selectFromSearch(ShareContact contact) async {
+    HapticFeedback.selectionClick();
+
+    if (_selectedIds.contains(contact.id)) {
+      _selectedIds.remove(contact.id);
+    } else {
+      _selectedIds.add(contact.id);
+    }
+
+    _searchController.clear();
+    _searchFocusNode.unfocus();
+
+    setState(() {
+      _loading = true;
+    });
+
+    final allContacts = await widget.repository.getShareContacts();
+    if (!mounted) return;
+
+    setState(() {
+      // Trở về trang grid ngay sau khi chọn ở Search.
+      // Target vừa chọn nằm trong nhóm selected nên tự được đẩy lên đầu.
+      _contacts = _selectedFirst(allContacts);
+      _searchMode = false;
+      _loading = false;
     });
   }
 
@@ -85,7 +126,6 @@ class _SharePostContentState extends State<SharePostContent> {
     });
 
     final results = await widget.repository.searchShareContacts(value);
-
     if (!mounted || token != _searchToken) return;
 
     setState(() {
@@ -99,11 +139,10 @@ class _SharePostContentState extends State<SharePostContent> {
     _searchFocusNode.unfocus();
 
     final contacts = await widget.repository.getShareContacts();
-
     if (!mounted) return;
 
     setState(() {
-      _contacts = contacts;
+      _contacts = _selectedFirst(contacts);
       _searchMode = false;
       _loading = false;
     });
@@ -129,9 +168,6 @@ class _SharePostContentState extends State<SharePostContent> {
     if (!mounted) return;
 
     final count = _selectedIds.length;
-
-    // Trả số người đã gửi về Home. Snackbar được hiển thị ở Home context,
-    // tránh để widget trong bottom sheet tự điều khiển overlay bên ngoài.
     Navigator.of(context).pop(count);
   }
 
@@ -194,7 +230,7 @@ class _SharePostContentState extends State<SharePostContent> {
                       ),
                       SizedBox(width: screen.width * 0.018),
                       Text(
-                        'Tìm liên hệ',
+                        'Tìm liên hệ hoặc nhóm',
                         style: TextStyle(
                           fontSize: _font(screen.width, 12.5),
                           fontWeight: FontWeight.w500,
@@ -206,72 +242,68 @@ class _SharePostContentState extends State<SharePostContent> {
                 ),
               ),
             ),
-
           Expanded(
             child: _loading
                 ? const Center(
-              child: CircularProgressIndicator(strokeWidth: 2.2),
-            )
+                    child: CircularProgressIndicator(strokeWidth: 2.2),
+                  )
                 : _contacts.isEmpty
-                ? Center(
-              child: Text(
-                'Không tìm thấy liên hệ.',
-                style: TextStyle(
-                  fontSize: _font(screen.width, 12),
-                  color: AppColors.grayText,
-                ),
-              ),
-            )
-                : _searchMode
-                ? ListView.builder(
-              physics: const BouncingScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(
-                screen.width * 0.055,
-                screen.width * 0.020,
-                screen.width * 0.055,
-                screen.width * 0.030,
-              ),
-              itemCount: _contacts.length,
-              itemBuilder: (context, index) {
-                final contact = _contacts[index];
+                    ? Center(
+                        child: Text(
+                          'Không tìm thấy liên hệ hoặc nhóm.',
+                          style: TextStyle(
+                            fontSize: _font(screen.width, 12),
+                            color: AppColors.grayText,
+                          ),
+                        ),
+                      )
+                    : _searchMode
+                        ? ListView.builder(
+                            physics: const BouncingScrollPhysics(),
+                            padding: EdgeInsets.fromLTRB(
+                              screen.width * 0.055,
+                              screen.width * 0.020,
+                              screen.width * 0.055,
+                              screen.width * 0.030,
+                            ),
+                            itemCount: _contacts.length,
+                            itemBuilder: (context, index) {
+                              final contact = _contacts[index];
 
-                return _ShareSearchRow(
-                  contact: contact,
-                  selected:
-                  _selectedIds.contains(contact.id),
-                  onTap: () => _toggleContact(contact),
-                );
-              },
-            )
-                : GridView.builder(
-              physics: const BouncingScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(
-                screen.width * 0.055,
-                screen.width * 0.025,
-                screen.width * 0.055,
-                screen.width * 0.025,
-              ),
-              gridDelegate:
-              const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                childAspectRatio: 0.90,
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 12,
-              ),
-              itemCount: _contacts.length,
-              itemBuilder: (context, index) {
-                final contact = _contacts[index];
+                              return _ShareSearchRow(
+                                contact: contact,
+                                selected: _selectedIds.contains(contact.id),
+                                onTap: () => _selectFromSearch(contact),
+                              );
+                            },
+                          )
+                        : GridView.builder(
+                            physics: const BouncingScrollPhysics(),
+                            padding: EdgeInsets.fromLTRB(
+                              screen.width * 0.055,
+                              screen.width * 0.025,
+                              screen.width * 0.055,
+                              screen.width * 0.025,
+                            ),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              childAspectRatio: 0.90,
+                              mainAxisSpacing: 10,
+                              crossAxisSpacing: 12,
+                            ),
+                            itemCount: _contacts.length,
+                            itemBuilder: (context, index) {
+                              final contact = _contacts[index];
 
-                return _ShareContactGridItem(
-                  contact: contact,
-                  selected:
-                  _selectedIds.contains(contact.id),
-                  onTap: () => _toggleContact(contact),
-                );
-              },
-            ),
+                              return _ShareContactGridItem(
+                                contact: contact,
+                                selected: _selectedIds.contains(contact.id),
+                                onTap: () => _toggleGridTarget(contact),
+                              );
+                            },
+                          ),
           ),
-
           if (_selectedIds.isNotEmpty)
             _ShareMessageComposer(
               controller: _messageController,
@@ -401,8 +433,8 @@ class _ShareContactGridItem extends StatelessWidget {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              _ShareAvatar(
-                asset: contact.avatarAsset,
+              _ShareTargetAvatar(
+                contact: contact,
                 size: avatar,
               ),
               if (selected)
@@ -462,16 +494,14 @@ class _ShareSearchRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: EdgeInsets.symmetric(
-          vertical: width * 0.020,
-        ),
+        padding: EdgeInsets.symmetric(vertical: width * 0.020),
         child: Row(
           children: [
             Stack(
               clipBehavior: Clip.none,
               children: [
-                _ShareAvatar(
-                  asset: contact.avatarAsset,
+                _ShareTargetAvatar(
+                  contact: contact,
                   size: avatar,
                 ),
                 if (selected)
@@ -603,18 +633,18 @@ class _ShareMessageComposer extends StatelessWidget {
                 alignment: Alignment.center,
                 child: sending
                     ? const SizedBox(
-                  width: 12,
-                  height: 12,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 1.7,
-                    color: Colors.white,
-                  ),
-                )
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.7,
+                          color: Colors.white,
+                        ),
+                      )
                     : Icon(
-                  LucideIcons.send,
-                  size: (width * 0.034).clamp(13.0, 15.0).toDouble(),
-                  color: Colors.white,
-                ),
+                        LucideIcons.send,
+                        size: (width * 0.034).clamp(13.0, 15.0).toDouble(),
+                        color: Colors.white,
+                      ),
               ),
             ),
           ],
@@ -624,11 +654,59 @@ class _ShareMessageComposer extends StatelessWidget {
   }
 }
 
-class _ShareAvatar extends StatelessWidget {
+class _ShareTargetAvatar extends StatelessWidget {
+  final ShareContact contact;
+  final double size;
+
+  const _ShareTargetAvatar({
+    required this.contact,
+    required this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!contact.isGroup || contact.memberAvatarAssets.length < 2) {
+      return _SingleShareAvatar(
+        asset: contact.avatarAsset,
+        size: size,
+      );
+    }
+
+    final small = size * 0.68;
+
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 0,
+            top: 0,
+            child: _SingleShareAvatar(
+              asset: contact.memberAvatarAssets[0],
+              size: small,
+            ),
+          ),
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: _SingleShareAvatar(
+              asset: contact.memberAvatarAssets[1],
+              size: small,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SingleShareAvatar extends StatelessWidget {
   final String asset;
   final double size;
 
-  const _ShareAvatar({
+  const _SingleShareAvatar({
     required this.asset,
     required this.size,
   });

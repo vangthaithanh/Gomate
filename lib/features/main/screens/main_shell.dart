@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../explore/screens/explore_screen.dart';
+import '../../messages/screens/message_screen.dart';
 import '../../home/screens/home_screen.dart';
 import '../../map/screens/map_screen.dart';
 import '../../profile/screens/profile_screen.dart';
@@ -31,7 +31,7 @@ class _MainShellState extends State<MainShell> {
 
     final pages = <Widget>[
       const HomeScreen(),
-      const ExploreScreen(),
+      const MessageScreen(),
       GoMateMapScreen(
         bottomNavigationInset: metrics.totalHeight + 8,
       ),
