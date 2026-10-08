@@ -1,113 +1,91 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../../core/theme/app_colors.dart';
 
 class GoMateMapControls extends StatelessWidget {
-  final VoidCallback onCreateTrip;
-  final VoidCallback onTrip;
-  final VoidCallback onResetNorth;
+  final VoidCallback onSearch;
   final VoidCallback onLocation;
+
+  /// Chỉ truyền callback khi thực sự đang có lịch trình ghim.
+  /// Null => không render nút lịch trình.
+  final VoidCallback? onPinnedTrip;
 
   const GoMateMapControls({
     super.key,
-    required this.onCreateTrip,
-    required this.onTrip,
-    required this.onResetNorth,
+    required this.onSearch,
     required this.onLocation,
+    this.onPinnedTrip,
   });
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final gap = (width * 0.030).clamp(10.0, 13.0).toDouble();
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // LỊCH TRÌNH
-        _button(
-          icon: Icons.calendar_month_outlined,
-          onTap: onCreateTrip,
-          showPlus: true,
+        _MapControlButton(
+          icon: LucideIcons.search,
+          onTap: onSearch,
         ),
-
-        const SizedBox(height: 10),
-
-        // ROUTE / TRIP
-        _button(
-          icon: Icons.route_rounded,
-          onTap: onTrip,
-        ),
-
-        const SizedBox(height: 10),
-
-        // HƯỚNG BẢN ĐỒ
-        _button(
-          icon: Icons.explore_outlined,
-          onTap: onResetNorth,
-        ),
-
-        const SizedBox(height: 10),
-
-        // VỊ TRÍ HIỆN TẠI
-        _button(
-          icon: Icons.my_location_rounded,
+        SizedBox(height: gap),
+        _MapControlButton(
+          icon: LucideIcons.locate_fixed,
           onTap: onLocation,
         ),
+        if (onPinnedTrip != null) ...[
+          SizedBox(height: gap),
+          _MapControlButton(
+            icon: LucideIcons.calendar_days,
+            onTap: onPinnedTrip!,
+          ),
+        ],
       ],
     );
   }
+}
 
-  Widget _button({
-    required IconData icon,
-    required VoidCallback onTap,
-    bool showPlus = false,
-  }) {
+class _MapControlButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _MapControlButton({
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final size = (width * 0.108).clamp(40.0, 45.0).toDouble();
+    final iconSize = (width * 0.050).clamp(18.5, 21.5).toDouble();
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(25),
+        customBorder: const CircleBorder(),
         child: Container(
-          width: 50,
-          height: 50,
+          width: size,
+          height: size,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.96),
+            color: Colors.white,
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.10),
+                color: Colors.black.withOpacity(0.055),
                 blurRadius: 10,
-                offset: const Offset(0, 4),
+                offset: const Offset(0, 2),
               ),
             ],
           ),
-          child: Stack(
-            children: [
-              Center(
-                child: Icon(
-                  icon,
-                  size: 22,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-
-              if (showPlus)
-                Positioned(
-                  right: 7,
-                  bottom: 7,
-                  child: Container(
-                    width: 16,
-                    height: 16,
-                    decoration: const BoxDecoration(
-                      color: AppColors.blue500,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.add_rounded,
-                      size: 12,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-            ],
+          alignment: Alignment.center,
+          child: Icon(
+            icon,
+            size: iconSize,
+            color: AppColors.primaryIcon,
           ),
         ),
       ),

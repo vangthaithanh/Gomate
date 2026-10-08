@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 
@@ -42,6 +43,27 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  bool _homeHeaderVisible = true;
+
+  bool _handleHomeScroll(UserScrollNotification notification) {
+    // Chỉ xử lý scroll dọc của Home.
+    // PageView ảnh bài viết / rail gợi ý ngang sẽ không làm header nhảy.
+    if (notification.metrics.axis != Axis.vertical) return false;
+    if (notification.direction == ScrollDirection.idle) return false;
+
+    final shouldShow =
+        notification.metrics.pixels <= 4 ||
+        notification.direction == ScrollDirection.forward;
+
+    if (shouldShow != _homeHeaderVisible && mounted) {
+      setState(() {
+        _homeHeaderVisible = shouldShow;
+      });
+    }
+
+    return false;
+  }
+
   final DemoMomentsRepository _momentsRepository =
       DemoMomentsRepository.instance;
 
@@ -334,109 +356,160 @@ class _HomeScreenState extends State<HomeScreen> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final ui = _HomeMetrics.fromWidth(constraints.maxWidth);
+            final floatingHeaderHeight =
+                ui.headerHeight + (ui.topPadding * 2);
 
-            return ListView(
-              physics: const BouncingScrollPhysics(),
-              padding: EdgeInsets.only(
-                top: ui.topPadding,
-                bottom: ui.bottomPadding,
-              ),
+            return Stack(
               children: [
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: ui.contentPadding),
-                  child: _HomeHeader(
-                    ui: ui,
-                    onSearchTap: _openSearch,
+                NotificationListener<UserScrollNotification>(
+                  onNotification: _handleHomeScroll,
+                  child: ListView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: EdgeInsets.only(
+                      top: ui.topPadding,
+                      bottom: ui.bottomPadding,
+                    ),
+                    children: [
+                      // Vùng trống cho header nổi ở trạng thái đầu trang.
+                      // Khi kéo feed, vùng này cuộn đi bình thường.
+                      SizedBox(
+                        height: floatingHeaderHeight + ui.gapSmall,
+                      ),
+
+                      MomentsStrip(
+                        repository: _momentsRepository,
+                      ),
+
+                      SizedBox(height: ui.gapMedium),
+
+                      _PostSlot(
+                        hidden: _hiddenPostIndexes.contains(0),
+                        bottomGap: ui.gapSection,
+                        child: _FeedPostCard(
+                          post: _posts[0],
+                          highlighted:
+                              _hasHighlightedMoment(_posts[0].authorName),
+                          ui: ui,
+                          onMoreTap: () => _openPostActions(0),
+                          onCommentTap: () => _openComments(_posts[0]),
+                          onShareTap: () => _openShare(_posts[0]),
+                          onHashtagTap: _openHashtag,
+                          onLocationTap: () => _openPostLocation(_posts[0]),
+                        ),
+                      ),
+
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: ui.contentPadding,
+                        ),
+                        child: _PlaceSuggestionSection(
+                          future: _recommendations,
+                          ui: ui,
+                          onRetry: _retryRecommendations,
+                          onTap: _openRecommendedPlace,
+                          onSeeAll: _openAllRecommendations,
+                        ),
+                      ),
+
+                      SizedBox(height: ui.gapSection),
+
+                      _PostSlot(
+                        hidden: _hiddenPostIndexes.contains(1),
+                        bottomGap: ui.gapSection,
+                        child: _FeedPostCard(
+                          post: _posts[1],
+                          highlighted:
+                              _hasHighlightedMoment(_posts[1].authorName),
+                          ui: ui,
+                          onMoreTap: () => _openPostActions(1),
+                          onCommentTap: () => _openComments(_posts[1]),
+                          onShareTap: () => _openShare(_posts[1]),
+                          onHashtagTap: _openHashtag,
+                          onLocationTap: () => _openPostLocation(_posts[1]),
+                        ),
+                      ),
+
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: ui.contentPadding,
+                        ),
+                        child: _UserSuggestionSection(
+                          items: _userSuggestions,
+                          ui: ui,
+                        ),
+                      ),
+
+                      SizedBox(height: ui.gapSection),
+
+                      _PostSlot(
+                        hidden: _hiddenPostIndexes.contains(2),
+                        bottomGap: ui.gapSection,
+                        child: _FeedPostCard(
+                          post: _posts[2],
+                          highlighted:
+                              _hasHighlightedMoment(_posts[2].authorName),
+                          ui: ui,
+                          onMoreTap: () => _openPostActions(2),
+                          onCommentTap: () => _openComments(_posts[2]),
+                          onShareTap: () => _openShare(_posts[2]),
+                          onHashtagTap: _openHashtag,
+                          onLocationTap: () => _openPostLocation(_posts[2]),
+                        ),
+                      ),
+
+                      _PostSlot(
+                        hidden: _hiddenPostIndexes.contains(3),
+                        child: _FeedPostCard(
+                          post: _posts[3],
+                          highlighted:
+                              _hasHighlightedMoment(_posts[3].authorName),
+                          ui: ui,
+                          onMoreTap: () => _openPostActions(3),
+                          onCommentTap: () => _openComments(_posts[3]),
+                          onShareTap: () => _openShare(_posts[3]),
+                          onHashtagTap: _openHashtag,
+                          onLocationTap: () => _openPostLocation(_posts[3]),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
 
-                SizedBox(height: ui.gapSmall),
-
-                MomentsStrip(
-                  repository: _momentsRepository,
-                ),
-
-                SizedBox(height: ui.gapMedium),
-
-                _PostSlot(
-                  hidden: _hiddenPostIndexes.contains(0),
-                  bottomGap: ui.gapSection,
-                  child: _FeedPostCard(
-                    post: _posts[0],
-                    highlighted: _hasHighlightedMoment(_posts[0].authorName),
-                    ui: ui,
-                    onMoreTap: () => _openPostActions(0),
-                    onCommentTap: () => _openComments(_posts[0]),
-                    onShareTap: () => _openShare(_posts[0]),
-                    onHashtagTap: _openHashtag,
-                    onLocationTap: () => _openPostLocation(_posts[0]),
-                  ),
-                ),
-
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: ui.contentPadding),
-                  child: _PlaceSuggestionSection(
-                    future: _recommendations,
-                    ui: ui,
-                    onRetry: _retryRecommendations,
-                    onTap: _openRecommendedPlace,
-                    onSeeAll: _openAllRecommendations,
-                  ),
-                ),
-
-                SizedBox(height: ui.gapSection),
-
-                _PostSlot(
-                  hidden: _hiddenPostIndexes.contains(1),
-                  bottomGap: ui.gapSection,
-                  child: _FeedPostCard(
-                    post: _posts[1],
-                    highlighted: _hasHighlightedMoment(_posts[1].authorName),
-                    ui: ui,
-                    onMoreTap: () => _openPostActions(1),
-                    onCommentTap: () => _openComments(_posts[1]),
-                    onShareTap: () => _openShare(_posts[1]),
-                    onHashtagTap: _openHashtag,
-                    onLocationTap: () => _openPostLocation(_posts[1]),
-                  ),
-                ),
-
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: ui.contentPadding),
-                  child: _UserSuggestionSection(
-                    items: _userSuggestions,
-                    ui: ui,
-                  ),
-                ),
-
-                SizedBox(height: ui.gapSection),
-
-                _PostSlot(
-                  hidden: _hiddenPostIndexes.contains(2),
-                  bottomGap: ui.gapSection,
-                  child: _FeedPostCard(
-                    post: _posts[2],
-                    highlighted: _hasHighlightedMoment(_posts[2].authorName),
-                    ui: ui,
-                    onMoreTap: () => _openPostActions(2),
-                    onCommentTap: () => _openComments(_posts[2]),
-                    onShareTap: () => _openShare(_posts[2]),
-                    onHashtagTap: _openHashtag,
-                    onLocationTap: () => _openPostLocation(_posts[2]),
-                  ),
-                ),
-
-                _PostSlot(
-                  hidden: _hiddenPostIndexes.contains(3),
-                  child: _FeedPostCard(
-                    post: _posts[3],
-                    highlighted: _hasHighlightedMoment(_posts[3].authorName),
-                    ui: ui,
-                    onMoreTap: () => _openPostActions(3),
-                    onCommentTap: () => _openComments(_posts[3]),
-                    onShareTap: () => _openShare(_posts[3]),
-                    onHashtagTap: _openHashtag,
-                    onLocationTap: () => _openPostLocation(_posts[3]),
+                // Header Home nằm trực tiếp trong home_screen.dart.
+                // Kéo xuống: trượt lên + mờ dần.
+                // Kéo lên: hiện lại ngay như Instagram.
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: IgnorePointer(
+                    ignoring: !_homeHeaderVisible,
+                    child: AnimatedSlide(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOutCubic,
+                      offset: _homeHeaderVisible
+                          ? Offset.zero
+                          : const Offset(0, -1.08),
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 140),
+                        curve: Curves.easeOut,
+                        opacity: _homeHeaderVisible ? 1 : 0,
+                        child: Container(
+                          height: floatingHeaderHeight,
+                          color: Colors.white,
+                          padding: EdgeInsets.fromLTRB(
+                            ui.contentPadding,
+                            ui.topPadding,
+                            ui.contentPadding,
+                            ui.topPadding,
+                          ),
+                          child: _HomeHeader(
+                            ui: ui,
+                            onSearchTap: _openSearch,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -610,13 +683,13 @@ class _HomeMetrics {
       width: width,
 
       contentPadding: contentPadding,
-      topPadding: c(width * 0.025, 8, 12),
+      topPadding: c(width * 0.018, 6, 8),
       // Navbar overlay nên cần khoảng scroll cuối.
       bottomPadding: c(width * 0.30, 108, 132),
 
-      headerHeight: c(width * 0.12, 44, 52),
-      headerIconSize: c(width * 0.064, 22, 25),
-      logoFontSize: c(width * 0.064, 23, 27),
+      headerHeight: c(width * 0.108, 40, 46),
+      headerIconSize: c(width * 0.058, 21, 23),
+      logoFontSize: c(width * 0.058, 21, 24),
 
       momentActiveSize: momentActive,
       momentNormalSize: momentNormal,
@@ -675,8 +748,8 @@ class _HomeHeader extends StatelessWidget {
             style: TextStyle(
               fontSize: ui.logoFontSize,
               height: 1,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
               color: AppColors.primaryText,
             ),
           ),
