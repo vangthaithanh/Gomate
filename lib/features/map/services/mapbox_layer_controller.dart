@@ -16,6 +16,10 @@ typedef GoMatePlaceTap = void Function(String placeId);
 class GoMateMapboxLayerController {
   MapboxMap? _map;
 
+  // onStyleLoaded can arrive before onMapCreated finishes attaching.
+  // Keep that style request so it is not silently lost.
+  bool _baseStyleRequested = false;
+
   // Marker size policy:
   // - zoom xa: dot có kích thước tối thiểu cố định.
   // - zoom gần: icon xuất hiện và tăng dần theo zoom.
@@ -732,104 +736,147 @@ class GoMateMapboxLayerController {
         }
       },
     );
+
+    // If onStyleLoaded ran before attach, apply its pending style request.
+    if (_baseStyleRequested) {
+      await configureGoMateBaseStyle();
+    }
   }
 
 
   Future<void> configureGoMateBaseStyle() async {
+    _baseStyleRequested = true;
+
     final map = _map;
-    if (map == null) return;
+    if (map == null) {
+      debugPrint('[GoMate Maps] Waiting for Mapbox attach before applying style.');
+      return;
+    }
 
-    await map.style.setStyleImportConfigProperties(
-      'basemap',
-      <String, Object>{
-        // ============================================================
-        // GOMATE LIGHT MAP
-        // ============================================================
+    // Preserve the approved GoMate V17 palette. Configure each property
+    // separately so an unsupported option does not discard the other colors.
+    final settings = <String, Object>{
+      // ============================================================
+      // GOMATE LIGHT MAP
+      // ============================================================
 
-        'lightPreset': 'day',
+      'lightPreset': 'day',
 
-        // QUAN TRỌNG:
-        // Không dùng monochrome nữa vì làm toàn map bị xám.
-        'theme': 'default',
+      // QUAN TRỌNG:
+      // Không dùng monochrome nữa vì làm toàn map bị xám.
+      'theme': 'default',
 
-        // ============================================================
-        // VISIBILITY
-        // ============================================================
+      // ============================================================
+      // VISIBILITY
+      // ============================================================
 
-        'showPointOfInterestLabels': false,
-        'showPlaceLabels': true,
-        'showRoadLabels': true,
-        'showTransitLabels': false,
-        'showPedestrianRoads': true,
+      'showPointOfInterestLabels': false,
+      'showPlaceLabels': true,
+      'showRoadLabels': true,
+      'showTransitLabels': false,
+      'showPedestrianRoads': true,
 
-        // Giúp nhận biết ranh giới khu vực rõ hơn.
-        'showAdminBoundaries': true,
+      // Giúp nhận biết ranh giới khu vực rõ hơn.
+      'showAdminBoundaries': true,
 
-        'show3dObjects': false,
+      'show3dObjects': false,
 
-        // ============================================================
-        // BASE
-        // ============================================================
+      // ============================================================
+      // BASE
+      // ============================================================
 
-        // Nền đất hơi xanh/xám, không dùng trắng tinh.
-        'colorLand': '#F4F7FB',
+      // Nền đất hơi xanh/xám, không dùng trắng tinh.
+      'colorLand': '#F4F7FB',
 
-        // Nước phải đủ khác với đất.
-        'colorWater': '#CFEAF7',
+      // Nước phải đủ khác với đất.
+      'colorWater': '#CFEAF7',
 
-        // ============================================================
-        // LAND USE
-        // ============================================================
+      // ============================================================
+      // LAND USE
+      // ============================================================
 
-        // Công viên / cây xanh.
-        'colorGreenspace': '#DDEFE3',
+      // Công viên / cây xanh.
+      'colorGreenspace': '#DDEFE3',
 
-        // Khu thương mại - xanh tím cực nhạt.
-        'colorCommercial': '#E9EFF9',
+      // Khu thương mại - xanh tím cực nhạt.
+      'colorCommercial': '#E9EFF9',
 
-        // Trường học / đại học.
-        'colorEducation': '#EEEAF8',
+      // Trường học / đại học.
+      'colorEducation': '#EEEAF8',
 
-        // Bệnh viện / y tế.
-        'colorMedical': '#F8E8EC',
+      // Bệnh viện / y tế.
+      'colorMedical': '#F8E8EC',
 
-        // Công nghiệp.
-        'colorIndustrial': '#ECE8E1',
+      // Công nghiệp.
+      'colorIndustrial': '#ECE8E1',
 
-        // ============================================================
-        // BUILDINGS
-        // ============================================================
+      // ============================================================
+      // BUILDINGS
+      // ============================================================
 
-        'colorBuildings': '#DCE3EC',
+      'colorBuildings': '#DCE3EC',
 
-        // ============================================================
-        // ROADS
-        // ============================================================
+      // ============================================================
+      // ROADS
+      // ============================================================
 
-        // Đường nhỏ sáng hơn nền building.
-        'colorRoads': '#FFFFFF',
+      // Đường nhỏ sáng hơn nền building.
+      'colorRoads': '#FFFFFF',
 
-        // Trục đường lớn.
-        'colorTrunks': '#D5E2F0',
+      // Trục đường lớn.
+      'colorTrunks': '#D5E2F0',
 
-        // Cao tốc / đường chính nổi hơn một chút.
-        'colorMotorways': '#BFD7F5',
+      // Cao tốc / đường chính nổi hơn một chút.
+      'colorMotorways': '#BFD7F5',
 
-        // ============================================================
-        // LABELS
-        // ============================================================
+      // ============================================================
+      // LABELS
+      // ============================================================
 
-        'colorPlaceLabels': '#42546D',
+      'colorPlaceLabels': '#42546D',
 
-        'colorRoadLabels': '#68788D',
+      'colorRoadLabels': '#68788D',
 
-        // ============================================================
-        // ADMINISTRATIVE BOUNDARIES
-        // ============================================================
+      // ============================================================
+      // ADMINISTRATIVE BOUNDARIES
+      // ============================================================
 
-        'colorAdminBoundaries': '#AEBCCE',
-      },
-    );
+      'colorAdminBoundaries': '#AEBCCE',
+    };
+
+    var applied = 0;
+    var failed = 0;
+
+    for (final entry in settings.entries) {
+      try {
+        await map.style.setStyleImportConfigProperty(
+          'basemap',
+          entry.key,
+          entry.value,
+        );
+        applied++;
+      } catch (error) {
+        failed++;
+        debugPrint(
+          '[GoMate Maps] basemap ${entry.key} could not be applied: $error',
+        );
+      }
+    }
+
+    // Readback makes missing/ignored Mapbox Standard options visible in logs.
+    // Reading does not modify the map, and failure here must not break UI.
+    for (final property in <String>['colorLand', 'colorWater', 'colorGreenspace']) {
+      try {
+        final result = await map.style.getStyleImportConfigProperty(
+          'basemap',
+          property,
+        );
+        debugPrint('[GoMate Maps] $property = ${result.value}');
+      } catch (error) {
+        debugPrint('[GoMate Maps] Cannot read $property: $error');
+      }
+    }
+    debugPrint('[GoMate Maps] Basemap config applied: $applied, failed: $failed');
   }
 
   /// Current-user location visual.
