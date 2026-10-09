@@ -17,7 +17,6 @@ abstract class MessageRepository extends ChangeNotifier {
   MessageConversation? conversation(String id);
   MessageItinerary? linkedGroupItinerary(String conversationId);
   MessageGroupRole groupRole(String conversationId);
-  List<MessageContact> groupInviteCandidates(String conversationId, String query);
   List<MessageGroupInvite> pendingGroupInvites(String conversationId);
   List<MessageContact> searchContacts(String query);
   List<MessageSearchResult> searchMessages(String conversationId, String query);
@@ -692,35 +691,6 @@ class DemoMessageRepository extends MessageRepository {
     final item = conversation(conversationId);
     if (item == null || !item.isGroup) return const [];
     return List.unmodifiable(item.pendingInvites);
-  }
-
-  @override
-  List<MessageContact> groupInviteCandidates(
-    String conversationId,
-    String query,
-  ) {
-    final item = conversation(conversationId);
-    if (item == null || !item.isGroup) return const [];
-
-    final memberIds = item.participants.map((e) => e.id).toSet();
-    final pendingIds = item.pendingInvites.map((e) => e.contactId).toSet();
-    final normalized = query.trim().toLowerCase();
-
-    final result = _contacts.where((contact) {
-      if (memberIds.contains(contact.id)) return false;
-      if (normalized.isEmpty) return true;
-      return contact.name.toLowerCase().contains(normalized) ||
-          contact.subtitle.toLowerCase().contains(normalized);
-    }).toList(growable: false);
-
-    result.sort((a, b) {
-      final ap = pendingIds.contains(a.id);
-      final bp = pendingIds.contains(b.id);
-      if (ap == bp) return 0;
-      return ap ? -1 : 1;
-    });
-
-    return result;
   }
 
   @override

@@ -9,8 +9,10 @@ import '../../messages/models/message_models.dart';
 import '../../messages/screens/chat_screen.dart';
 import '../../messages/screens/group_management_screen.dart';
 import '../../messages/widgets/message_widgets.dart';
+import '../../map/state/map_ui_session.dart';
 import '../models/trip_ui_models.dart';
 import '../widgets/trip_shared_sheets.dart';
+import '../../../core/widgets/gomate_name_editor_content.dart';
 
 class TripDetailScreen extends StatefulWidget {
   final TripUi trip;
@@ -45,7 +47,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
 
     final value = await GoMateBottomSheet.show<String>(
       context: context,
-      child: TripNameEditorContent(
+      child: GoMateNameEditorContent(
         title: 'Chỉnh sửa tên lịch trình',
         initialValue: _trip.title,
         hintText: 'Tên lịch trình...',
@@ -57,6 +59,8 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     setState(() {
       _trip = _trip.copyWith(title: value);
     });
+
+    GoMateMapUiSession.updateTrip(_trip);
 
     final conversationId = _trip.conversationId;
 
@@ -90,6 +94,8 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         days: result.days,
       );
     });
+
+    GoMateMapUiSession.updateTrip(_trip);
   }
 
   void _openChat() {
@@ -145,15 +151,23 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
   }
 
   void _openPlaceFlow() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => TripRoutePlaceholderScreen(
-          title: _trip.canEditTrip
-              ? 'Thêm địa điểm'
-              : 'Xem lộ trình',
-          canEdit: _trip.canEditTrip,
-        ),
-      ),
+    // Cả "Thêm địa điểm" và "Xem lộ trình" đều mở Map
+    // đúng lịch trình và bung lộ trình ngày.
+    //
+    // Quan trọng với luồng Message -> TripDetail:
+    // MessageDetail là một route nằm trên MainShell. Nếu chỉ pop TripDetail
+    // thì người dùng vẫn bị giữ ở MessageDetail, nên Map phía dưới không hiện.
+    // Vì vậy request tab Map trước rồi đóng toàn bộ các route detail về MainShell.
+    GoMateMapUiSession.updateTrip(_trip);
+
+    GoMateMapUiSession.requestOpenTripOnMap(
+      _trip,
+      day: 1,
+      expandDayRoute: true,
+    );
+
+    Navigator.of(context).popUntil(
+      (route) => route.isFirst,
     );
   }
 
@@ -175,6 +189,8 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
           _trip = _trip.copyWith(isActive: true);
         });
 
+        GoMateMapUiSession.updateTrip(_trip);
+
         GoMateSnackBar.show(
           context,
           message: 'Đã ghim lịch trình',
@@ -185,6 +201,11 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         setState(() {
           _trip = _trip.copyWith(isActive: false);
         });
+
+        GoMateMapUiSession.updateTrip(_trip);
+        GoMateMapUiSession.clearPinnedTrip(
+          tripId: _trip.id,
+        );
 
         GoMateSnackBar.show(
           context,
@@ -231,6 +252,8 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
       message: 'Đã xoá lịch trình',
     );
 
+    GoMateMapUiSession.removeTrip(_trip.id);
+
     Navigator.of(context).pop(
       TripDetailResult(
         trip: _trip,
@@ -265,6 +288,8 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
       message: 'Đã rời lịch trình',
     );
 
+    GoMateMapUiSession.removeTrip(_trip.id);
+
     Navigator.of(context).pop(
       TripDetailResult(
         trip: _trip,
@@ -274,6 +299,8 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
   }
 
   void _close() {
+    GoMateMapUiSession.updateTrip(_trip);
+
     Navigator.of(context).pop(
       TripDetailResult(trip: _trip),
     );

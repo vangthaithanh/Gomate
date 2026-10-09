@@ -8,7 +8,6 @@ import '../data/message_repository.dart';
 import '../models/message_models.dart';
 import '../widgets/message_widgets.dart';
 import '../widgets/message_group_invite_content.dart';
-import '../widgets/message_group_invite_content.dart';
 
 class RoleAwareGroupMembersScreen extends StatefulWidget {
   final String conversationId;

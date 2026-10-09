@@ -10,6 +10,7 @@ import '../../../core/widgets/gomate_search_field.dart';
 import '../../../core/widgets/snackbar.dart';
 import '../../messages/data/message_repository.dart';
 import '../../messages/widgets/message_widgets.dart';
+import '../../map/state/map_ui_session.dart';
 import '../models/trip_ui_models.dart';
 import 'create_trip_screen.dart';
 import 'trip_detail_screen.dart';
@@ -28,6 +29,35 @@ class _TripScreenState extends State<TripScreen> {
 
   final MessageRepository _messageRepository =
       DemoMessageRepository.instance;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Trip là nguồn dữ liệu UI demo hiện tại.
+    // Map dùng cùng danh sách này thay vì tạo một bộ demo khác.
+    GoMateMapUiSession.registerTrips(_trips);
+
+    GoMateMapUiSession.revision.addListener(
+      _pullTripChangesFromMap,
+    );
+  }
+
+  void _pullTripChangesFromMap() {
+    if (!mounted) return;
+
+    final shared = GoMateMapUiSession.availableTrips;
+
+    setState(() {
+      _trips
+        ..clear()
+        ..addAll(shared);
+    });
+  }
+
+  void _syncMapTripSession() {
+    GoMateMapUiSession.registerTrips(_trips);
+  }
 
   late final List<TripUi> _trips = <TripUi>[
     TripUi(
@@ -169,6 +199,10 @@ class _TripScreenState extends State<TripScreen> {
 
   @override
   void dispose() {
+    GoMateMapUiSession.revision.removeListener(
+      _pullTripChangesFromMap,
+    );
+
     _searchController.dispose();
     super.dispose();
   }
@@ -193,6 +227,8 @@ class _TripScreenState extends State<TripScreen> {
     setState(() {
       _trips.insert(0, normalized);
     });
+
+    _syncMapTripSession();
 
     await _openTrip(normalized);
   }
@@ -223,7 +259,10 @@ class _TripScreenState extends State<TripScreen> {
         setState(() {
           _trips.removeAt(index);
         });
+
+        _syncMapTripSession();
       }
+
       return;
     }
 
@@ -231,6 +270,8 @@ class _TripScreenState extends State<TripScreen> {
       setState(() {
         _trips[index] = result.trip;
       });
+
+      _syncMapTripSession();
     }
   }
 
@@ -280,6 +321,8 @@ class _TripScreenState extends State<TripScreen> {
       }
     });
 
+    _syncMapTripSession();
+
     GoMateSnackBar.show(
       context,
       message: 'Đã ghim lịch trình',
@@ -300,6 +343,8 @@ class _TripScreenState extends State<TripScreen> {
       _trips[index] =
           _trips[index].copyWith(isActive: false);
     });
+
+    _syncMapTripSession();
 
     GoMateSnackBar.show(
       context,
@@ -344,6 +389,8 @@ class _TripScreenState extends State<TripScreen> {
       );
     });
 
+    _syncMapTripSession();
+
     GoMateSnackBar.show(
       context,
       message: 'Đã xoá lịch trình',
@@ -383,6 +430,8 @@ class _TripScreenState extends State<TripScreen> {
             (item) => item.id == trip.id,
       );
     });
+
+    _syncMapTripSession();
 
     GoMateSnackBar.show(
       context,

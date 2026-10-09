@@ -5,10 +5,13 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/bottom_sheet.dart';
 import '../../../core/widgets/snackbar.dart';
 import '../../home/widgets/report_reason_content.dart';
+import '../../map/state/map_ui_session.dart';
+import '../../trip/models/trip_ui_models.dart';
+import '../../trip/screens/trip_detail_screen.dart';
 import '../data/message_repository.dart';
 import '../models/message_models.dart';
 import '../widgets/message_widgets.dart';
-import '../../trip/widgets/trip_shared_sheets.dart';
+import '../../../core/widgets/gomate_name_editor_content.dart';
 import 'group_management_screen.dart';
 import 'message_add_to_itinerary_screen.dart';
 import 'message_support_screens.dart';
@@ -180,7 +183,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
       ) async {
     final value = await GoMateBottomSheet.show<String>(
       context: context,
-      child: TripNameEditorContent(
+      child: GoMateNameEditorContent(
         title: 'Chỉnh sửa tên nhóm',
         initialValue: conversation.title,
         hintText: 'Tên nhóm...',
@@ -207,8 +210,28 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
     );
   }
 
-  void _openLinkedItinerary(MessageConversation conversation) {
-    final itinerary = widget.repository.linkedGroupItinerary(conversation.id);
+  TripAccessRole _toTripRole(
+    MessageGroupRole role,
+  ) {
+    switch (role) {
+      case MessageGroupRole.leader:
+        return TripAccessRole.leader;
+
+      case MessageGroupRole.deputy:
+        return TripAccessRole.deputy;
+
+      case MessageGroupRole.member:
+        return TripAccessRole.member;
+    }
+  }
+
+  void _openLinkedItinerary(
+    MessageConversation conversation,
+  ) {
+    final itinerary =
+        widget.repository.linkedGroupItinerary(
+      conversation.id,
+    );
 
     if (itinerary == null) {
       GoMateSnackBar.show(
@@ -218,16 +241,54 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
       return;
     }
 
+    TripUi? trip;
+
+    // Ưu tiên object Trip đang dùng chung trong app.
+    for (final item in GoMateMapUiSession.availableTrips) {
+      if (item.id == itinerary.id) {
+        trip = item;
+        break;
+      }
+    }
+
+    // Fallback UI-only trong lúc backend Trip/Message
+    // chưa dùng chung DTO.
+    trip ??= TripUi(
+      id: itinerary.id,
+      title: itinerary.title,
+      days: 1,
+      destination: itinerary.title,
+      coverAsset: itinerary.imageAsset,
+      isGroup: true,
+      currentUserRole: _toTripRole(
+        conversation.roleOf(
+          widget.repository.currentUserId,
+        ),
+      ),
+      members: conversation.participants
+          .map(
+            (member) => TripMemberUi(
+              id: member.id,
+              name: member.displayName,
+              avatarAsset: member.avatarAsset ?? '',
+              role: _toTripRole(
+                member.role,
+              ),
+            ),
+          )
+          .toList(growable: false),
+      conversationId: conversation.id,
+    );
+
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => GroupItineraryPlaceholderScreen(
-          itinerary: itinerary,
-          conversationId: conversation.id,
+        builder: (_) => TripDetailScreen(
+          trip: trip!,
+          messageRepository: widget.repository,
         ),
       ),
     );
   }
-
 
   Future<void> _openAddToItinerary(
     MessageConversation conversation,

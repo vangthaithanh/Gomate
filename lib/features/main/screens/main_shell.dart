@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../messages/screens/message_screen.dart';
 import '../../home/screens/home_screen.dart';
 import '../../map/screens/map_screen.dart';
+import '../../map/state/map_ui_session.dart';
 import '../../profile/screens/profile_screen.dart';
 import '../../trip/screens/trip_screen.dart';
 
@@ -19,6 +20,71 @@ class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+
+    GoMateMapUiSession.requestedMainTab.addListener(
+      _handleRequestedTab,
+    );
+
+    GoMateMapUiSession.revision.addListener(
+      _handleMapUiRevision,
+    );
+  }
+
+  @override
+  void dispose() {
+    GoMateMapUiSession.requestedMainTab.removeListener(
+      _handleRequestedTab,
+    );
+
+    GoMateMapUiSession.revision.removeListener(
+      _handleMapUiRevision,
+    );
+
+    super.dispose();
+  }
+
+  void _handleRequestedTab() {
+    final requested =
+        GoMateMapUiSession.requestedMainTab.value;
+
+    if (requested == null ||
+        requested < 0 ||
+        requested > 4) {
+      return;
+    }
+
+    if (mounted && _currentIndex != requested) {
+      _switchTab(requested);
+    }
+
+    GoMateMapUiSession.clearRequestedMainTab();
+  }
+
+  void _handleMapUiRevision() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _switchTab(int index) {
+    if (index == _currentIndex) {
+      return;
+    }
+
+    // Nếu rời Map khi đang có pinned trip,
+    // selected trip tạm thời phải quay về pinned trip.
+    if (_currentIndex == 2 && index != 2) {
+      GoMateMapUiSession.handleLeavingMapTab();
+    }
+
+    setState(() {
+      _currentIndex = index;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final screenWidth = mediaQuery.size.width;
@@ -29,11 +95,16 @@ class _MainShellState extends State<MainShell> {
       bottomSafe,
     );
 
+    final hideBottomNav =
+        _currentIndex == 2 &&
+        GoMateMapUiSession.hideMapBottomNav;
+
     final pages = <Widget>[
       const HomeScreen(),
       const MessageScreen(),
       GoMateMapScreen(
-        bottomNavigationInset: metrics.totalHeight + 8,
+        bottomNavigationInset:
+            hideBottomNav ? 0 : metrics.totalHeight + 8,
       ),
       const TripScreen(),
       const ProfileScreen(),
@@ -69,25 +140,20 @@ class _MainShellState extends State<MainShell> {
           //
           // Chạy sát 2 mép màn hình.
           // ============================================================
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: SizedBox(
-              height: metrics.totalHeight,
-              child: _BottomNavigationArea(
-                currentIndex: _currentIndex,
-                metrics: metrics,
-                onTap: (index) {
-                  if (index == _currentIndex) return;
-
-                  setState(() {
-                    _currentIndex = index;
-                  });
-                },
+          if (!hideBottomNav)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SizedBox(
+                height: metrics.totalHeight,
+                child: _BottomNavigationArea(
+                  currentIndex: _currentIndex,
+                  metrics: metrics,
+                  onTap: _switchTab,
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

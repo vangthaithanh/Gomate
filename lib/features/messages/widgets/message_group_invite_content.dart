@@ -93,7 +93,6 @@ class _MessageGroupInviteContentState
 
       // Đồng bộ leader/deputy:
       // ai có quyền mời thì cũng có quyền huỷ pending invite.
-      canCancelPending: true,
 
       onAddInvites: (ids) {
         if (ids.isEmpty) return;

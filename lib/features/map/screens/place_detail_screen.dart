@@ -11,6 +11,8 @@ import '../../../core/widgets/gomate_image_viewer.dart';
 import '../../../core/widgets/gomate_itinerary_picker.dart';
 import '../../../core/widgets/snackbar.dart';
 import '../../home/data/post_interaction_repository.dart';
+import '../../trip/models/trip_ui_models.dart';
+import '../state/map_ui_session.dart';
 import '../utils/cloudinary_image_url.dart';
 import '../widgets/share_place_content.dart';
 
@@ -282,54 +284,34 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
   }
 
   Future<void> _openItineraryPicker() async {
-    // TODO(integration):
-    // Sau này thay list demo bằng lịch trình thật của current user.
-    const items = <GoMateItineraryPickerItem>[
-      GoMateItineraryPickerItem(
-        id: 'demo-dalat-group',
-        title: 'Đà lạt ơi',
-        dateRange: '12-15 tháng 10, 2026',
-        summary: '4 ngày - 12 địa điểm',
-        imageAsset: 'assets/images/survey_city.jpg',
-        memberCount: 4,
-      ),
-      GoMateItineraryPickerItem(
-        id: 'demo-vungtau-personal',
-        title: 'Biển vũng tàu',
-        dateRange: 'Đang cập nhật',
-        summary: 'Lịch trình cá nhân',
-        imageAsset: 'assets/images/checkin.jpg',
-      ),
-      GoMateItineraryPickerItem(
-        id: 'demo-vungtau-group',
-        title: 'Biển vũng tàu',
-        dateRange: 'Đang cập nhật',
-        summary: 'Lịch trình nhóm',
-        imageAsset: 'assets/images/survey_beach.jpg',
-        memberCount: 2,
-      ),
-    ];
+    final trips = GoMateMapUiSession.availableTrips;
+
+    final items = trips
+        .map(
+          (trip) => GoMateItineraryPickerItem(
+            id: trip.id,
+            title: trip.title,
+            dateRange: trip.dateRangeLabel,
+            summary:
+                '${trip.days} ngày - ${trip.places.length} địa điểm',
+            imageAsset: trip.coverAsset,
+            memberCount: trip.isGroup ? trip.memberCount : 0,
+          ),
+        )
+        .toList(growable: false);
 
     final selected =
-    await Navigator.of(context).push<GoMateItineraryPickerItem>(
-      MaterialPageRoute<GoMateItineraryPickerItem>(
+        await Navigator.of(context).push<GoMateItineraryPickerItem>(
+      MaterialPageRoute(
         builder: (pickerContext) {
           return GoMateItineraryPickerScreen(
             items: items,
-
-            // Giống picker ở Message.
             showCancel: true,
             searchHint: 'Tìm kiếm lịch trình...',
-
             onCancel: () {
               Navigator.of(pickerContext).pop();
             },
-
             onSelected: (item) {
-              // QUAN TRỌNG:
-              // Chưa thêm địa điểm vào lịch trình ở bước này.
-              //
-              // Chỉ trả itinerary đã chọn về Place Detail.
               Navigator.of(pickerContext).pop(item);
             },
           );
@@ -339,13 +321,38 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
 
     if (!mounted || selected == null) return;
 
-    // TODO(place-itinerary-flow):
-    // Flow tiếp theo sẽ xử lý ở đây.
-    //
-    // Không:
-    // - thêm địa điểm ngay;
-    // - snackbar "Đã thêm...";
-    // - sửa dữ liệu lịch trình.
+    TripUi? trip;
+
+    for (final item in trips) {
+      if (item.id == selected.id) {
+        trip = item;
+        break;
+      }
+    }
+
+    if (trip == null) return;
+
+    if (!trip.canEditTrip) {
+      GoMateSnackBar.show(
+        context,
+        message: 'Bạn chỉ có quyền xem lộ trình này.',
+      );
+      return;
+    }
+
+    // Luồng từ Place Detail luôn đi đầy đủ:
+    // Trip đã chọn -> chọn ngày -> giờ bắt đầu -> giờ kết thúc.
+    GoMateMapUiSession.requestAddPlaceFromDetail(
+      placeId: place.id,
+      trip: trip,
+    );
+
+    // MainShell đã được yêu cầu đổi về Map.
+    // Đóng toàn bộ route detail/search nằm trên MainShell để flow Map
+    // luôn hiện ra ngay, bất kể Place Detail được mở từ đâu.
+    Navigator.of(context).popUntil(
+      (route) => route.isFirst,
+    );
   }
 
   bool _handleDetailScroll(UserScrollNotification notification) {

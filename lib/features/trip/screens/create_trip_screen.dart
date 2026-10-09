@@ -7,6 +7,7 @@ import '../../../core/widgets/snackbar.dart';
 import '../../messages/data/message_repository.dart';
 import '../models/trip_ui_models.dart';
 import '../widgets/trip_shared_sheets.dart';
+import '../../../core/widgets/gomate_name_editor_content.dart';
 
 class CreateTripScreen extends StatefulWidget {
   final MessageRepository? messageRepository;
@@ -56,7 +57,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   Future<void> _editName() async {
     final value = await GoMateBottomSheet.show<String>(
       context: context,
-      child: TripNameEditorContent(
+      child: GoMateNameEditorContent(
         title: 'Chỉnh sửa tên lịch trình',
         initialValue: _title,
         hintText: 'Tên lịch trình...',
