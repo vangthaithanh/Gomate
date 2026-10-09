@@ -23,6 +23,7 @@ import '../widgets/post_action_content.dart';
 import '../widgets/report_reason_content.dart';
 import '../../moments/data/moments_repository.dart';
 import '../../moments/widgets/moments_strip.dart';
+import '../../../core/widgets/gomate_main_tab_header.dart';
 
 class HomeScreen extends StatefulWidget {
   /// MainShell truyền callback này để chuyển sang tab Map mà không push
@@ -356,8 +357,14 @@ class _HomeScreenState extends State<HomeScreen> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final ui = _HomeMetrics.fromWidth(constraints.maxWidth);
+
+            final mainHeaderUi =
+            GoMateMainTabHeaderMetrics.fromWidth(
+              constraints.maxWidth,
+            );
+
             final floatingHeaderHeight =
-                ui.headerHeight + (ui.topPadding * 2);
+                mainHeaderUi.totalHeight;
 
             return Stack(
               children: [
@@ -373,7 +380,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       // Vùng trống cho header nổi ở trạng thái đầu trang.
                       // Khi kéo feed, vùng này cuộn đi bình thường.
                       SizedBox(
-                        height: floatingHeaderHeight + ui.gapSmall,
+                        height:
+                        floatingHeaderHeight +
+                            mainHeaderUi.contentGap,
                       ),
 
                       MomentsStrip(
@@ -497,15 +506,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Container(
                           height: floatingHeaderHeight,
                           color: Colors.white,
-                          padding: EdgeInsets.fromLTRB(
-                            ui.contentPadding,
-                            ui.topPadding,
-                            ui.contentPadding,
-                            ui.topPadding,
-                          ),
-                          child: _HomeHeader(
-                            ui: ui,
-                            onSearchTap: _openSearch,
+                          child: GoMateMainTabHeader(
+                            title: 'GoMate',
+                            leadingIcon: LucideIcons.search,
+                            onLeadingTap: _openSearch,
+                            trailingIcon: LucideIcons.bell,
+                            onTrailingTap: () {},
                           ),
                         ),
                       ),
@@ -601,10 +607,6 @@ class _HomeMetrics {
   final double topPadding;
   final double bottomPadding;
 
-  final double headerHeight;
-  final double headerIconSize;
-  final double logoFontSize;
-
   final double momentActiveSize;
   final double momentNormalSize;
   final double momentItemWidth;
@@ -632,9 +634,6 @@ class _HomeMetrics {
     required this.contentPadding,
     required this.topPadding,
     required this.bottomPadding,
-    required this.headerHeight,
-    required this.headerIconSize,
-    required this.logoFontSize,
     required this.momentActiveSize,
     required this.momentNormalSize,
     required this.momentItemWidth,
@@ -687,10 +686,6 @@ class _HomeMetrics {
       // Navbar overlay nên cần khoảng scroll cuối.
       bottomPadding: c(width * 0.30, 108, 132),
 
-      headerHeight: c(width * 0.108, 40, 46),
-      headerIconSize: c(width * 0.058, 21, 23),
-      logoFontSize: c(width * 0.058, 21, 24),
-
       momentActiveSize: momentActive,
       momentNormalSize: momentNormal,
       momentItemWidth: momentItemWidth,
@@ -719,80 +714,6 @@ class _HomeMetrics {
 // ============================================================================
 // HEADER
 // ============================================================================
-
-class _HomeHeader extends StatelessWidget {
-  final _HomeMetrics ui;
-  final VoidCallback onSearchTap;
-
-  const _HomeHeader({
-    required this.ui,
-    required this.onSearchTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: ui.headerHeight,
-      child: Row(
-        children: [
-          _HeaderButton(
-            icon: LucideIcons.search,
-            iconSize: ui.headerIconSize,
-            onTap: onSearchTap,
-          ),
-
-          const Spacer(),
-
-          Text(
-            'GoMate',
-            style: TextStyle(
-              fontSize: ui.logoFontSize,
-              height: 1,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.3,
-              color: AppColors.primaryText,
-            ),
-          ),
-
-          const Spacer(),
-
-          _HeaderButton(
-            icon: LucideIcons.bell,
-            iconSize: ui.headerIconSize,
-            onTap: () {},
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeaderButton extends StatelessWidget {
-  final IconData icon;
-  final double iconSize;
-  final VoidCallback onTap;
-
-  const _HeaderButton({
-    required this.icon,
-    required this.iconSize,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
-      child: SizedBox(
-        width: iconSize + 22,
-        height: iconSize + 22,
-        child: Center(
-          child: Icon(icon, size: iconSize, color: AppColors.black),
-        ),
-      ),
-    );
-  }
-}
 
 // ============================================================================
 // MOMENTS

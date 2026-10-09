@@ -11,6 +11,9 @@ abstract class MessageRepository extends ChangeNotifier {
   List<MessageContact> get contacts;
   List<MessageItinerary> get itineraries;
 
+  /// Chỉ các lịch trình current user có quyền mời thêm thành viên.
+  List<MessageItinerary> get inviteableItineraries;
+
   MessageConversation? conversation(String id);
   MessageItinerary? linkedGroupItinerary(String conversationId);
   MessageGroupRole groupRole(String conversationId);
@@ -43,7 +46,7 @@ abstract class MessageRepository extends ChangeNotifier {
     required String conversationId,
     required String text,
   });
-  void attachItinerary({
+  void invitePeerToItinerary({
     required String conversationId,
     required String itineraryId,
   });
@@ -63,6 +66,10 @@ class DemoMessageRepository extends MessageRepository {
   final String currentUserName = 'Thune';
 
   final List<MessageConversation> _items = <MessageConversation>[];
+
+  /// Mock state cho lời mời từ direct chat vào lịch trình.
+  /// Key = "<itineraryId>:<inviteeUserId>".
+  final Set<String> _pendingDirectItineraryInvites = <String>{};
 
   final List<MessageContact> _contacts = const <MessageContact>[
     MessageContact(
@@ -147,11 +154,30 @@ class DemoMessageRepository extends MessageRepository {
       memberCount: 4,
     ),
     const MessageItinerary(
-      id: 'trip_personal_demo',
-      title: 'Đà Lạt ơi',
+      id: 'trip_personal_da_lat',
+      title: 'Đà lạt ơi',
       dateRange: '12-15 tháng 10, 2026',
       summary: '4 ngày - 12 địa điểm',
       imageAsset: 'assets/images/survey_city.jpg',
+      memberCount: 4,
+      canInviteMembers: true,
+    ),
+    const MessageItinerary(
+      id: 'trip_personal_vung_tau_1',
+      title: 'Biển vũng tàu',
+      dateRange: '20-22 tháng 10, 2026',
+      summary: '3 ngày - 8 địa điểm',
+      imageAsset: 'assets/images/thiennhien.jpg',
+      canInviteMembers: true,
+    ),
+    const MessageItinerary(
+      id: 'trip_personal_vung_tau_2',
+      title: 'Biển vũng tàu',
+      dateRange: '02-04 tháng 11, 2026',
+      summary: '3 ngày - 6 địa điểm',
+      imageAsset: 'assets/images/survey_city.jpg',
+      memberCount: 2,
+      canInviteMembers: true,
     ),
   ];
 
@@ -630,6 +656,11 @@ class DemoMessageRepository extends MessageRepository {
   List<MessageItinerary> get itineraries => List.unmodifiable(_itineraries);
 
   @override
+  List<MessageItinerary> get inviteableItineraries => List.unmodifiable(
+        _itineraries.where((item) => item.canInviteMembers),
+      );
+
+  @override
   MessageConversation? conversation(String id) {
     for (final item in _items) {
       if (item.id == id) return item;
@@ -951,20 +982,31 @@ class DemoMessageRepository extends MessageRepository {
   }
 
   @override
-  void cancelGroupInvite(String conversationId, String contactId) {
+  void cancelGroupInvite(
+      String conversationId,
+      String contactId,
+      ) {
     final index = _indexOf(conversationId);
     if (index < 0) return;
+
     final item = _items[index];
-    if (!item.isGroup ||
-        item.roleOf(currentUserId) != MessageGroupRole.leader) {
+    if (!item.isGroup) return;
+
+    final role = item.roleOf(currentUserId);
+
+    if (role != MessageGroupRole.leader &&
+        role != MessageGroupRole.deputy) {
       return;
     }
 
     _items[index] = item.copyWith(
       pendingInvites: item.pendingInvites
-          .where((invite) => invite.contactId != contactId)
+          .where(
+            (invite) => invite.contactId != contactId,
+      )
           .toList(growable: false),
     );
+
     notifyListeners();
   }
 
@@ -1120,19 +1162,44 @@ class DemoMessageRepository extends MessageRepository {
   }
 
   @override
-  void attachItinerary({
+  void invitePeerToItinerary({
     required String conversationId,
     required String itineraryId,
   }) {
-    final index = _indexOf(conversationId);
-    if (index < 0) return;
+    final conversation = this.conversation(conversationId);
 
-    final item = _items[index];
-    if (item.itineraryIds.contains(itineraryId)) return;
+    if (conversation == null ||
+        conversation.isGroup ||
+        conversation.isPending ||
+        conversation.isBlocked) {
+      return;
+    }
 
-    _items[index] = item.copyWith(
-      itineraryIds: [...item.itineraryIds, itineraryId],
-    );
+    MessageParticipant? peer;
+    for (final participant in conversation.participants) {
+      if (participant.id != currentUserId) {
+        peer = participant;
+        break;
+      }
+    }
+
+    if (peer == null) return;
+
+    MessageItinerary? itinerary;
+    for (final item in _itineraries) {
+      if (item.id == itineraryId) {
+        itinerary = item;
+        break;
+      }
+    }
+
+    if (itinerary == null || !itinerary.canInviteMembers) return;
+
+    // Demo UI: đây chỉ là pending invitation.
+    // Không tăng memberCount cho tới khi người nhận accept ở backend thật.
+    final inviteKey = '$itineraryId:${peer.id}';
+    if (!_pendingDirectItineraryInvites.add(inviteKey)) return;
+
     notifyListeners();
   }
 

@@ -8,7 +8,9 @@ import '../../home/widgets/report_reason_content.dart';
 import '../data/message_repository.dart';
 import '../models/message_models.dart';
 import '../widgets/message_widgets.dart';
+import '../../trip/widgets/trip_shared_sheets.dart';
 import 'group_management_screen.dart';
+import 'message_add_to_itinerary_screen.dart';
 import 'message_support_screens.dart';
 
 class MessageDetailScreen extends StatefulWidget {
@@ -27,6 +29,7 @@ class MessageDetailScreen extends StatefulWidget {
 
 class _MessageDetailScreenState extends State<MessageDetailScreen> {
   bool _showLinks = false;
+  String? _pendingItineraryInviteId;
 
   @override
   void initState() {
@@ -172,69 +175,24 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
-  Future<void> _renameGroup(MessageConversation conversation) async {
-    final controller = TextEditingController(text: conversation.title);
-
-    await GoMateBottomSheet.show<void>(
+  Future<void> _renameGroup(
+      MessageConversation conversation,
+      ) async {
+    final value = await GoMateBottomSheet.show<String>(
       context: context,
-      child: SizedBox(
-        width: double.infinity,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Chỉnh sửa tên nhóm',
-              style: TextStyle(
-                fontSize: messageFont(MediaQuery.sizeOf(context).width, 16),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              height: 44,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: AppColors.grayBackground,
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: controller,
-                      cursorColor: AppColors.primaryIcon,
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        isDense: true,
-                        hintText: 'Tên nhóm',
-                      ),
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () {
-                      widget.repository.renameGroup(
-                        conversation.id,
-                        controller.text,
-                      );
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text(
-                      'Lưu',
-                      style: TextStyle(
-                        color: AppColors.primaryText,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+      child: TripNameEditorContent(
+        title: 'Chỉnh sửa tên nhóm',
+        initialValue: conversation.title,
+        hintText: 'Tên nhóm...',
       ),
     );
 
-    controller.dispose();
+    if (!mounted || value == null) return;
+
+    widget.repository.renameGroup(
+      conversation.id,
+      value,
+    );
   }
 
   void _toggleMute(MessageConversation conversation) {
@@ -267,6 +225,67 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
           conversationId: conversation.id,
         ),
       ),
+    );
+  }
+
+
+  Future<void> _openAddToItinerary(
+    MessageConversation conversation,
+  ) async {
+    if (conversation.isGroup) return;
+
+    if (conversation.isBlocked) {
+      GoMateSnackBar.show(
+        context,
+        message: 'Bỏ chặn người dùng trước khi mời vào lịch trình',
+      );
+      return;
+    }
+
+    final peer = _peer(conversation);
+    if (peer == null) return;
+
+    final itinerary = await Navigator.of(context).push<MessageItinerary>(
+      MaterialPageRoute<MessageItinerary>(
+        builder: (_) => MessageAddToItineraryScreen(
+          repository: widget.repository,
+        ),
+      ),
+    );
+
+    if (!mounted || itinerary == null) return;
+
+    setState(() {
+      _pendingItineraryInviteId = itinerary.id;
+    });
+
+    final confirmed = await GoMateBottomSheet.show<bool>(
+      context: context,
+      child: MessageConfirmContent(
+        title: 'Mời ${peer.displayName} vào lịch trình\n${itinerary.title}',
+        description:
+            'Người này sẽ tham gia vào lịch trình khi xác nhận lời mời',
+        onConfirm: () => Navigator.of(context).pop(true),
+      ),
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _pendingItineraryInviteId = null;
+    });
+
+    if (confirmed != true) return;
+
+    widget.repository.invitePeerToItinerary(
+      conversationId: conversation.id,
+      itineraryId: itinerary.id,
+    );
+
+    GoMateSnackBar.show(
+      context,
+      message:
+          'Đã gửi lời mời tham gia ${itinerary.title} cho ${peer.displayName}',
     );
   }
 
@@ -427,16 +446,17 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
               MessageDetailMenuRow(
                 icon: LucideIcons.users_round,
                 label: 'Thêm vào lịch trình',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => MessageItineraryPickerScreen(
-                        conversationId: conversation.id,
-                        repository: widget.repository,
+                trailing: _pendingItineraryInviteId == null
+                    ? null
+                    : Text(
+                        '(1) Thêm',
+                        style: TextStyle(
+                          fontSize: messageFont(width, 10),
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primaryText,
+                        ),
                       ),
-                    ),
-                  );
-                },
+                onTap: () => _openAddToItinerary(conversation),
               ),
             MessageDetailMenuRow(
               icon: LucideIcons.message_square_warning,

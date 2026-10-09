@@ -5,6 +5,7 @@ import 'package:flutter_lucide/flutter_lucide.dart';
 import '../../../core/theme/app_colors.dart';
 import '../data/post_interaction_repository.dart';
 import '../models/post_interaction_models.dart';
+import '../../../core/widgets/gomate_search_field.dart';
 
 class SharePostContent extends StatefulWidget {
   final String postId;
@@ -190,14 +191,6 @@ class _SharePostContentState extends State<SharePostContent> {
       height: height,
       child: Column(
         children: [
-          if (_searchMode)
-            _ShareSearchBar(
-              controller: _searchController,
-              focusNode: _searchFocusNode,
-              onChanged: _onSearchChanged,
-              onCancel: _cancelSearch,
-            )
-          else
             Padding(
               padding: EdgeInsets.fromLTRB(
                 screen.width * 0.055,
@@ -205,41 +198,19 @@ class _SharePostContentState extends State<SharePostContent> {
                 screen.width * 0.055,
                 screen.width * 0.025,
               ),
-              child: InkWell(
+              child: _searchMode
+                  ? GoMateSearchField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                hintText: 'Tìm liên hệ hoặc nhóm',
+                onChanged: _onSearchChanged,
+                showCancel: true,
+                onCancel: _cancelSearch,
+              )
+                  : GoMateSearchField(
+                hintText: 'Tìm liên hệ hoặc nhóm',
+                readOnly: true,
                 onTap: _enterSearch,
-                borderRadius: BorderRadius.circular(
-                  (screen.width * 0.040).clamp(14.0, 17.0).toDouble(),
-                ),
-                child: Container(
-                  height: (screen.width * 0.095).clamp(35.0, 40.0).toDouble(),
-                  padding: EdgeInsets.symmetric(
-                    horizontal: screen.width * 0.030,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.grayBackground,
-                    borderRadius: BorderRadius.circular(
-                      (screen.width * 0.040).clamp(14.0, 17.0).toDouble(),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        LucideIcons.search,
-                        size: (screen.width * 0.048).clamp(18.0, 21.0).toDouble(),
-                        color: AppColors.grayText,
-                      ),
-                      SizedBox(width: screen.width * 0.018),
-                      Text(
-                        'Tìm liên hệ hoặc nhóm',
-                        style: TextStyle(
-                          fontSize: _font(screen.width, 12.5),
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.grayText,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ),
             ),
           Expanded(
@@ -312,97 +283,6 @@ class _SharePostContentState extends State<SharePostContent> {
               onSend: _send,
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _ShareSearchBar extends StatelessWidget {
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  final ValueChanged<String> onChanged;
-  final VoidCallback onCancel;
-
-  const _ShareSearchBar({
-    required this.controller,
-    required this.focusNode,
-    required this.onChanged,
-    required this.onCancel,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        width * 0.055,
-        0,
-        width * 0.055,
-        width * 0.025,
-      ),
-      child: Container(
-        height: (width * 0.095).clamp(35.0, 40.0).toDouble(),
-        padding: EdgeInsets.only(
-          left: width * 0.030,
-          right: width * 0.012,
-        ),
-        decoration: BoxDecoration(
-          color: AppColors.grayBackground,
-          borderRadius: BorderRadius.circular(
-            (width * 0.040).clamp(14.0, 17.0).toDouble(),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              LucideIcons.search,
-              size: (width * 0.048).clamp(18.0, 21.0).toDouble(),
-              color: AppColors.grayText,
-            ),
-            SizedBox(width: width * 0.018),
-            Expanded(
-              child: TextField(
-                controller: controller,
-                focusNode: focusNode,
-                textInputAction: TextInputAction.search,
-                onChanged: onChanged,
-                cursorColor: AppColors.primaryIcon,
-                style: TextStyle(
-                  fontSize: _font(width, 12.5),
-                  color: AppColors.black,
-                ),
-                decoration: InputDecoration(
-                  isDense: true,
-                  border: InputBorder.none,
-                  hintText: 'Tìm...',
-                  hintStyle: TextStyle(
-                    fontSize: _font(width, 12.5),
-                    color: AppColors.grayText,
-                  ),
-                ),
-              ),
-            ),
-            InkWell(
-              onTap: onCancel,
-              borderRadius: BorderRadius.circular(10),
-              child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: width * 0.020,
-                  vertical: width * 0.010,
-                ),
-                child: Text(
-                  'Huỷ',
-                  style: TextStyle(
-                    fontSize: _font(width, 12.5),
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primaryText,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

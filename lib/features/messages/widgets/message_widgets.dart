@@ -3,6 +3,7 @@ import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../models/message_models.dart';
+import '../../../core/widgets/gomate_search_field.dart';
 
 double messageFont(double width, double baseAt375) {
   final value = baseAt375 * (width / 375);
@@ -307,78 +308,15 @@ class MessageSearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-
-    return Container(
-      height: messageClamp(width * 0.125, 45, 50),
-      padding: EdgeInsets.only(
-        left: width * 0.038,
-        right: showCancel ? width * 0.018 : width * 0.038,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.grayBackground,
-        borderRadius: BorderRadius.circular(
-          messageClamp(width * 0.065, 20, 25),
-        ),
-        border: Border.all(
-          color: AppColors.grayBorder,
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            LucideIcons.search,
-            size: messageClamp(width * 0.060, 22, 25),
-            color: AppColors.grayText,
-          ),
-          SizedBox(width: width * 0.030),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              focusNode: focusNode,
-              readOnly: readOnly,
-              onTap: onTap,
-              onChanged: onChanged,
-              cursorColor: AppColors.primaryIcon,
-              textInputAction: TextInputAction.search,
-              style: TextStyle(
-                fontSize: messageFont(width, 13.5),
-                color: Colors.black,
-              ),
-              decoration: InputDecoration(
-                isDense: true,
-                border: InputBorder.none,
-                hintText: hintText,
-                hintStyle: TextStyle(
-                  fontSize: messageFont(width, 13.5),
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.grayText,
-                ),
-              ),
-            ),
-          ),
-          if (showCancel)
-            InkWell(
-              onTap: onCancel,
-              borderRadius: BorderRadius.circular(10),
-              child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: width * 0.020,
-                  vertical: width * 0.010,
-                ),
-                child: Text(
-                  'Huỷ',
-                  style: TextStyle(
-                    fontSize: messageFont(width, 12.5),
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primaryText,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+    return GoMateSearchField(
+      controller: controller,
+      focusNode: focusNode,
+      hintText: hintText,
+      onChanged: onChanged,
+      onTap: onTap,
+      onCancel: onCancel,
+      showCancel: showCancel,
+      readOnly: readOnly,
     );
   }
 }
@@ -814,6 +752,7 @@ class MessageDetailMenuRow extends StatelessWidget {
   final VoidCallback onTap;
   final Color color;
   final bool showChevron;
+  final Widget? trailing;
 
   const MessageDetailMenuRow({
     super.key,
@@ -822,6 +761,7 @@ class MessageDetailMenuRow extends StatelessWidget {
     required this.onTap,
     this.color = Colors.black,
     this.showChevron = true,
+    this.trailing,
   });
 
   @override
@@ -852,107 +792,15 @@ class MessageDetailMenuRow extends StatelessWidget {
                 ),
               ),
             ),
-            if (showChevron)
+            if (trailing != null)
+              trailing!
+            else if (showChevron)
               Icon(
                 LucideIcons.chevron_right,
                 size: messageClamp(width * 0.060, 21, 24),
                 color: AppColors.grayText,
               ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class MessageItineraryCard extends StatelessWidget {
-  final MessageItinerary itinerary;
-  final VoidCallback onTap;
-
-  const MessageItineraryCard({
-    super.key,
-    required this.itinerary,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final imageSize = messageClamp(width * 0.20, 72, 82);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(15),
-        child: Container(
-          padding: EdgeInsets.all(width * 0.012),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(15),
-            boxShadow: AppColors.elevatedShadow,
-          ),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.asset(
-                  itinerary.imageAsset,
-                  width: imageSize,
-                  height: imageSize,
-                  fit: BoxFit.cover,
-                ),
-              ),
-              SizedBox(width: width * 0.035),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      itinerary.title,
-                      style: TextStyle(
-                        fontSize: messageFont(width, 13),
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primaryText,
-                      ),
-                    ),
-                    SizedBox(height: width * 0.012),
-                    Text(
-                      itinerary.dateRange,
-                      style: TextStyle(
-                        fontSize: messageFont(width, 11),
-                        color: AppColors.grayText,
-                      ),
-                    ),
-                    SizedBox(height: width * 0.006),
-                    Text(
-                      itinerary.summary,
-                      style: TextStyle(
-                        fontSize: messageFont(width, 11),
-                        color: AppColors.grayText,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (itinerary.memberCount > 0) ...[
-                Text(
-                  '${itinerary.memberCount}',
-                  style: TextStyle(
-                    fontSize: messageFont(width, 14),
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primaryText,
-                  ),
-                ),
-                SizedBox(width: width * 0.012),
-                Icon(
-                  LucideIcons.users_round,
-                  color: AppColors.primaryIcon,
-                  size: messageClamp(width * 0.055, 20, 23),
-                ),
-              ],
-            ],
-          ),
         ),
       ),
     );

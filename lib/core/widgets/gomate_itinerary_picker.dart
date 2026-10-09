@@ -24,19 +24,57 @@ class GoMateItineraryPickerItem {
 }
 
 /// Picker lịch trình dùng chung cho:
-/// - Tin nhắn -> Thêm vào lịch trình
-/// - Chi tiết địa điểm -> Thêm vào lịch trình
+/// - Tin nhắn -> Thêm vào lịch trình.
+/// - Chi tiết địa điểm -> Thêm vào lịch trình.
 ///
-/// Chỉ xử lý UI + tìm kiếm.
-/// Business action sau khi chọn được truyền qua [onSelected].
+/// Luồng search đã chốt:
+///
+/// 1. Mở picker:
+///    <   [ Tìm kiếm lịch trình... ]
+///
+/// 2. Chạm vào ô nhưng CHƯA nhập:
+///    <   [ Tìm kiếm lịch trình... ]
+///    => chưa hiện "Huỷ".
+///
+/// 3. Khi đã nhập từ khoá:
+///        [ từ khoá ...        Huỷ ]
+///    => nút Back tạm ẩn để search bar có đủ không gian.
+///
+/// 4. Bấm "Huỷ":
+///    - clear keyword;
+///    - unfocus / đóng keyboard;
+///    - KHÔNG pop route;
+///    - quay lại đúng trạng thái số 1.
+///
+/// 5. Chỉ nút Back mới đóng picker.
+///
+/// [onCancel] được giữ tên để tương thích code hiện tại, nhưng chỉ dùng cho
+/// hành động đóng picker bằng nút Back. Nó KHÔNG được gọi bởi nút "Huỷ" search.
 class GoMateItineraryPickerScreen extends StatefulWidget {
   final List<GoMateItineraryPickerItem> items;
   final FutureOr<void> Function(GoMateItineraryPickerItem item) onSelected;
+
+  /// Cho phép search bar hiện chữ "Huỷ" khi đã có keyword.
+  final bool showCancel;
+
+  /// Placeholder.
+  final String searchHint;
+
+  /// Callback đóng picker bằng nút Back.
+  /// Nếu null sẽ dùng Navigator.maybePop().
+  final VoidCallback? onCancel;
+
+  /// Empty-state quick create.
+  final VoidCallback? onQuickCreate;
 
   const GoMateItineraryPickerScreen({
     super.key,
     required this.items,
     required this.onSelected,
+    this.showCancel = true,
+    this.searchHint = 'Tìm kiếm lịch trình...',
+    this.onCancel,
+    this.onQuickCreate,
   });
 
   @override
@@ -47,19 +85,26 @@ class GoMateItineraryPickerScreen extends StatefulWidget {
 class _GoMateItineraryPickerScreenState
     extends State<GoMateItineraryPickerScreen> {
   final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
 
   late List<GoMateItineraryPickerItem> _visible;
   String _query = '';
 
+  bool get _hasKeyword =>
+      widget.showCancel && _query.trim().isNotEmpty;
+
   @override
   void initState() {
     super.initState();
-    _visible = widget.items;
+    _visible = List<GoMateItineraryPickerItem>.of(widget.items);
   }
 
   @override
-  void didUpdateWidget(covariant GoMateItineraryPickerScreen oldWidget) {
+  void didUpdateWidget(
+      covariant GoMateItineraryPickerScreen oldWidget,
+      ) {
     super.didUpdateWidget(oldWidget);
+
     if (!identical(oldWidget.items, widget.items)) {
       _applySearch(_query);
     }
@@ -70,21 +115,50 @@ class _GoMateItineraryPickerScreenState
 
     setState(() {
       _query = value;
+
       _visible = q.isEmpty
-          ? widget.items
+          ? List<GoMateItineraryPickerItem>.of(widget.items)
           : widget.items
-              .where(
-                (item) =>
-                    item.title.toLowerCase().contains(q) ||
-                    item.dateRange.toLowerCase().contains(q) ||
-                    item.summary.toLowerCase().contains(q),
-              )
-              .toList(growable: false);
+          .where(
+            (item) =>
+        item.title.toLowerCase().contains(q) ||
+            item.dateRange.toLowerCase().contains(q) ||
+            item.summary.toLowerCase().contains(q),
+      )
+          .toList(growable: false);
     });
+  }
+
+  /// "Huỷ" trong search KHÔNG đóng picker.
+  ///
+  /// Nó chỉ quay từ:
+  ///
+  /// [ keyword ... Huỷ ]
+  ///
+  /// về:
+  ///
+  /// < [ Tìm kiếm lịch trình... ]
+  void _cancelCurrentSearch() {
+    _controller.clear();
+    _applySearch('');
+    _focusNode.unfocus();
+  }
+
+  /// Chỉ nút Back mới thoát picker.
+  void _closePicker() {
+    final callback = widget.onCancel;
+
+    if (callback != null) {
+      callback();
+      return;
+    }
+
+    Navigator.of(context).maybePop();
   }
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -92,63 +166,102 @@ class _GoMateItineraryPickerScreenState
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final metrics = _PickerMetrics.fromWidth(width);
+    final ui = _PickerMetrics.fromWidth(width);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      // Full-bleed, không tạo artboard trắng nằm trên nền xám.
+      backgroundColor: Colors.white,
       body: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            metrics.outerHorizontal,
-            metrics.outerTop,
-            metrics.outerHorizontal,
-            0,
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.vertical(
-              top: Radius.circular(metrics.pageRadius),
-            ),
-            child: ColoredBox(
-              color: Colors.white,
-              child: Column(
+        child: Column(
+          children: [
+            SizedBox(height: ui.headerTopGap),
+
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: ui.headerHorizontal,
+              ),
+              child: Row(
                 children: [
-                  SizedBox(height: metrics.searchTopGap),
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: metrics.searchHorizontal,
-                    ),
-                    child: _PickerSearchField(
-                      controller: _controller,
-                      metrics: metrics,
-                      onChanged: _applySearch,
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 150),
+                    switchInCurve: Curves.easeOut,
+                    switchOutCurve: Curves.easeIn,
+                    transitionBuilder: (child, animation) {
+                      return FadeTransition(
+                        opacity: animation,
+                        child: SizeTransition(
+                          sizeFactor: animation,
+                          axis: Axis.horizontal,
+                          axisAlignment: -1,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: _hasKeyword
+                        ? const SizedBox.shrink(
+                      key: ValueKey('picker-no-back'),
+                    )
+                        : Padding(
+                      key: const ValueKey('picker-back'),
+                      padding: EdgeInsets.only(
+                        right: ui.backToSearchGap,
+                      ),
+                      child: InkWell(
+                        onTap: _closePicker,
+                        customBorder: const CircleBorder(),
+                        child: SizedBox.square(
+                          dimension: ui.backButtonSize,
+                          child: Center(
+                            child: Icon(
+                              LucideIcons.chevron_left,
+                              size: ui.backIconSize,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                  SizedBox(height: metrics.searchToContentGap),
+
                   Expanded(
-                    child: _buildContent(metrics),
+                    child: _PickerSearchField(
+                      controller: _controller,
+                      focusNode: _focusNode,
+                      metrics: ui,
+                      hintText: widget.searchHint,
+                      showCancel: _hasKeyword,
+                      onChanged: _applySearch,
+                      onCancel: _cancelCurrentSearch,
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
+
+            SizedBox(height: ui.headerToContentGap),
+
+            Expanded(
+              child: _buildContent(ui),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildContent(_PickerMetrics metrics) {
+  Widget _buildContent(_PickerMetrics ui) {
     if (widget.items.isEmpty) {
       return _EmptyItineraryState(
-        metrics: metrics,
+        metrics: ui,
         text: 'Chưa có lịch trình',
         showCalendarIcon: true,
+        onTap: widget.onQuickCreate,
       );
     }
 
     if (_visible.isEmpty) {
       return _EmptyItineraryState(
-        metrics: metrics,
+        metrics: ui,
         text: 'Không tìm thấy lịch trình',
         showCalendarIcon: false,
       );
@@ -156,20 +269,23 @@ class _GoMateItineraryPickerScreenState
 
     return ListView.separated(
       physics: const BouncingScrollPhysics(),
+      keyboardDismissBehavior:
+      ScrollViewKeyboardDismissBehavior.onDrag,
       padding: EdgeInsets.fromLTRB(
-        metrics.listHorizontal,
-        metrics.listTopPadding,
-        metrics.listHorizontal,
-        metrics.listBottomPadding,
+        ui.listHorizontal,
+        0,
+        ui.listHorizontal,
+        ui.listBottomPadding,
       ),
       itemCount: _visible.length,
-      separatorBuilder: (_, __) => SizedBox(height: metrics.rowGap),
+      separatorBuilder: (_, __) =>
+          SizedBox(height: ui.rowGap),
       itemBuilder: (context, index) {
         final item = _visible[index];
 
         return _ItineraryPickerRow(
           item: item,
-          metrics: metrics,
+          metrics: ui,
           onTap: () => widget.onSelected(item),
         );
       },
@@ -179,53 +295,109 @@ class _GoMateItineraryPickerScreenState
 
 class _PickerSearchField extends StatelessWidget {
   final TextEditingController controller;
+  final FocusNode focusNode;
   final _PickerMetrics metrics;
+  final String hintText;
+
+  final bool showCancel;
+
   final ValueChanged<String> onChanged;
+  final VoidCallback onCancel;
 
   const _PickerSearchField({
     required this.controller,
+    required this.focusNode,
     required this.metrics,
+    required this.hintText,
+    required this.showCancel,
     required this.onChanged,
+    required this.onCancel,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOut,
       height: metrics.searchHeight,
-      padding: EdgeInsets.symmetric(
-        horizontal: metrics.searchInnerHorizontal,
+      padding: EdgeInsets.only(
+        left: metrics.searchInnerHorizontal,
+        right: showCancel
+            ? metrics.searchCancelRightPadding
+            : metrics.searchInnerHorizontal,
       ),
       decoration: BoxDecoration(
         color: const Color(0xFFF6F6F6),
-        borderRadius: BorderRadius.circular(metrics.searchRadius),
+        borderRadius: BorderRadius.circular(
+          metrics.searchRadius,
+        ),
       ),
       child: Row(
         children: [
           Icon(
             LucideIcons.search,
             size: metrics.searchIconSize,
-            color: const Color(0xFF858585),
+            color: const Color(0xFF828282),
           ),
+
           SizedBox(width: metrics.searchIconGap),
+
           Expanded(
             child: TextField(
               controller: controller,
+              focusNode: focusNode,
               onChanged: onChanged,
               cursorColor: AppColors.primaryIcon,
+              textInputAction: TextInputAction.search,
               style: TextStyle(
                 fontSize: metrics.searchFontSize,
-                fontWeight: FontWeight.w400,
+                fontWeight: FontWeight.w500,
                 color: AppColors.black,
               ),
               decoration: InputDecoration(
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
                 isDense: true,
-                hintText: 'Tìm lịch trình ....',
+                contentPadding: EdgeInsets.zero,
+                hintText: hintText,
                 hintStyle: TextStyle(
                   fontSize: metrics.searchFontSize,
-                  fontWeight: FontWeight.w400,
-                  color: const Color(0xFF8B8B8B),
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF828282),
                 ),
+              ),
+            ),
+          ),
+
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 130),
+            child: showCancel
+                ? InkWell(
+              key: const ValueKey('picker-search-cancel'),
+              onTap: onCancel,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal:
+                  metrics.cancelHorizontalPadding,
+                  vertical:
+                  metrics.cancelVerticalPadding,
+                ),
+                child: Text(
+                  'Huỷ',
+                  style: TextStyle(
+                    fontSize: metrics.cancelFontSize,
+                    height: 1,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.primaryText,
+                  ),
+                ),
+              ),
+            )
+                : const SizedBox.shrink(
+              key: ValueKey(
+                'picker-search-cancel-hidden',
               ),
             ),
           ),
@@ -256,9 +428,13 @@ class _ItineraryPickerRow extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(metrics.rowRadius),
+        borderRadius: BorderRadius.circular(
+          metrics.rowRadius,
+        ),
         child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: metrics.rowHeight),
+          constraints: BoxConstraints(
+            minHeight: metrics.rowHeight,
+          ),
           child: Padding(
             padding: EdgeInsets.symmetric(
               horizontal: metrics.rowHorizontalPadding,
@@ -267,7 +443,9 @@ class _ItineraryPickerRow extends StatelessWidget {
             child: Row(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(metrics.imageRadius),
+                  borderRadius: BorderRadius.circular(
+                    metrics.imageRadius,
+                  ),
                   child: Image.asset(
                     imageAsset,
                     width: metrics.imageSize,
@@ -286,7 +464,11 @@ class _ItineraryPickerRow extends StatelessWidget {
                     ),
                   ),
                 ),
-                SizedBox(width: metrics.imageToTitleGap),
+
+                SizedBox(
+                  width: metrics.imageToTitleGap,
+                ),
+
                 Expanded(
                   child: Text(
                     item.title,
@@ -300,6 +482,7 @@ class _ItineraryPickerRow extends StatelessWidget {
                     ),
                   ),
                 ),
+
                 if (item.memberCount > 0) ...[
                   SizedBox(width: metrics.memberGap),
                   Text(
@@ -326,74 +509,100 @@ class _EmptyItineraryState extends StatelessWidget {
   final _PickerMetrics metrics;
   final String text;
   final bool showCalendarIcon;
+  final VoidCallback? onTap;
 
   const _EmptyItineraryState({
     required this.metrics,
     required this.text,
     required this.showCalendarIcon,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Transform.translate(
-        offset: Offset(0, -metrics.emptyLift),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              text,
-              style: TextStyle(
-                fontSize: metrics.emptyTextSize,
-                fontWeight: FontWeight.w400,
-                color: const Color(0xFF8A8A8A),
-              ),
+    final content = Transform.translate(
+      offset: Offset(
+        0,
+        -metrics.emptyLift,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: metrics.emptyTextSize,
+              fontWeight: FontWeight.w400,
+              color: const Color(0xFF8A8A8A),
             ),
-            SizedBox(height: metrics.emptyTextToIconGap),
-            if (showCalendarIcon)
-              SizedBox(
-                width: metrics.emptyIconBox,
-                height: metrics.emptyIconBox,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Positioned(
-                      left: 0,
-                      top: 0,
-                      child: Icon(
-                        LucideIcons.calendar,
-                        size: metrics.emptyCalendarSize,
+          ),
+
+          SizedBox(
+            height: metrics.emptyTextToIconGap,
+          ),
+
+          if (showCalendarIcon)
+            SizedBox(
+              width: metrics.emptyIconBox,
+              height: metrics.emptyIconBox,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    child: Icon(
+                      LucideIcons.calendar,
+                      size: metrics.emptyCalendarSize,
+                      color: AppColors.primaryIcon,
+                    ),
+                  ),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: metrics.emptyPlusBadge,
+                      height: metrics.emptyPlusBadge,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
                         color: AppColors.primaryIcon,
                       ),
-                    ),
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: Container(
-                        width: metrics.emptyPlusBadge,
-                        height: metrics.emptyPlusBadge,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.primaryIcon,
-                        ),
-                        alignment: Alignment.center,
-                        child: Icon(
-                          LucideIcons.plus,
-                          size: metrics.emptyPlusIcon,
-                          color: Colors.white,
-                        ),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        LucideIcons.plus,
+                        size: metrics.emptyPlusIcon,
+                        color: Colors.white,
                       ),
                     ),
-                  ],
-                ),
-              )
-            else
-              Icon(
-                LucideIcons.search,
-                size: metrics.emptyCalendarSize,
-                color: AppColors.grayText,
+                  ),
+                ],
               ),
-          ],
+            )
+          else
+            Icon(
+              LucideIcons.search,
+              size: metrics.emptyCalendarSize,
+              color: AppColors.grayText,
+            ),
+        ],
+      ),
+    );
+
+    return Center(
+      child: onTap == null
+          ? content
+          : Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
+            child: content,
+          ),
         ),
       ),
     );
@@ -401,25 +610,29 @@ class _EmptyItineraryState extends StatelessWidget {
 }
 
 class _PickerMetrics {
-  final double width;
+  final double headerTopGap;
+  final double headerHorizontal;
+  final double headerToContentGap;
 
-  final double outerHorizontal;
-  final double outerTop;
-  final double pageRadius;
+  final double backButtonSize;
+  final double backIconSize;
+  final double backToSearchGap;
 
-  final double searchTopGap;
-  final double searchHorizontal;
   final double searchHeight;
   final double searchRadius;
   final double searchInnerHorizontal;
+  final double searchCancelRightPadding;
   final double searchIconSize;
   final double searchIconGap;
   final double searchFontSize;
-  final double searchToContentGap;
+
+  final double cancelHorizontalPadding;
+  final double cancelVerticalPadding;
+  final double cancelFontSize;
 
   final double listHorizontal;
-  final double listTopPadding;
   final double listBottomPadding;
+
   final double rowHeight;
   final double rowGap;
   final double rowRadius;
@@ -444,21 +657,23 @@ class _PickerMetrics {
   final double emptyPlusIcon;
 
   const _PickerMetrics({
-    required this.width,
-    required this.outerHorizontal,
-    required this.outerTop,
-    required this.pageRadius,
-    required this.searchTopGap,
-    required this.searchHorizontal,
+    required this.headerTopGap,
+    required this.headerHorizontal,
+    required this.headerToContentGap,
+    required this.backButtonSize,
+    required this.backIconSize,
+    required this.backToSearchGap,
     required this.searchHeight,
     required this.searchRadius,
     required this.searchInnerHorizontal,
+    required this.searchCancelRightPadding,
     required this.searchIconSize,
     required this.searchIconGap,
     required this.searchFontSize,
-    required this.searchToContentGap,
+    required this.cancelHorizontalPadding,
+    required this.cancelVerticalPadding,
+    required this.cancelFontSize,
     required this.listHorizontal,
-    required this.listTopPadding,
     required this.listBottomPadding,
     required this.rowHeight,
     required this.rowGap,
@@ -482,28 +697,34 @@ class _PickerMetrics {
   });
 
   factory _PickerMetrics.fromWidth(double width) {
-    double c(double value, double min, double max) =>
-        value.clamp(min, max).toDouble();
+    double c(double value, double min, double max) {
+      return value.clamp(min, max).toDouble();
+    }
 
     return _PickerMetrics(
-      width: width,
-      outerHorizontal: c(width * 0.022, 7, 10),
-      outerTop: c(width * 0.020, 6, 9),
-      pageRadius: c(width * 0.080, 24, 30),
+      headerTopGap: c(width * 0.055, 18, 24),
+      headerHorizontal: c(width * 0.060, 20, 26),
+      headerToContentGap: c(width * 0.065, 22, 28),
 
-      searchTopGap: c(width * 0.070, 22, 29),
-      searchHorizontal: c(width * 0.072, 23, 30),
-      searchHeight: c(width * 0.105, 38, 44),
-      searchRadius: c(width * 0.060, 20, 24),
+      backButtonSize: c(width * 0.105, 38, 44),
+      backIconSize: c(width * 0.072, 25, 30),
+      backToSearchGap: c(width * 0.022, 7, 10),
+
+      searchHeight: c(width * 0.115, 42, 48),
+      searchRadius: c(width * 0.060, 20, 25),
       searchInnerHorizontal: c(width * 0.040, 13, 17),
-      searchIconSize: c(width * 0.060, 21, 25),
-      searchIconGap: c(width * 0.020, 7, 9),
-      searchFontSize: c(width * 0.038, 13.5, 16),
-      searchToContentGap: c(width * 0.080, 25, 32),
+      searchCancelRightPadding: c(width * 0.012, 4, 6),
+      searchIconSize: c(width * 0.065, 23, 27),
+      searchIconGap: c(width * 0.025, 8, 11),
+      searchFontSize: c(width * 0.038, 14, 16),
 
-      listHorizontal: c(width * 0.075, 24, 31),
-      listTopPadding: c(width * 0.012, 4, 6),
+      cancelHorizontalPadding: c(width * 0.020, 7, 9),
+      cancelVerticalPadding: c(width * 0.018, 6, 8),
+      cancelFontSize: c(width * 0.034, 12.5, 14),
+
+      listHorizontal: c(width * 0.075, 25, 31),
       listBottomPadding: c(width * 0.080, 26, 34),
+
       rowHeight: c(width * 0.155, 56, 64),
       rowGap: c(width * 0.025, 8, 11),
       rowRadius: c(width * 0.030, 10, 12),

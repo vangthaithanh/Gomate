@@ -111,7 +111,6 @@ class MessageConversation {
   final String activityLabel;
   final List<String> mediaAssets;
   final List<String> links;
-  final List<String> itineraryIds;
 
   /// Group chat và group itinerary là một cặp nghiệp vụ.
   /// Mọi conversation type=group phải có linkedItineraryId.
@@ -136,7 +135,6 @@ class MessageConversation {
     this.activityLabel = 'Hoạt động gần đây',
     this.mediaAssets = const <String>[],
     this.links = const <String>[],
-    this.itineraryIds = const <String>[],
     this.linkedItineraryId,
     this.pendingInvites = const <MessageGroupInvite>[],
   }) : assert(
@@ -168,7 +166,6 @@ class MessageConversation {
     String? activityLabel,
     List<String>? mediaAssets,
     List<String>? links,
-    List<String>? itineraryIds,
     String? linkedItineraryId,
     List<MessageGroupInvite>? pendingInvites,
   }) {
@@ -189,7 +186,6 @@ class MessageConversation {
       activityLabel: activityLabel ?? this.activityLabel,
       mediaAssets: mediaAssets ?? this.mediaAssets,
       links: links ?? this.links,
-      itineraryIds: itineraryIds ?? this.itineraryIds,
       linkedItineraryId: linkedItineraryId ?? this.linkedItineraryId,
       pendingInvites: pendingInvites ?? this.pendingInvites,
     );
@@ -230,6 +226,10 @@ class MessageItinerary {
   final String imageAsset;
   final int memberCount;
 
+  /// Current user có quyền mời thêm người vào lịch trình này hay không.
+  /// Group itinerary do conversation quản lý riêng sẽ để false.
+  final bool canInviteMembers;
+
   const MessageItinerary({
     required this.id,
     required this.title,
@@ -237,5 +237,6 @@ class MessageItinerary {
     required this.summary,
     required this.imageAsset,
     this.memberCount = 0,
+    this.canInviteMembers = false,
   });
 }

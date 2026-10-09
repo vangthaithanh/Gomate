@@ -247,12 +247,6 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
       _reviews.removeWhere((item) => item.isMine);
       _reviews.insert(0, updated);
     });
-
-    GoMateSnackBar.show(
-      context,
-      message: current == null ? 'Đã đăng đánh giá' : 'Đã chỉnh sửa đánh giá',
-      icon: LucideIcons.circle_check,
-    );
   }
 
   Future<void> _openAllReviews() async {
@@ -271,28 +265,6 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
     );
   }
 
-  Future<void> _openPlaceActions() async {
-    await GoMateBottomSheet.show<void>(
-      context: context,
-      size: GoMateBottomSheetSize.compact,
-      contentPadding: EdgeInsets.zero,
-      child: Builder(
-        builder: (sheetContext) {
-          return _PlaceActionsContent(
-            onAddToTrip: () {
-              Navigator.of(sheetContext).pop();
-              Future<void>.delayed(Duration.zero, _openItineraryPicker);
-            },
-            onShare: () {
-              Navigator.of(sheetContext).pop();
-              Future<void>.delayed(Duration.zero, _openSharePlace);
-            },
-          );
-        },
-      ),
-    );
-  }
-
   Future<void> _openSharePlace() async {
     final sentCount = await GoMateBottomSheet.show<int>(
       context: context,
@@ -307,17 +279,11 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
 
     if (!mounted || sentCount == null || sentCount <= 0) return;
 
-    GoMateSnackBar.show(
-      context,
-      message: 'Đã gửi địa điểm cho $sentCount người',
-      icon: LucideIcons.circle_check,
-    );
   }
 
   Future<void> _openItineraryPicker() async {
-    // UI demo hiện tại. Khi nối dữ liệu lịch trình thật chỉ cần thay list này.
-    // Nếu list rỗng, GoMateItineraryPickerScreen tự hiển thị:
-    // "Chưa có lịch trình" + icon lịch/plus đúng mockup.
+    // TODO(integration):
+    // Sau này thay list demo bằng lịch trình thật của current user.
     const items = <GoMateItineraryPickerItem>[
       GoMateItineraryPickerItem(
         id: 'demo-dalat-group',
@@ -344,26 +310,42 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
       ),
     ];
 
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => GoMateItineraryPickerScreen(
-          items: items,
-          onSelected: (item) {
-            Navigator.of(context).pop();
+    final selected =
+    await Navigator.of(context).push<GoMateItineraryPickerItem>(
+      MaterialPageRoute<GoMateItineraryPickerItem>(
+        builder: (pickerContext) {
+          return GoMateItineraryPickerScreen(
+            items: items,
 
-            Future<void>.delayed(Duration.zero, () {
-              if (!mounted) return;
+            // Giống picker ở Message.
+            showCancel: true,
+            searchHint: 'Tìm kiếm lịch trình...',
 
-              GoMateSnackBar.show(
-                context,
-                message: 'Đã thêm ${place.name} vào ${item.title}',
-                icon: LucideIcons.circle_check,
-              );
-            });
-          },
-        ),
+            onCancel: () {
+              Navigator.of(pickerContext).pop();
+            },
+
+            onSelected: (item) {
+              // QUAN TRỌNG:
+              // Chưa thêm địa điểm vào lịch trình ở bước này.
+              //
+              // Chỉ trả itinerary đã chọn về Place Detail.
+              Navigator.of(pickerContext).pop(item);
+            },
+          );
+        },
       ),
     );
+
+    if (!mounted || selected == null) return;
+
+    // TODO(place-itinerary-flow):
+    // Flow tiếp theo sẽ xử lý ở đây.
+    //
+    // Không:
+    // - thêm địa điểm ngay;
+    // - snackbar "Đã thêm...";
+    // - sửa dữ liệu lịch trình.
   }
 
   bool _handleDetailScroll(UserScrollNotification notification) {
@@ -383,7 +365,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
     final width = MediaQuery.sizeOf(context).width;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
     final horizontal = (width * 0.055).clamp(18.0, 24.0).toDouble();
-    final headerHeight = (width * 0.36).clamp(132.0, 150.0).toDouble();
+    final headerHeight = (width * 0.19).clamp(68.0, 78.0).toDouble();
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -441,12 +423,13 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                     opacity: _detailHeaderVisible ? 1 : 0,
                     child: SizedBox(
                       height: headerHeight,
-                      child: _PlaceFloatingHeader(
-                        place: place,
+                      child:_PlaceFloatingHeader(
                         isFavorite: _isFavorite,
                         onBack: () => Navigator.of(context).pop(),
                         onFavorite: _toggleFavorite,
-                        onMore: _openPlaceActions,
+
+                        // Giữ nguyên toàn bộ SharePlace flow hiện tại.
+                        onShare: _openSharePlace,
                       ),
                     ),
                   ),
@@ -456,14 +439,11 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
             Positioned(
               left: 0,
               right: 0,
-              bottom: safeBottom + (width * 0.035).clamp(12.0, 16.0).toDouble(),
+              bottom:
+              safeBottom + (width * 0.035).clamp(12.0, 16.0).toDouble(),
               child: Center(
-                child: SizedBox(
-                  width: (width * 0.42).clamp(150.0, 184.0).toDouble(),
-                  child: _GradientButton(
-                    label: 'Chỉ đường',
-                    onTap: () => Navigator.of(context).pop(true),
-                  ),
+                child: _AddItineraryButton(
+                  onTap: _openItineraryPicker,
                 ),
               ),
             ),
@@ -734,107 +714,68 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
 }
 
 class _PlaceFloatingHeader extends StatelessWidget {
-  final MapPlaceUi place;
   final bool isFavorite;
+
   final VoidCallback onBack;
   final VoidCallback onFavorite;
-  final VoidCallback onMore;
+  final VoidCallback onShare;
 
   const _PlaceFloatingHeader({
-    required this.place,
     required this.isFavorite,
     required this.onBack,
     required this.onFavorite,
-    required this.onMore,
+    required this.onShare,
   });
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final horizontal = (width * 0.055).clamp(18.0, 24.0).toDouble();
+
+    final horizontal =
+    (width * 0.055).clamp(18.0, 24.0).toDouble();
 
     return Container(
-      padding: EdgeInsets.fromLTRB(
-        horizontal,
-        width * 0.015,
-        horizontal,
-        width * 0.024,
+      padding: EdgeInsets.symmetric(
+        horizontal: horizontal,
       ),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.035),
+            color: Colors.black.withOpacity(0.055),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              _HeaderIconButton(
-                icon: LucideIcons.chevron_left,
-                onTap: onBack,
-              ),
-              const Spacer(),
-              _HeaderIconButton(
-                icon: isFavorite ? Icons.favorite_rounded : LucideIcons.heart,
-                color: isFavorite ? AppColors.primaryIcon : Colors.black,
-                onTap: onFavorite,
-              ),
-              SizedBox(width: width * 0.020),
-              _HeaderIconButton(
-                icon: LucideIcons.ellipsis_vertical,
-                onTap: onMore,
-              ),
-            ],
+          _HeaderIconButton(
+            icon: LucideIcons.chevron_left,
+            onTap: onBack,
           ),
-          SizedBox(height: width * 0.012),
-          Text(
-            place.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: (width * 0.050).clamp(18.0, 22.0).toDouble(),
-              fontWeight: FontWeight.w800,
-              color: AppColors.primaryText,
-              height: 1.05,
-            ),
+
+          const Spacer(),
+
+          _HeaderIconButton(
+            icon: isFavorite
+                ? Icons.favorite_rounded
+                : LucideIcons.heart,
+            color: isFavorite
+                ? AppColors.primaryIcon
+                : Colors.black,
+            onTap: onFavorite,
           ),
-          SizedBox(height: width * 0.010),
-          Row(
-            children: [
-              Icon(
-                Icons.star_rounded,
-                size: (width * 0.040).clamp(15.0, 17.0).toDouble(),
-                color: AppColors.primaryIcon,
-              ),
-              SizedBox(width: width * 0.008),
-              Expanded(
-                child: Text(
-                  '${place.rating.toStringAsFixed(1)} (${place.reviewCount})   ${place.tags.isNotEmpty ? place.tags.first : 'Khu du lịch'}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: (width * 0.028).clamp(10.5, 12.0).toDouble(),
-                    color: AppColors.grayText,
-                  ),
-                ),
-              ),
-            ],
+
+          SizedBox(
+            width: (width * 0.020)
+                .clamp(7.0, 9.0)
+                .toDouble(),
           ),
-          SizedBox(height: width * 0.010),
-          Text(
-            place.address,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: (width * 0.027).clamp(10.0, 11.5).toDouble(),
-              color: AppColors.grayText,
-            ),
+
+          _HeaderIconButton(
+            icon: LucideIcons.send,
+            onTap: onShare,
           ),
         ],
       ),
@@ -1292,6 +1233,137 @@ class _SmartImage extends StatelessWidget {
   }
 }
 
+class _AddItineraryButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _AddItineraryButton({
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+
+    // Figma reference:
+    // artboard: 375
+    // button: 189 x 45
+    //
+    // Quy đổi theo width thật thay vì fix cứng 189px.
+    final buttonWidth =
+    (width * (189 / 375)).clamp(178.0, 205.0).toDouble();
+
+    final buttonHeight =
+    (width * (45 / 375)).clamp(43.0, 47.0).toDouble();
+
+    // Figma radius: 20 / height 45.
+    final radius =
+        buttonHeight * (20 / 45);
+
+    final iconCircleSize =
+    (buttonHeight * 0.59).clamp(25.0, 27.5).toDouble();
+
+    final iconSize =
+    (iconCircleSize * 0.58).clamp(14.5, 16.0).toDouble();
+
+    final contentGap =
+    (width * (8 / 375)).clamp(7.0, 9.0).toDouble();
+
+    final horizontalPadding =
+    (width * (13 / 375)).clamp(11.0, 14.0).toDouble();
+
+    final fontSize =
+    (width * (14 / 375)).clamp(13.5, 14.5).toDouble();
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(radius),
+        child: Ink(
+          width: buttonWidth,
+          height: buttonHeight,
+          padding: EdgeInsets.symmetric(
+            horizontal: horizontalPadding,
+          ),
+          decoration: BoxDecoration(
+            // Figma:
+            // #0A43A8 0%
+            // #0C6ECF 57%
+            // #0D8AE8 100%
+            gradient: const LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              stops: [
+                0.0,
+                0.57,
+                1.0,
+              ],
+              colors: [
+                Color(0xFF0A43A8),
+                Color(0xFF0C6ECF),
+                Color(0xFF0D8AE8),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(radius),
+
+            // Figma:
+            // 0px 4px 12px rgba(0,0,0,0.08)
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x14000000),
+                offset: Offset(0, 4),
+                blurRadius: 12,
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: iconCircleSize,
+                height: iconCircleSize,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white,
+                      width: 2.5,
+                    ),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      LucideIcons.plus,
+                      size: iconSize,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+
+              SizedBox(width: contentGap),
+
+              Flexible(
+                child: Text(
+                  'Thêm lịch trình',
+                  maxLines: 1,
+                  overflow: TextOverflow.visible,
+                  softWrap: false,
+                  style: TextStyle(
+                    fontSize: fontSize,
+                    height: 1,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _GradientButton extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
@@ -1333,87 +1405,6 @@ class _GradientButton extends StatelessWidget {
                 color: Colors.white,
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PlaceActionsContent extends StatelessWidget {
-  final VoidCallback onAddToTrip;
-  final VoidCallback onShare;
-
-  const _PlaceActionsContent({
-    required this.onAddToTrip,
-    required this.onShare,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _ActionRow(
-          icon: LucideIcons.plus,
-          label: 'Thêm vào lịch trình',
-          onTap: onAddToTrip,
-        ),
-        Divider(height: 1, color: AppColors.grayBorder.withOpacity(0.65)),
-        _ActionRow(
-          icon: LucideIcons.send,
-          label: 'Chia sẻ',
-          onTap: onShare,
-        ),
-        SizedBox(height: (width * 0.020).clamp(7.0, 10.0).toDouble()),
-      ],
-    );
-  }
-}
-
-class _ActionRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _ActionRow({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: (width * 0.060).clamp(20.0, 25.0).toDouble(),
-            vertical: (width * 0.035).clamp(12.0, 15.0).toDouble(),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                size: (width * 0.060).clamp(21.0, 25.0).toDouble(),
-                color: Colors.black,
-              ),
-              SizedBox(width: width * 0.035),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: (width * 0.034).clamp(12.0, 14.5).toDouble(),
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black,
-                ),
-              ),
-            ],
           ),
         ),
       ),
