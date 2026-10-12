@@ -7,6 +7,7 @@ PostgreSQL is the business source of truth.
 MongoDB is for:
 - `interaction_events`,
 - `messages`,
+- `moments` and Moment social events after the Moment backend task is approved,
 - `current_locations`,
 - `location_history`,
 - `location_archives`,
@@ -32,7 +33,7 @@ user_interests
 
 ### Social graph
 ```text
-follows
+user_follows
 follow_requests
 blocked_users
 ```
@@ -186,13 +187,19 @@ Onboarding writes `user_interests`; skip is allowed.
 
 ## 5. Social graph schema
 
-### follows
+### user_follows
 ```text
-follower_id  UUID FK users
-following_id UUID FK users
+follower_user_id UUID FK users
+followed_user_id UUID FK users
 created_at   TIMESTAMPTZ
-PK (follower_id, following_id)
+PK (follower_user_id, followed_user_id)
+CHECK follower_user_id <> followed_user_id
 ```
+
+Current implemented foundation:
+- `user_follows` is the only social relationship table implemented by V5.
+- Mutual friend is derived from two directed follow rows.
+- `follow_requests` and `blocked_users` are deferred until their dedicated business scope is approved.
 
 ### follow_requests
 ```text
@@ -366,27 +373,49 @@ Important:
 ### conversations
 ```text
 id UUID PK
-type DIRECT/GROUP/TRIP
+type DIRECT/GROUP
 created_by UUID
-trip_id UUID nullable UNIQUE for TRIP
+requester_id UUID for DIRECT/message request
+recipient_id UUID for DIRECT/message request
+user_low_id UUID for DIRECT uniqueness
+user_high_id UUID for DIRECT uniqueness
+linked_trip_id UUID nullable UNIQUE for GROUP
 title VARCHAR(150) nullable
-status PENDING/ACTIVE/CLOSED
+status PENDING/ACCEPTED/REMOVED/CLOSED
 created_at
+updated_at
+accepted_at nullable
+removed_at nullable
 ```
 
 ### conversation_members
 ```text
 conversation_id UUID
 user_id UUID
-role OWNER/ADMIN/MEMBER
+role LEADER/MEMBER
 status PENDING/ACTIVE/LEFT/REMOVED
+muted BOOLEAN
+blocked BOOLEAN direct-conversation scoped
 joined_at nullable
-left_at nullable
+removed_at nullable
 last_read_at nullable
 PK(conversation_id,user_id)
 ```
 
 Message body is MongoDB, not PostgreSQL.
+
+Current implemented Direct Message V1:
+- `V6__direct_message_foundation.sql` creates `conversations` and `conversation_members`.
+
+Current implemented Group Trip Chat Phase 1:
+- `V7__group_trip_chat_foundation.java` extends the V6 direct-message metadata schema for linked group-trip chat.
+- `GROUP` conversations must be linked to exactly one `trips.id` through `linked_trip_id`.
+- Group chat is not independent; it is created from successful group trip creation.
+- Create Trip accepts optional `selectedMemberIds`; backend validates active users, persists them in `trip_members`, then derives `PERSONAL/GROUP` from the persisted membership.
+- Client `tripType` is backward-compatible input only and cannot force the stored business state.
+- If a created Trip is derived `GROUP`, `conversation_members` must mirror creator + selected Trip members in the same transaction.
+- Message body remains in MongoDB. PostgreSQL stores metadata, membership, and the trip link only.
+- Group roles are only `LEADER` and `MEMBER`.
 
 ## 8. Trip schema
 
@@ -454,6 +483,14 @@ checkin_radius_m INT default 150
 status PLANNED/VISITED/SKIPPED
 ```
 
+Current V3 implementation uses `planned_start_at + planned_duration_min`, not a separate `planned_end_at`.
+Pre-Big-Update business knowledge still requires time to belong to the Trip Stop occurrence:
+- no start time means no complete interval and any end-only value must be ignored/cleared when a later end-time field exists;
+- start-only may be persisted as an occurrence-level hint, but API/UI must expose `hasCompleteInterval=false`;
+- the same Place may appear more than once as non-adjacent stops;
+- adjacent duplicate Place stops are invalid after add/insert, edit/replace Place, delete, reorder, and optimization;
+- `trip_stops.id`, not `place_id`, is the identity for occurrence-specific time/edit/delete/reorder operations.
+
 ### trip_reminders
 ```text
 id UUID
@@ -464,6 +501,21 @@ reminder_type TRIP_START/UPCOMING_STOP
 remind_at TIMESTAMPTZ
 status PENDING/SENT/CANCELLED
 ```
+
+### trip_pins
+Implemented by Big Update Phase 3 as `V8__trip_pin_state.sql`.
+
+```text
+user_id UUID PK FK users(id)
+trip_id UUID FK trips(id)
+pinned_at TIMESTAMPTZ
+```
+
+Rules:
+- pinned Trip state is per user;
+- one user has at most one pinned Trip;
+- pinning does not mutate `trips.status`;
+- only active Trip members may pin/read the Trip-protected location context.
 
 ### trip_checkins
 ```text
@@ -528,33 +580,102 @@ resolved_at nullable
 ### interaction_events
 ```text
 _id
-eventId        idempotency
+eventId        unique server event id/idempotency key when available
 eventType
 userId         when authenticated
-placeId? postId? tripId?
-recommendationRequestId?
-timestamp UTC
-context {}
+entityType?
+entityId?
+source
+createdAt UTC
+metadata {}
 ```
+
+Current implemented event in MongoDB Foundation V1:
+```text
+eventType = HOME_RECOMMENDATION_SERVED
+source    = spring.recommendations.home
+metadata  = safe recommendation summary only
+```
+
+Additional implemented Social Relationship events:
+```text
+eventType = USER_FOLLOWED
+eventType = USER_UNFOLLOWED
+source    = SOCIAL_RELATIONSHIP
+entityType = USER
+metadata  = { mutualAfter: true|false }
+```
+
+Rules:
+- Mongo event logging is non-critical; core APIs must still return if MongoDB is down.
+- Do not store raw JWT, refresh tokens, Firebase credentials, passwords, raw headers, or exact runtime GPS.
+- Recommendation metadata may store destination/context codes, candidate counts, returned `placeId`/`externalId` order, score/model source, and model version.
+
+### moments
+Implemented by Moment Backend V1 in MongoDB, without PostgreSQL/Flyway schema changes.
+
+```text
+_id
+momentId
+ownerUserId
+mediaUrl
+mediaPublicId    Cloudinary URL/public_id references, not binary
+mediaType
+caption?
+visibility
+createdAt
+expiresAt
+deletedAt?
+```
+
+Moment views/reactions/mutes are Mongo-owned:
+
+```text
+moment_views      momentId, ownerUserId, viewerUserId, viewedAt
+moment_reactions  reactionId, momentId, ownerUserId, reactorUserId, type, reactedAt
+moment_mutes      muterUserId, mutedUserId, createdAt
+```
+
+PostgreSQL remains the source of truth for users, follows/friendship, blocks, and future moderation decisions. Moment V1 does not add a report table/collection.
 
 ### messages
 ```text
 _id
 conversationId
-senderId
+senderUserId
 type TEXT/IMAGE/PLACE/LOCATION/POST
 text?
 media?
 placeId?
 postId?
 location? GeoJSON Point
-sentAt
+createdAt
 editedAt?
 deletedAt?
 ```
 
-### current_locations
-One document per `(tripId,userId)`, with GeoJSON point, accuracyM, updatedAt. Stale threshold must be respected.
+### trip_current_locations
+Implemented by Big Update Phase 3 for snapshot-only member location on Map.
+
+One document per `(tripId,userId)`:
+
+```text
+_id
+tripId
+userId
+latitude
+longitude
+accuracyM
+capturedAt
+updatedAt
+```
+
+Rules:
+- PostgreSQL remains the source of truth for Trip membership and `location_sharing_enabled`.
+- MongoDB stores runtime location snapshots only.
+- No fake member coordinates are allowed.
+- Current implementation returns `locationState=LAST_KNOWN`; do not present it as realtime/live tracking.
+- No TTL index is created in Phase 3.
 
 ### location_history
 Raw GPS only when Trip ACTIVE + sharing ON. Retention 0-7 days.
@@ -585,7 +706,7 @@ createdAt
 PostgreSQL:
 - unique `users(email)`
 - unique `user_profiles(nickname)`
-- `follows(follower_id,following_id)` PK
+- `user_follows(follower_user_id,followed_user_id)` PK
 - partial unique PENDING follow requests
 - Place category/province/status indexes + text/trigram search as chosen
 - `saved_places(user_id,place_id)` PK
@@ -594,13 +715,19 @@ PostgreSQL:
 - Comment post/time
 - `trip_members(trip_id,user_id)` PK + one active Leader per Trip
 - unique stop order `(trip_id,day_no,order_no)`
+- no unique `(trip_id,place_id)` constraint on `trip_stops`; repeated non-adjacent Places are valid
 - unique check-in `(trip_stop_id,user_id)`
 - notification inbox `(user_id,is_read,created_at)`
 
 Mongo:
 - messages `{conversationId:1,sentAt:-1}`
-- interaction `{userId:1,timestamp:-1}` and `{placeId:1,eventType:1}`
-- current location unique `{tripId:1,userId:1}`
+- interaction_events unique `{eventId:1}`
+- interaction_events `{userId:1,createdAt:-1}`
+- interaction_events `{eventType:1,createdAt:-1}`
+- interaction_events `{entityType:1,entityId:1,createdAt:-1}`
+- trip_current_locations unique `{tripId:1,userId:1}`
+- trip_current_locations `{tripId:1,updatedAt:-1}`
+- trip_current_locations `{updatedAt:-1}`
 - location history `{tripId:1,userId:1,recordedAt:1}` + 2dsphere
 - recommendation_logs unique `requestId`
 
@@ -619,6 +746,12 @@ V3 Social
 V4 Conversation
 V5 Trip/Location integration
 V6 Notification/Admin
+```
+
+Current implementation also includes later incremental migrations for the already-built social/message/group-trip/pinned-trip work. For Phase 3, the relevant new migration is:
+
+```text
+V8__trip_pin_state.sql
 ```
 
 Rules:

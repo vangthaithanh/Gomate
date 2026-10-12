@@ -52,16 +52,23 @@ class MessageAvatar extends StatelessWidget {
             color: const Color(0x1A0A43A8),
             border: activeRing
                 ? null
-                : Border.all(
-                    color: AppColors.grayBorder,
-                    width: 1,
-                  ),
+                : Border.all(color: AppColors.grayBorder, width: 1),
           ),
           child: asset == null
               ? Icon(
                   LucideIcons.user_round,
                   color: Colors.white,
                   size: size * 0.55,
+                )
+              : asset!.startsWith('http://') || asset!.startsWith('https://')
+              ? Image.network(
+                  asset!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Icon(
+                    LucideIcons.user_round,
+                    color: Colors.white,
+                    size: size * 0.55,
+                  ),
                 )
               : Image.asset(
                   asset!,
@@ -91,10 +98,7 @@ class MessageGroupAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (conversation.coverAsset != null) {
-      return MessageAvatar(
-        size: size,
-        asset: conversation.coverAsset,
-      );
+      return MessageAvatar(size: size, asset: conversation.coverAsset);
     }
 
     final members = conversation.participants
@@ -113,19 +117,13 @@ class MessageGroupAvatar extends StatelessWidget {
             Positioned(
               left: 0,
               top: 0,
-              child: MessageAvatar(
-                size: small,
-                asset: members[0].avatarAsset,
-              ),
+              child: MessageAvatar(size: small, asset: members[0].avatarAsset),
             ),
           if (members.length > 1)
             Positioned(
               right: 0,
               bottom: 0,
-              child: MessageAvatar(
-                size: small,
-                asset: members[1].avatarAsset,
-              ),
+              child: MessageAvatar(size: small, asset: members[1].avatarAsset),
             ),
         ],
       ),
@@ -191,10 +189,7 @@ class MessageConversationTile extends StatelessWidget {
           child: Row(
             children: [
               if (conversation.isGroup)
-                MessageGroupAvatar(
-                  conversation: conversation,
-                  size: avatarSize,
-                )
+                MessageGroupAvatar(conversation: conversation, size: avatarSize)
               else
                 MessageAvatar(
                   size: avatarSize,
@@ -214,8 +209,7 @@ class MessageConversationTile extends StatelessWidget {
                         fontSize: messageFont(width, 14.5),
                         height: 1.18,
                         color: Colors.black,
-                        fontWeight:
-                            unread ? FontWeight.w700 : FontWeight.w400,
+                        fontWeight: unread ? FontWeight.w700 : FontWeight.w400,
                       ),
                     ),
                     if (preview.isNotEmpty) ...[
@@ -411,10 +405,7 @@ class MessageConfirmContent extends StatelessWidget {
             ),
           ),
           SizedBox(height: width * 0.035),
-          MessageGradientButton(
-            label: confirmLabel,
-            onTap: onConfirm,
-          ),
+          MessageGradientButton(label: confirmLabel, onTap: onConfirm),
         ],
       ),
     );
@@ -476,15 +467,10 @@ class MessageBubble extends StatelessWidget {
         vertical: messageClamp(width * 0.021, 7, 9),
       ),
       decoration: BoxDecoration(
-        color: isMine
-            ? const Color(0x330A43A8)
-            : const Color(0xFFE9E9EB),
+        color: isMine ? const Color(0x330A43A8) : const Color(0xFFE9E9EB),
         borderRadius: _radius(),
         border: highlighted
-            ? Border.all(
-                color: AppColors.primaryIcon,
-                width: 2,
-              )
+            ? Border.all(color: AppColors.primaryIcon, width: 2)
             : null,
       ),
       child: Text(
@@ -499,10 +485,7 @@ class MessageBubble extends StatelessWidget {
     );
 
     if (isMine) {
-      return Align(
-        alignment: Alignment.centerRight,
-        child: bubble,
-      );
+      return Align(alignment: Alignment.centerRight, child: bubble);
     }
 
     return Row(
@@ -538,15 +521,12 @@ class MessageBubble extends StatelessWidget {
                           color: AppColors.grayText,
                         ),
                       ),
-                      if (role == MessageGroupRole.leader ||
-                          role == MessageGroupRole.deputy) ...[
+                      if (role == MessageGroupRole.leader) ...[
                         SizedBox(width: width * 0.008),
                         Icon(
                           LucideIcons.key,
                           size: messageClamp(width * 0.032, 11, 13),
-                          color: role == MessageGroupRole.leader
-                              ? AppColors.primaryIcon
-                              : AppColors.grayText,
+                          color: AppColors.primaryIcon,
                         ),
                       ],
                     ],
@@ -564,10 +544,7 @@ class MessageBubble extends StatelessWidget {
 class MessageChatComposer extends StatefulWidget {
   final ValueChanged<String> onSend;
 
-  const MessageChatComposer({
-    super.key,
-    required this.onSend,
-  });
+  const MessageChatComposer({super.key, required this.onSend});
 
   @override
   State<MessageChatComposer> createState() => _MessageChatComposerState();
@@ -725,19 +702,12 @@ class MessageDetailAction extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: messageClamp(width * 0.058, 20, 24),
-              color: color,
-            ),
+            Icon(icon, size: messageClamp(width * 0.058, 20, 24), color: color),
             SizedBox(height: width * 0.010),
             Text(
               label,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: messageFont(width, 10),
-                color: color,
-              ),
+              style: TextStyle(fontSize: messageFont(width, 10), color: color),
             ),
           ],
         ),
@@ -776,11 +746,7 @@ class MessageDetailMenuRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: messageClamp(width * 0.060, 21, 24),
-              color: color,
-            ),
+            Icon(icon, size: messageClamp(width * 0.060, 21, 24), color: color),
             SizedBox(width: width * 0.040),
             Expanded(
               child: Text(

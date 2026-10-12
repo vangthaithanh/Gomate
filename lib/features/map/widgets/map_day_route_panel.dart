@@ -32,14 +32,10 @@ class GoMateMapDayRoutePanel extends StatelessWidget {
     final maxHeight = (width * 0.64).clamp(220.0, 270.0).toDouble();
 
     return Container(
-      constraints: BoxConstraints(
-        maxHeight: maxHeight,
-      ),
+      constraints: BoxConstraints(maxHeight: maxHeight),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(radius),
-        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(radius)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.10),
@@ -78,8 +74,7 @@ class GoMateMapDayRoutePanel extends StatelessWidget {
                 child: Text(
                   'Tối ưu lộ trình',
                   style: TextStyle(
-                    fontSize:
-                        (width * 0.033).clamp(12.0, 13.5).toDouble(),
+                    fontSize: (width * 0.033).clamp(12.0, 13.5).toDouble(),
                     fontWeight: FontWeight.w800,
                     color: AppColors.primaryText,
                   ),
@@ -90,8 +85,7 @@ class GoMateMapDayRoutePanel extends StatelessWidget {
             Text(
               'Lộ trình trong ngày',
               style: TextStyle(
-                fontSize:
-                    (width * 0.033).clamp(12.0, 13.5).toDouble(),
+                fontSize: (width * 0.033).clamp(12.0, 13.5).toDouble(),
                 fontWeight: FontWeight.w800,
                 color: AppColors.primaryText,
               ),
@@ -105,9 +99,7 @@ class GoMateMapDayRoutePanel extends StatelessWidget {
                 width * 0.08,
                 // Empty-state cũng phải chừa đúng vùng navbar.
                 // Nhờ vậy panel được kéo cao lên thay vì để text lọt xuống sau nav.
-                (bottomInset + width * 0.055)
-                    .clamp(30.0, 130.0)
-                    .toDouble(),
+                (bottomInset + width * 0.055).clamp(30.0, 130.0).toDouble(),
               ),
               child: Text(
                 canEdit
@@ -115,8 +107,7 @@ class GoMateMapDayRoutePanel extends StatelessWidget {
                     : 'Ngày này chưa có địa điểm.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize:
-                      (width * 0.029).clamp(10.5, 12.0).toDouble(),
+                  fontSize: (width * 0.029).clamp(10.5, 12.0).toDouble(),
                   height: 1.35,
                   color: AppColors.grayText,
                 ),
@@ -132,9 +123,7 @@ class GoMateMapDayRoutePanel extends StatelessWidget {
                   (width * 0.070).clamp(24.0, 29.0).toDouble(),
                   0,
                   (width * 0.070).clamp(24.0, 29.0).toDouble(),
-                  (bottomInset + width * 0.02)
-                      .clamp(16.0, 110.0)
-                      .toDouble(),
+                  (bottomInset + width * 0.02).clamp(16.0, 110.0).toDouble(),
                 ),
                 itemCount: places.length,
                 onReorder: canEdit && onReorder != null
@@ -150,8 +139,7 @@ class GoMateMapDayRoutePanel extends StatelessWidget {
                     // ObjectKey giữ mỗi TripPlaceUi occurrence là một item riêng.
                     key: ObjectKey(place),
                     padding: EdgeInsets.only(
-                      bottom:
-                          (width * 0.025).clamp(9.0, 11.0).toDouble(),
+                      bottom: (width * 0.025).clamp(9.0, 11.0).toDouble(),
                     ),
                     child: _RoutePlaceCard(
                       place: place,
@@ -192,11 +180,15 @@ class _RoutePlaceCard extends StatelessWidget {
       return 'Chưa đặt thời gian';
     }
 
-    if (start.isNotEmpty && end.isNotEmpty) {
+    if (place.hasFullTime) {
       return '$start - $end';
     }
 
-    return start.isNotEmpty ? start : end;
+    if (start.isNotEmpty) {
+      return 'Bắt đầu $start • chưa có giờ kết thúc';
+    }
+
+    return 'Chưa đặt thời gian';
   }
 
   @override
@@ -241,8 +233,7 @@ class _RoutePlaceCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize:
-                            (width * 0.033).clamp(12.0, 13.5).toDouble(),
+                        fontSize: (width * 0.033).clamp(12.0, 13.5).toDouble(),
                         fontWeight: FontWeight.w600,
                         color: Colors.black,
                       ),
@@ -253,8 +244,7 @@ class _RoutePlaceCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize:
-                            (width * 0.029).clamp(10.5, 12.0).toDouble(),
+                        fontSize: (width * 0.029).clamp(10.5, 12.0).toDouble(),
                         fontWeight: FontWeight.w400,
                         color: AppColors.grayText,
                       ),
@@ -272,8 +262,7 @@ class _RoutePlaceCard extends StatelessWidget {
                     ),
                     child: Icon(
                       LucideIcons.x,
-                      size:
-                          (width * 0.040).clamp(14.0, 16.5).toDouble(),
+                      size: (width * 0.040).clamp(14.0, 16.5).toDouble(),
                       color: AppColors.grayText,
                     ),
                   ),
@@ -291,9 +280,7 @@ class _RoutePlaceCard extends StatelessWidget {
 class _PlaceImage extends StatelessWidget {
   final TripPlaceUi place;
 
-  const _PlaceImage({
-    required this.place,
-  });
+  const _PlaceImage({required this.place});
 
   @override
   Widget build(BuildContext context) {
@@ -322,10 +309,7 @@ class _PlaceImage extends StatelessWidget {
     return const ColoredBox(
       color: AppColors.blue50,
       child: Center(
-        child: Icon(
-          LucideIcons.image,
-          color: AppColors.primaryIcon,
-        ),
+        child: Icon(LucideIcons.image, color: AppColors.primaryIcon),
       ),
     );
   }

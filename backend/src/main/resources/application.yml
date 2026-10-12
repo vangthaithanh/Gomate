@@ -10,6 +10,10 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/gomate_auth}
     username: ${DB_USERNAME:gomate}
     password: ${DB_PASSWORD}
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://127.0.0.1:27017/gomate?serverSelectionTimeoutMS=1500&connectTimeoutMS=1500&socketTimeoutMS=1500}
+      database: ${MONGO_DATABASE:gomate}
   sql:
     init:
       mode: never

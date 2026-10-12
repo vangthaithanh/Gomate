@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import '../config/api_config.dart';
 import '../network/api_exception.dart';
@@ -75,12 +76,69 @@ class AuthService extends ChangeNotifier {
     );
   }
 
-  Map<String, dynamic> _decode(http.Response response) {
-    Map<String, dynamic> result = {};
+  Future<http.Response> _sendMultipart(
+    String path, {
+    required String fileField,
+    required String filePath,
+    required String token,
+    Map<String, String>? fields,
+  }) async {
+    final bases = _baseUrl == null ? ApiConfig.candidateBaseUrls : [_baseUrl];
+    String? lastNetworkError;
+    for (final base in bases) {
+      final url = Uri.parse('$base$path');
+      if (kReleaseMode && url.scheme != 'https') {
+        throw const ApiException(
+          0,
+          'CONFIG_ERROR',
+          'Bản phát hành yêu cầu kết nối HTTPS.',
+        );
+      }
+      final request = http.MultipartRequest('POST', url)
+        ..headers['Accept'] = 'application/json'
+        ..headers['Authorization'] = 'Bearer $token';
+      if (fields != null) request.fields.addAll(fields);
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          fileField,
+          filePath,
+          contentType: _mediaTypeForPath(filePath),
+        ),
+      );
+      try {
+        return await (() async => http.Response.fromStream(
+          await _client.send(request),
+        ))().timeout(const Duration(seconds: 20));
+      } on TimeoutException catch (error) {
+        lastNetworkError = error.message ?? 'Request timed out';
+      } on http.ClientException catch (error) {
+        lastNetworkError = error.message;
+      }
+    }
+    throw ApiException(
+      0,
+      'NETWORK_ERROR',
+      'Không kết nối được máy chủ. Hãy kiểm tra backend GoMate và mạng nội bộ.'
+          '${lastNetworkError == null ? '' : '\n$lastNetworkError'}',
+    );
+  }
+
+  MediaType _mediaTypeForPath(String filePath) {
+    final extension = filePath.split('.').last.toLowerCase();
+    return switch (extension) {
+      'jpg' || 'jpeg' => MediaType('image', 'jpeg'),
+      'png' => MediaType('image', 'png'),
+      'webp' => MediaType('image', 'webp'),
+      'heic' => MediaType('image', 'heic'),
+      _ => MediaType('image', 'jpeg'),
+    };
+  }
+
+  Object? _decodeJson(http.Response response) {
+    Object? result = <String, dynamic>{};
     try {
       if (response.bodyBytes.isNotEmpty) {
-        result =
-            jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+        result = jsonDecode(utf8.decode(response.bodyBytes));
       }
     } catch (_) {
       throw ApiException(
@@ -89,8 +147,13 @@ class AuthService extends ChangeNotifier {
         'Máy chủ trả dữ liệu không hợp lệ. Kiểm tra địa chỉ API.',
       );
     }
-    if (response.statusCode >= 200 && response.statusCode < 300) return result;
-    final code = result['code'] as String? ?? 'HTTP_ERROR';
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return result;
+    }
+    final errorMap = result is Map<String, dynamic>
+        ? result
+        : const <String, dynamic>{};
+    final code = errorMap['code'] as String? ?? 'HTTP_ERROR';
     final message = switch (code) {
       'INVALID_CREDENTIALS' => 'Email hoặc mật khẩu không đúng.',
       'ACCOUNT_LOCKED' => 'Tài khoản đã bị khóa.',
@@ -101,9 +164,19 @@ class AuthService extends ChangeNotifier {
       'RATE_LIMITED' => 'Bạn thao tác quá nhiều. Vui lòng đợi một phút.',
       'VALIDATION_ERROR' =>
         'Thông tin chưa hợp lệ. Kiểm tra email, biệt danh và mật khẩu.',
-      _ => result['message'] as String? ?? 'Không thể thực hiện yêu cầu.',
+      _ => errorMap['message'] as String? ?? 'Không thể thực hiện yêu cầu.',
     };
     throw ApiException(response.statusCode, code, message);
+  }
+
+  Map<String, dynamic> _decode(http.Response response) {
+    final result = _decodeJson(response);
+    if (result is Map<String, dynamic>) return result;
+    throw ApiException(
+      response.statusCode,
+      'INVALID_RESPONSE',
+      'Máy chủ trả dữ liệu không hợp lệ. Kiểm tra địa chỉ API.',
+    );
   }
 
   Future<void> _persist() async {
@@ -274,9 +347,113 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  Future<Object?> requestJson(
+    String method,
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
+    final sentToken = _accessToken;
+    if (sentToken == null) {
+      throw const ApiException(401, 'UNAUTHORIZED', 'Vui lòng đăng nhập.');
+    }
+    final generation = _generation;
+    var response = await _send(method, path, body: body, token: sentToken);
+    if (generation != _generation) {
+      throw const ApiException(401, 'UNAUTHORIZED', 'Phiên đã thay đổi.');
+    }
+    try {
+      if (response.statusCode == 401) {
+        if (sentToken == _accessToken) await _refreshOnce();
+        response = await _send(method, path, body: body, token: _accessToken);
+      }
+      if (generation != _generation) {
+        throw const ApiException(401, 'UNAUTHORIZED', 'Phiên đã thay đổi.');
+      }
+      return _decodeJson(response);
+    } on ApiException catch (error) {
+      if (error.status == 401 && generation == _generation) await clearLocal();
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> multipartRequest(
+    String path, {
+    required String fileField,
+    required String filePath,
+    Map<String, String>? fields,
+  }) async {
+    final sentToken = _accessToken;
+    if (sentToken == null) {
+      throw const ApiException(401, 'UNAUTHORIZED', 'Vui lòng đăng nhập.');
+    }
+    final generation = _generation;
+    var response = await _sendMultipart(
+      path,
+      fileField: fileField,
+      filePath: filePath,
+      token: sentToken,
+      fields: fields,
+    );
+    if (generation != _generation) {
+      throw const ApiException(401, 'UNAUTHORIZED', 'Phiên đã thay đổi.');
+    }
+    try {
+      if (response.statusCode == 401) {
+        if (sentToken == _accessToken) await _refreshOnce();
+        response = await _sendMultipart(
+          path,
+          fileField: fileField,
+          filePath: filePath,
+          token: _accessToken!,
+          fields: fields,
+        );
+      }
+      if (generation != _generation) {
+        throw const ApiException(401, 'UNAUTHORIZED', 'Phiên đã thay đổi.');
+      }
+      return _decode(response);
+    } on ApiException catch (error) {
+      if (error.status == 401 && generation == _generation) await clearLocal();
+      rethrow;
+    }
+  }
+
   Future<void> loadProfile() async {
     _user = await request('GET', '/users/me');
     notifyListeners();
+  }
+
+  Future<void> updateProfile({
+    String? nickname,
+    String? fullName,
+    String? city,
+    String? bio,
+    String? avatarUrl,
+  }) async {
+    _user = await request(
+      'PATCH',
+      '/users/me/profile',
+      body: {
+        if (nickname != null) 'nickname': nickname.trim(),
+        if (fullName != null) 'fullName': fullName.trim(),
+        if (city != null) 'city': city.trim(),
+        if (bio != null) 'bio': bio.trim(),
+        if (avatarUrl != null) 'avatarUrl': avatarUrl.trim(),
+      },
+    );
+    notifyListeners();
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await request(
+      'POST',
+      '/auth/change-password',
+      body: {'currentPassword': currentPassword, 'newPassword': newPassword},
+    );
+    await clearLocal();
   }
 
   Future<void> saveOnboarding(List<String> codes) async {

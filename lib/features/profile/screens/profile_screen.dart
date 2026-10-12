@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/services/auth_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/snackbar.dart';
+import '../widgets/profile_account_sheets.dart';
 import 'setting_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -12,6 +15,54 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   int _selectedTab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    AuthService.instance.addListener(_refresh);
+    AuthService.instance.loadProfile().catchError((_) {});
+  }
+
+  @override
+  void dispose() {
+    AuthService.instance.removeListener(_refresh);
+    super.dispose();
+  }
+
+  void _refresh() {
+    if (mounted) setState(() {});
+  }
+
+  Map<String, dynamic> get _user => AuthService.instance.user ?? const {};
+
+  String get _nickname => _text(_user['nickname'], fallback: 'gomate');
+
+  String get _displayName {
+    final displayName = _text(_user['displayName']);
+    if (displayName.isNotEmpty) return displayName;
+    final fullName = _text(_user['fullName']);
+    return fullName.isNotEmpty ? fullName : _nickname;
+  }
+
+  String get _bio {
+    final bio = _text(_user['bio']);
+    return bio.isEmpty ? 'Khám phá nhiều hơn, đi xa hơn cùng GoMate.' : bio;
+  }
+
+  String? get _avatarUrl {
+    final value = _text(_user['avatarUrl']);
+    return value.isEmpty ? null : value;
+  }
+
+  int get _followersCount => _stat('followersCount');
+
+  int get _mutualFriendCount => _stat('mutualFriendCount');
+
+  Future<void> _editProfile() async {
+    final saved = await showProfileEditSheet(context, user: _user);
+    if (!mounted || saved != true) return;
+    GoMateSnackBar.show(context, message: 'Đã cập nhật hồ sơ');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,13 +112,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             },
           ),
 
-          const Expanded(
+          Expanded(
             child: Center(
               child: Text(
-                'xuthu',
+                _nickname,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 19,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textPrimary,
@@ -79,11 +130,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _topIconButton(
             icon: Icons.menu_rounded,
             onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const SettingsScreen(),
-                ),
-              );
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
             },
           ),
         ],
@@ -91,21 +140,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _topIconButton({
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
+  Widget _topIconButton({required IconData icon, required VoidCallback onTap}) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
       child: SizedBox(
         width: 44,
         height: 44,
-        child: Icon(
-          icon,
-          size: 25,
-          color: AppColors.textPrimary,
-        ),
+        child: Icon(icon, size: 25, color: AppColors.textPrimary),
       ),
     );
   }
@@ -130,11 +172,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Biệt danh / ID hiển thị
-                  const Text(
-                    'Xuân Thu',
+                  Text(
+                    _displayName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary,
@@ -143,11 +185,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   const SizedBox(height: 14),
 
-                  const Row(
+                  Row(
                     children: [
                       Expanded(
                         child: _SocialStat(
-                          value: '4',
+                          value: _followersCount.toString(),
                           label: 'Người theo dõi',
                         ),
                       ),
@@ -156,7 +198,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                       Expanded(
                         child: _SocialStat(
-                          value: '4',
+                          value: _mutualFriendCount.toString(),
                           label: 'Bạn bè',
                         ),
                       ),
@@ -170,9 +212,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         const SizedBox(height: 18),
 
-        const Text(
-          'Khám phá nhiều hơn, đi xa hơn cùng GoMate.',
-          style: TextStyle(
+        Text(
+          _bio,
+          style: const TextStyle(
             fontSize: 13.5,
             height: 1.45,
             color: AppColors.textPrimary,
@@ -185,17 +227,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           onTap: () {},
           borderRadius: BorderRadius.circular(10),
           child: const Padding(
-            padding: EdgeInsets.symmetric(
-              vertical: 3,
-            ),
+            padding: EdgeInsets.symmetric(vertical: 3),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.link_rounded,
-                  size: 16,
-                  color: AppColors.blue500,
-                ),
+                Icon(Icons.link_rounded, size: 16, color: AppColors.blue500),
                 SizedBox(width: 5),
                 Text(
                   'Thêm liên kết',
@@ -219,25 +255,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           height: 42,
           child: OutlinedButton.icon(
             onPressed: () {
-              // UI only - bước sau nối màn chỉnh sửa hồ sơ.
+              _editProfile();
             },
-            icon: const Icon(
-              Icons.edit_outlined,
-              size: 17,
-            ),
+            icon: const Icon(Icons.edit_outlined, size: 17),
             label: const Text(
               'Chỉnh sửa hồ sơ',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
             ),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.textPrimary,
               backgroundColor: AppColors.blue50.withOpacity(0.30),
-              side: BorderSide(
-                color: AppColors.blue100.withOpacity(0.85),
-              ),
+              side: BorderSide(color: AppColors.blue100.withOpacity(0.85)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -258,36 +286,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: AppColors.blue100,
-            border: Border.all(
-              color: Colors.white,
-              width: 3,
-            ),
+            border: Border.all(color: Colors.white, width: 3),
           ),
-          child: const Icon(
-            Icons.person_rounded,
-            size: 42,
-            color: AppColors.blue500,
-          ),
+          child: _avatarUrl == null
+              ? const Icon(
+                  Icons.person_rounded,
+                  size: 42,
+                  color: AppColors.blue500,
+                )
+              : ClipOval(
+                  child: Image.network(
+                    _avatarUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.person_rounded,
+                      size: 42,
+                      color: AppColors.blue500,
+                    ),
+                  ),
+                ),
         ),
 
         Positioned(
           right: 0,
           bottom: 1,
-          child: Container(
-            width: 26,
-            height: 26,
-            decoration: BoxDecoration(
-              color: AppColors.blue500,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white,
-                width: 2,
+          child: InkWell(
+            onTap: _editProfile,
+            customBorder: const CircleBorder(),
+            child: Container(
+              width: 26,
+              height: 26,
+              decoration: BoxDecoration(
+                color: AppColors.blue500,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
               ),
-            ),
-            child: const Icon(
-              Icons.camera_alt_outlined,
-              size: 13,
-              color: Colors.white,
+              child: const Icon(
+                Icons.camera_alt_outlined,
+                size: 13,
+                color: Colors.white,
+              ),
             ),
           ),
         ),
@@ -305,12 +343,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       height: 52,
       decoration: BoxDecoration(
         border: Border(
-          top: BorderSide(
-            color: AppColors.blue100.withOpacity(0.55),
-          ),
-          bottom: BorderSide(
-            color: AppColors.blue100.withOpacity(0.55),
-          ),
+          top: BorderSide(color: AppColors.blue100.withOpacity(0.55)),
+          bottom: BorderSide(color: AppColors.blue100.withOpacity(0.55)),
         ),
       ),
       child: Row(
@@ -353,13 +387,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             alignment: Alignment.center,
             children: [
               Icon(
-                selected
-                    ? (selectedIcon ?? icon)
-                    : icon,
+                selected ? (selectedIcon ?? icon) : icon,
                 size: 23,
-                color: selected
-                    ? AppColors.blue500
-                    : AppColors.textSecondary,
+                color: selected ? AppColors.blue500 : AppColors.textSecondary,
               ),
 
               if (selected)
@@ -416,9 +446,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       onTap: () {},
       borderRadius: BorderRadius.circular(18),
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-          vertical: 8,
-        ),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: [
             Container(
@@ -428,29 +456,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 shape: BoxShape.circle,
                 color: AppColors.blue100,
               ),
-              child: const Icon(
-                Icons.person_rounded,
-                size: 22,
-                color: AppColors.blue500,
-              ),
+              child: _avatarUrl == null
+                  ? const Icon(
+                      Icons.person_rounded,
+                      size: 22,
+                      color: AppColors.blue500,
+                    )
+                  : ClipOval(
+                      child: Image.network(
+                        _avatarUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.person_rounded,
+                          size: 22,
+                          color: AppColors.blue500,
+                        ),
+                      ),
+                    ),
             ),
 
             const SizedBox(width: 10),
 
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Xuân Thu',
-                    style: TextStyle(
+                    _displayName,
+                    style: const TextStyle(
                       fontSize: 13.5,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  SizedBox(height: 2),
-                  Text(
+                  const SizedBox(height: 2),
+                  const Text(
                     'Chia sẻ điều mới?',
                     style: TextStyle(
                       fontSize: 12.5,
@@ -475,47 +515,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildSamplePost() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.only(
-        top: 12,
-        bottom: 14,
-      ),
+      padding: const EdgeInsets.only(top: 12, bottom: 14),
       decoration: BoxDecoration(
         border: Border(
-          top: BorderSide(
-            color: AppColors.blue100.withOpacity(0.45),
-          ),
+          top: BorderSide(color: AppColors.blue100.withOpacity(0.45)),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
               CircleAvatar(
                 radius: 20,
                 backgroundColor: AppColors.blue100,
-                child: Icon(
-                  Icons.person_rounded,
-                  color: AppColors.blue500,
-                ),
+                backgroundImage: _avatarUrl == null
+                    ? null
+                    : NetworkImage(_avatarUrl!),
+                child: _avatarUrl == null
+                    ? const Icon(Icons.person_rounded, color: AppColors.blue500)
+                    : null,
               ),
 
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
 
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Xuân Thu',
-                      style: TextStyle(
+                      _displayName,
+                      style: const TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    SizedBox(height: 2),
-                    Text(
+                    const SizedBox(height: 2),
+                    const Text(
                       '3 ngày trước',
                       style: TextStyle(
                         fontSize: 11.5,
@@ -526,7 +563,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
 
-              Icon(
+              const Icon(
                 Icons.more_horiz_rounded,
                 color: AppColors.textSecondary,
               ),
@@ -537,10 +574,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           const Text(
             'Một chút Đà Lạt 🌿',
-            style: TextStyle(
-              fontSize: 13.5,
-              color: AppColors.textPrimary,
-            ),
+            style: TextStyle(fontSize: 13.5, color: AppColors.textPrimary),
           ),
 
           const SizedBox(height: 10),
@@ -551,8 +585,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
               itemCount: 3,
-              separatorBuilder: (_, __) =>
-              const SizedBox(width: 8),
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (_, index) {
                 return Container(
                   width: 146,
@@ -618,10 +651,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildFavoritesTab() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        vertical: 34,
-        horizontal: 24,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 34, horizontal: 24),
       child: const Column(
         children: [
           Icon(
@@ -657,6 +687,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+
+  String _text(Object? value, {String fallback = ''}) {
+    if (value is! String) return fallback;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? fallback : trimmed;
+  }
+
+  int _stat(String key) {
+    final stats = _user['relationshipStats'];
+    if (stats is! Map) return 0;
+    final value = stats[key];
+    if (value is num) return value.toInt();
+    return 0;
+  }
 }
 
 // ============================================================================
@@ -667,10 +711,7 @@ class _SocialStat extends StatelessWidget {
   final String value;
   final String label;
 
-  const _SocialStat({
-    required this.value,
-    required this.label,
-  });
+  const _SocialStat({required this.value, required this.label});
 
   @override
   Widget build(BuildContext context) {

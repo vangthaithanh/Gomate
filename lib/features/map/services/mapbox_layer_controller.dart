@@ -1,6 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -14,7 +14,15 @@ import '../models/map_route.dart';
 typedef GoMatePlaceTap = void Function(String placeId);
 
 class GoMateMapboxLayerController {
+  static const String _routeSourceId = 'gomate-active-route-source';
+  static const String _routeShadowLayerId = 'gomate-active-route-shadow';
+  static const String _routeLayerId = 'gomate-active-route-main';
+
   MapboxMap? _map;
+
+  // onStyleLoaded can arrive before onMapCreated finishes attaching.
+  // Keep that style request so it is not silently lost.
+  bool _baseStyleRequested = false;
 
   // Marker size policy:
   // - zoom xa: dot có kích thước tối thiểu cố định.
@@ -44,11 +52,7 @@ class GoMateMapboxLayerController {
   static const double _memberCardMinIconSize = 1.42;
   static const double _memberCardMaxIconSize = 1.72;
 
-
-
-  _PlaceVisualType _visualTypeForPlace(
-      GoMateMapPlace place,
-      ) {
+  _PlaceVisualType _visualTypeForPlace(GoMateMapPlace place) {
     final source = <String>[
       place.categoryLabel,
       place.name,
@@ -99,14 +103,7 @@ class GoMateMapboxLayerController {
       return _PlaceVisualType.hotel;
     }
 
-    if (containsAny([
-      'bar',
-      'pub',
-      'nightlife',
-      'cocktail',
-      'beer',
-      'bia ',
-    ])) {
+    if (containsAny(['bar', 'pub', 'nightlife', 'cocktail', 'beer', 'bia '])) {
       return _PlaceVisualType.bar;
     }
 
@@ -265,22 +262,15 @@ class GoMateMapboxLayerController {
 
     // Fallback vẫn bám enum backend hiện tại, không thay backend contract.
     return switch (place.category) {
-      GoMatePlaceCategory.attraction =>
-      _PlaceVisualType.attraction,
-      GoMatePlaceCategory.cafe =>
-      _PlaceVisualType.cafe,
-      GoMatePlaceCategory.food =>
-      _PlaceVisualType.restaurant,
-      GoMatePlaceCategory.nature =>
-      _PlaceVisualType.park,
-      GoMatePlaceCategory.shopping =>
-      _PlaceVisualType.shopping,
+      GoMatePlaceCategory.attraction => _PlaceVisualType.attraction,
+      GoMatePlaceCategory.cafe => _PlaceVisualType.cafe,
+      GoMatePlaceCategory.food => _PlaceVisualType.restaurant,
+      GoMatePlaceCategory.nature => _PlaceVisualType.park,
+      GoMatePlaceCategory.shopping => _PlaceVisualType.shopping,
     };
   }
 
-  int _visualColor(
-      _PlaceVisualType type,
-      ) {
+  int _visualColor(_PlaceVisualType type) {
     return switch (type) {
       _PlaceVisualType.attraction => 0xFF5B8DEF,
       _PlaceVisualType.checkin => 0xFFEF6F72,
@@ -305,9 +295,7 @@ class GoMateMapboxLayerController {
     };
   }
 
-  IconData _visualIcon(
-      _PlaceVisualType type,
-      ) {
+  IconData _visualIcon(_PlaceVisualType type) {
     return switch (type) {
       _PlaceVisualType.attraction => Icons.star,
       _PlaceVisualType.checkin => Icons.camera_alt,
@@ -332,52 +320,33 @@ class GoMateMapboxLayerController {
     };
   }
 
-  int _nearZoomBucket(
-      double zoom,
-      ) {
-    final clamped = zoom
-        .clamp(_nearStartZoom, _nearFullZoom)
-        .toDouble();
+  int _nearZoomBucket(double zoom) {
+    final clamped = zoom.clamp(_nearStartZoom, _nearFullZoom).toDouble();
 
-    return ((clamped - _nearStartZoom) / _nearZoomStep)
-        .floor();
+    return ((clamped - _nearStartZoom) / _nearZoomStep).floor();
   }
 
-  double _nearIconSizeForZoom(
-      double zoom,
-      ) {
-    final clamped = zoom
-        .clamp(_nearStartZoom, _nearFullZoom)
-        .toDouble();
+  double _nearIconSizeForZoom(double zoom) {
+    final clamped = zoom.clamp(_nearStartZoom, _nearFullZoom).toDouble();
 
-    final rawT =
-        (clamped - _nearStartZoom) /
-            (_nearFullZoom - _nearStartZoom);
+    final rawT = (clamped - _nearStartZoom) / (_nearFullZoom - _nearStartZoom);
 
     // Ease-out: tăng nhanh ở đầu để icon sớm đủ rõ,
     // sau đó tăng chậm dần và dừng ở max size.
     final t = Curves.easeOutCubic.transform(rawT);
 
-    return _nearMinIconSize +
-        ((_nearMaxIconSize - _nearMinIconSize) * t);
+    return _nearMinIconSize + ((_nearMaxIconSize - _nearMinIconSize) * t);
   }
 
-  double _selectedIconSizeForZoom(
-      double zoom,
-      ) {
+  double _selectedIconSizeForZoom(double zoom) {
     final normal = _nearIconSizeForZoom(zoom);
 
     return (normal + 0.16)
-        .clamp(
-      _selectedMinIconSize,
-      _selectedMaxIconSize,
-    )
+        .clamp(_selectedMinIconSize, _selectedMaxIconSize)
         .toDouble();
   }
 
-  _MemberMarkerMode _memberModeForZoom(
-      double zoom,
-      ) {
+  _MemberMarkerMode _memberModeForZoom(double zoom) {
     if (zoom < _memberCardStartZoom) {
       return _MemberMarkerMode.far;
     }
@@ -385,83 +354,58 @@ class GoMateMapboxLayerController {
     return _MemberMarkerMode.card;
   }
 
-  double _currentUserIconSizeForZoom(
-      double zoom,
-      ) {
+  double _currentUserIconSizeForZoom(double zoom) {
     final clamped = zoom
-        .clamp(
-      _memberCardStartZoom,
-      _memberCardFullZoom,
-    )
+        .clamp(_memberCardStartZoom, _memberCardFullZoom)
         .toDouble();
 
     final rawT =
         (clamped - _memberCardStartZoom) /
-            (_memberCardFullZoom -
-                _memberCardStartZoom);
+        (_memberCardFullZoom - _memberCardStartZoom);
 
-    final t =
-    Curves.easeOutCubic.transform(
-      rawT,
-    );
+    final t = Curves.easeOutCubic.transform(rawT);
 
     const minSize = 1.10;
     const maxSize = 1.42;
 
-    return minSize +
-        ((maxSize - minSize) * t);
+    return minSize + ((maxSize - minSize) * t);
   }
 
-  int _memberZoomBucket(
-      double zoom,
-      ) {
+  int _memberZoomBucket(double zoom) {
     final clamped = zoom
-        .clamp(
-      _memberCardStartZoom,
-      _memberCardFullZoom,
-    )
+        .clamp(_memberCardStartZoom, _memberCardFullZoom)
         .toDouble();
 
-    return ((clamped - _memberCardStartZoom) /
-        _memberZoomStep)
-        .floor();
+    return ((clamped - _memberCardStartZoom) / _memberZoomStep).floor();
   }
 
-  double _memberCardIconSizeForZoom(
-      double zoom,
-      ) {
+  double _memberCardIconSizeForZoom(double zoom) {
     final clamped = zoom
-        .clamp(
-      _memberCardStartZoom,
-      _memberCardFullZoom,
-    )
+        .clamp(_memberCardStartZoom, _memberCardFullZoom)
         .toDouble();
 
     final rawT =
         (clamped - _memberCardStartZoom) /
-            (_memberCardFullZoom - _memberCardStartZoom);
+        (_memberCardFullZoom - _memberCardStartZoom);
 
-    final t =
-    Curves.easeOutCubic.transform(rawT);
+    final t = Curves.easeOutCubic.transform(rawT);
 
     return _memberCardMinIconSize +
-        ((_memberCardMaxIconSize -
-            _memberCardMinIconSize) *
-            t);
+        ((_memberCardMaxIconSize - _memberCardMinIconSize) * t);
   }
 
-  bool _isPreviewCurrentUser(
-      GoMateMapMember member,
-      ) {
+  bool _isPreviewCurrentUser(GoMateMapMember member) {
     return _previewCurrentUserId != null &&
         member.userId == _previewCurrentUserId;
   }
 
-  String _memberSubtitle(
-      GoMateMapMember member,
-      ) {
+  String _memberSubtitle(GoMateMapMember member) {
     if (_isPreviewCurrentUser(member)) {
       return '';
+    }
+
+    if (member.isStale || member.locationState != 'LIVE') {
+      return 'Vị trí gần nhất';
     }
 
     final currentId = _previewCurrentUserId;
@@ -483,10 +427,7 @@ class GoMateMapboxLayerController {
       return 'Đang hoạt động';
     }
 
-    final km = _distanceKm(
-      current.position,
-      member.position,
-    );
+    final km = _distanceKm(current.position, member.position);
 
     if (km < 1) {
       return '${(km * 1000).round()} m';
@@ -495,55 +436,30 @@ class GoMateMapboxLayerController {
     return '${km.toStringAsFixed(1).replaceAll('.', ',')} km';
   }
 
-  double _distanceKm(
-      Position a,
-      Position b,
-      ) {
+  double _distanceKm(Position a, Position b) {
     const earthRadiusKm = 6371.0;
 
-    final lat1 =
-        a.lat.toDouble() * math.pi / 180;
+    final lat1 = a.lat.toDouble() * math.pi / 180;
 
-    final lat2 =
-        b.lat.toDouble() * math.pi / 180;
+    final lat2 = b.lat.toDouble() * math.pi / 180;
 
-    final dLat =
-        (b.lat.toDouble() -
-            a.lat.toDouble()) *
-            math.pi /
-            180;
+    final dLat = (b.lat.toDouble() - a.lat.toDouble()) * math.pi / 180;
 
-    final dLng =
-        (b.lng.toDouble() -
-            a.lng.toDouble()) *
-            math.pi /
-            180;
+    final dLng = (b.lng.toDouble() - a.lng.toDouble()) * math.pi / 180;
 
-    final sinLat =
-    math.sin(dLat / 2);
+    final sinLat = math.sin(dLat / 2);
 
-    final sinLng =
-    math.sin(dLng / 2);
+    final sinLng = math.sin(dLng / 2);
 
     final h =
-        (sinLat * sinLat) +
-            math.cos(lat1) *
-                math.cos(lat2) *
-                (sinLng * sinLng);
+        (sinLat * sinLat) + math.cos(lat1) * math.cos(lat2) * (sinLng * sinLng);
 
-    final c =
-        2 *
-            math.atan2(
-              math.sqrt(h),
-              math.sqrt(1 - h),
-            );
+    final c = 2 * math.atan2(math.sqrt(h), math.sqrt(1 - h));
 
     return earthRadiusKm * c;
   }
 
-  _ExploreMarkerMode _markerModeForZoom(
-      double zoom,
-      ) {
+  _ExploreMarkerMode _markerModeForZoom(double zoom) {
     if (zoom < 12.8) {
       return _ExploreMarkerMode.far;
     }
@@ -605,14 +521,14 @@ class GoMateMapboxLayerController {
   // Nhịp gần cảm giác pulse native V9:
   // nở rõ, mờ dần, reset nhanh.
   static const int _currentUserPulseCycleMs = 1050;
-  static const Duration _currentUserPulseFrameInterval =
-  Duration(milliseconds: 40);
+  static const Duration _currentUserPulseFrameInterval = Duration(
+    milliseconds: 40,
+  );
 
   bool _locationAvatarEnabled = false;
   bool _routeTrackingActive = false;
 
-  String _locationAvatarAsset =
-      'assets/map/member_thu.png';
+  String _locationAvatarAsset = 'assets/map/member_thu.png';
 
   String _locationDisplayName = 'Bạn';
 
@@ -621,8 +537,7 @@ class GoMateMapboxLayerController {
   _MemberMarkerMode? _currentUserMarkerMode;
   int? _currentUserMarkerBucket;
 
-  List<GoMateMapPlace> _explorePlaces =
-  const <GoMateMapPlace>[];
+  List<GoMateMapPlace> _explorePlaces = const <GoMateMapPlace>[];
 
   double _currentZoom = 14.2;
 
@@ -632,8 +547,7 @@ class GoMateMapboxLayerController {
   int? _nearMarkerBucket;
   GoMateMapPlace? _selectedPlace;
 
-  List<GoMateMapMember> _previewMembers =
-  const <GoMateMapMember>[];
+  List<GoMateMapMember> _previewMembers = const <GoMateMapMember>[];
 
   String? _previewCurrentUserId;
   bool _previewMembersEnabled = false;
@@ -642,41 +556,33 @@ class GoMateMapboxLayerController {
   int? _memberMarkerBucket;
 
   Future<void> attach(
-      MapboxMap map, {
-        required GoMatePlaceTap onPlaceTap,
-      }) async {
+    MapboxMap map, {
+    required GoMatePlaceTap onPlaceTap,
+  }) async {
     _map = map;
     await _loadAssets();
 
-    _placeManager =
-    await map.annotations.createPointAnnotationManager();
+    _placeManager = await map.annotations.createPointAnnotationManager();
 
-    _placeDotManager =
-    await map.annotations.createCircleAnnotationManager();
+    _placeDotManager = await map.annotations.createCircleAnnotationManager();
 
-    _selectedManager =
-    await map.annotations.createPointAnnotationManager();
-    _tripStopManager =
-    await map.annotations.createPointAnnotationManager();
-    _memberManager =
-    await map.annotations.createPointAnnotationManager();
+    _selectedManager = await map.annotations.createPointAnnotationManager();
+    _tripStopManager = await map.annotations.createPointAnnotationManager();
+    _memberManager = await map.annotations.createPointAnnotationManager();
 
     // Tạo pulse trước avatar để layer của avatar luôn nằm phía trên.
-    _currentUserPulseManager =
-    await map.annotations.createCircleAnnotationManager();
+    _currentUserPulseManager = await map.annotations
+        .createCircleAnnotationManager();
 
-    _currentUserManager =
-    await map.annotations.createPointAnnotationManager();
+    _currentUserManager = await map.annotations.createPointAnnotationManager();
 
-    _routeShadowManager =
-    await map.annotations.createPolylineAnnotationManager();
-    _routeManager =
-    await map.annotations.createPolylineAnnotationManager();
+    _routeShadowManager = await map.annotations
+        .createPolylineAnnotationManager();
+    _routeManager = await map.annotations.createPolylineAnnotationManager();
 
-    _checkinRadiusManager =
-    await map.annotations.createCircleAnnotationManager();
-    _originManager =
-    await map.annotations.createCircleAnnotationManager();
+    _checkinRadiusManager = await map.annotations
+        .createCircleAnnotationManager();
+    _originManager = await map.annotations.createCircleAnnotationManager();
 
     await _placeManager?.setIconAllowOverlap(true);
     await _selectedManager?.setIconAllowOverlap(true);
@@ -712,17 +618,15 @@ class GoMateMapboxLayerController {
       },
     );
 
-    _placeDotTapSubscription =
-        _placeDotManager?.tapEvents(
-          onTap: (annotation) {
-            final id =
-            annotation.customData?['placeId']?.toString();
+    _placeDotTapSubscription = _placeDotManager?.tapEvents(
+      onTap: (annotation) {
+        final id = annotation.customData?['placeId']?.toString();
 
-            if (id != null) {
-              onPlaceTap(id);
-            }
-          },
-        );
+        if (id != null) {
+          onPlaceTap(id);
+        }
+      },
+    );
 
     _tripTapSubscription = _tripStopManager?.tapEvents(
       onTap: (annotation) {
@@ -732,103 +636,148 @@ class GoMateMapboxLayerController {
         }
       },
     );
+
+    // If onStyleLoaded ran before attach, apply its pending style request.
+    if (_baseStyleRequested) {
+      await configureGoMateBaseStyle();
+    }
   }
 
-
   Future<void> configureGoMateBaseStyle() async {
+    _baseStyleRequested = true;
+
     final map = _map;
-    if (map == null) return;
+    if (map == null) {
+      debugPrint(
+        '[GoMate Maps] Waiting for Mapbox attach before applying style.',
+      );
+      return;
+    }
 
-    await map.style.setStyleImportConfigProperties(
-      'basemap',
-      <String, Object>{
-        // ============================================================
-        // GOMATE LIGHT MAP
-        // ============================================================
+    // Preserve the approved GoMate V17 palette. Configure each property
+    // separately so an unsupported option does not discard the other colors.
+    final settings = <String, Object>{
+      // ============================================================
+      // GOMATE LIGHT MAP
+      // ============================================================
+      'lightPreset': 'day',
 
-        'lightPreset': 'day',
+      // QUAN TRỌNG:
+      // Không dùng monochrome nữa vì làm toàn map bị xám.
+      'theme': 'default',
 
-        // QUAN TRỌNG:
-        // Không dùng monochrome nữa vì làm toàn map bị xám.
-        'theme': 'default',
+      // ============================================================
+      // VISIBILITY
+      // ============================================================
+      'showPointOfInterestLabels': false,
+      'showPlaceLabels': true,
+      'showRoadLabels': true,
+      'showTransitLabels': false,
+      'showPedestrianRoads': true,
 
-        // ============================================================
-        // VISIBILITY
-        // ============================================================
+      // Giúp nhận biết ranh giới khu vực rõ hơn.
+      'showAdminBoundaries': true,
 
-        'showPointOfInterestLabels': false,
-        'showPlaceLabels': true,
-        'showRoadLabels': true,
-        'showTransitLabels': false,
-        'showPedestrianRoads': true,
+      'show3dObjects': false,
 
-        // Giúp nhận biết ranh giới khu vực rõ hơn.
-        'showAdminBoundaries': true,
+      // ============================================================
+      // BASE
+      // ============================================================
 
-        'show3dObjects': false,
+      // Nền đất hơi xanh/xám, không dùng trắng tinh.
+      'colorLand': '#F4F7FB',
 
-        // ============================================================
-        // BASE
-        // ============================================================
+      // Nước phải đủ khác với đất.
+      'colorWater': '#CFEAF7',
 
-        // Nền đất hơi xanh/xám, không dùng trắng tinh.
-        'colorLand': '#F4F7FB',
+      // ============================================================
+      // LAND USE
+      // ============================================================
 
-        // Nước phải đủ khác với đất.
-        'colorWater': '#CFEAF7',
+      // Công viên / cây xanh.
+      'colorGreenspace': '#DDEFE3',
 
-        // ============================================================
-        // LAND USE
-        // ============================================================
+      // Khu thương mại - xanh tím cực nhạt.
+      'colorCommercial': '#E9EFF9',
 
-        // Công viên / cây xanh.
-        'colorGreenspace': '#DDEFE3',
+      // Trường học / đại học.
+      'colorEducation': '#EEEAF8',
 
-        // Khu thương mại - xanh tím cực nhạt.
-        'colorCommercial': '#E9EFF9',
+      // Bệnh viện / y tế.
+      'colorMedical': '#F8E8EC',
 
-        // Trường học / đại học.
-        'colorEducation': '#EEEAF8',
+      // Công nghiệp.
+      'colorIndustrial': '#ECE8E1',
 
-        // Bệnh viện / y tế.
-        'colorMedical': '#F8E8EC',
+      // ============================================================
+      // BUILDINGS
+      // ============================================================
+      'colorBuildings': '#DCE3EC',
 
-        // Công nghiệp.
-        'colorIndustrial': '#ECE8E1',
+      // ============================================================
+      // ROADS
+      // ============================================================
 
-        // ============================================================
-        // BUILDINGS
-        // ============================================================
+      // Đường nhỏ sáng hơn nền building.
+      'colorRoads': '#FFFFFF',
 
-        'colorBuildings': '#DCE3EC',
+      // Trục đường lớn.
+      'colorTrunks': '#D5E2F0',
 
-        // ============================================================
-        // ROADS
-        // ============================================================
+      // Cao tốc / đường chính nổi hơn một chút.
+      'colorMotorways': '#BFD7F5',
 
-        // Đường nhỏ sáng hơn nền building.
-        'colorRoads': '#FFFFFF',
+      // ============================================================
+      // LABELS
+      // ============================================================
+      'colorPlaceLabels': '#42546D',
 
-        // Trục đường lớn.
-        'colorTrunks': '#D5E2F0',
+      'colorRoadLabels': '#68788D',
 
-        // Cao tốc / đường chính nổi hơn một chút.
-        'colorMotorways': '#BFD7F5',
+      // ============================================================
+      // ADMINISTRATIVE BOUNDARIES
+      // ============================================================
+      'colorAdminBoundaries': '#AEBCCE',
+    };
 
-        // ============================================================
-        // LABELS
-        // ============================================================
+    var applied = 0;
+    var failed = 0;
 
-        'colorPlaceLabels': '#42546D',
+    for (final entry in settings.entries) {
+      try {
+        await map.style.setStyleImportConfigProperty(
+          'basemap',
+          entry.key,
+          entry.value,
+        );
+        applied++;
+      } catch (error) {
+        failed++;
+        debugPrint(
+          '[GoMate Maps] basemap ${entry.key} could not be applied: $error',
+        );
+      }
+    }
 
-        'colorRoadLabels': '#68788D',
-
-        // ============================================================
-        // ADMINISTRATIVE BOUNDARIES
-        // ============================================================
-
-        'colorAdminBoundaries': '#AEBCCE',
-      },
+    // Readback makes missing/ignored Mapbox Standard options visible in logs.
+    // Reading does not modify the map, and failure here must not break UI.
+    for (final property in <String>[
+      'colorLand',
+      'colorWater',
+      'colorGreenspace',
+    ]) {
+      try {
+        final result = await map.style.getStyleImportConfigProperty(
+          'basemap',
+          property,
+        );
+        debugPrint('[GoMate Maps] $property = ${result.value}');
+      } catch (error) {
+        debugPrint('[GoMate Maps] Cannot read $property: $error');
+      }
+    }
+    debugPrint(
+      '[GoMate Maps] Basemap config applied: $applied, failed: $failed',
     );
   }
 
@@ -842,19 +791,14 @@ class GoMateMapboxLayerController {
   /// approved simulated member marker when the map rotates.
   Future<void> enableLocationPuck({
     Position? position,
-    String avatarAsset =
-    'assets/map/member_thu.png',
+    String avatarAsset = 'assets/map/member_thu.png',
     String displayName = 'Bạn',
     bool routeActive = false,
   }) async {
-    final nextName =
-    displayName.trim().isEmpty
-        ? 'Bạn'
-        : displayName.trim();
+    final nextName = displayName.trim().isEmpty ? 'Bạn' : displayName.trim();
 
     final visualChanged =
-        avatarAsset != _locationAvatarAsset ||
-            nextName != _locationDisplayName;
+        avatarAsset != _locationAvatarAsset || nextName != _locationDisplayName;
 
     _locationAvatarEnabled = true;
     _locationAvatarAsset = avatarAsset;
@@ -875,21 +819,15 @@ class GoMateMapboxLayerController {
     // Vì vậy hai tâm luôn trùng nhau, kể cả khi GPS cập nhật.
     await _renderCurrentUserPulse();
 
-    await _renderCurrentUserMarker(
-      force: true,
-    );
+    await _renderCurrentUserMarker(force: true);
 
     if (_previewMembersEnabled) {
-      await _renderPreviewMembers(
-        force: true,
-      );
+      await _renderPreviewMembers(force: true);
     }
   }
 
   /// Call this whenever a fresh GPS/background location is received.
-  Future<void> updateCurrentUserPosition(
-      Position position,
-      ) async {
+  Future<void> updateCurrentUserPosition(Position position) async {
     _currentUserPosition = position;
 
     if (!_locationAvatarEnabled) {
@@ -898,20 +836,18 @@ class GoMateMapboxLayerController {
 
     await _renderCurrentUserPulse();
 
-    await _renderCurrentUserMarker(
-      force: true,
-    );
+    await _renderCurrentUserMarker(force: true);
   }
 
   /// Pinned trip / active route:
   /// false -> neutral avatar, no pulse
   /// true  -> blue ring + native animated pulse
   Future<void> setRouteTrackingActive(
-      bool active, {
-        Position? position,
-        String? avatarAsset,
-        String? displayName,
-      }) async {
+    bool active, {
+    Position? position,
+    String? avatarAsset,
+    String? displayName,
+  }) async {
     _locationAvatarEnabled = true;
     _routeTrackingActive = active;
 
@@ -930,10 +866,8 @@ class GoMateMapboxLayerController {
 
     if (displayName != null &&
         displayName.trim().isNotEmpty &&
-        displayName.trim() !=
-            _locationDisplayName) {
-      _locationDisplayName =
-          displayName.trim();
+        displayName.trim() != _locationDisplayName) {
+      _locationDisplayName = displayName.trim();
       visualChanged = true;
     }
 
@@ -942,22 +876,16 @@ class GoMateMapboxLayerController {
     }
 
     // Active/idle uses different ring color.
-    _currentUserMarkerCache.removeWhere(
-          (_, __) => true,
-    );
+    _currentUserMarkerCache.removeWhere((_, __) => true);
 
     await _applyNativeLocationPulse();
 
     await _renderCurrentUserPulse();
 
-    await _renderCurrentUserMarker(
-      force: true,
-    );
+    await _renderCurrentUserMarker(force: true);
 
     if (_previewMembersEnabled) {
-      await _renderPreviewMembers(
-        force: true,
-      );
+      await _renderPreviewMembers(force: true);
     }
   }
 
@@ -977,16 +905,12 @@ class GoMateMapboxLayerController {
 
     if (map != null) {
       await map.location.updateSettings(
-        LocationComponentSettings(
-          enabled: false,
-        ),
+        LocationComponentSettings(enabled: false),
       );
     }
 
     if (_previewMembersEnabled) {
-      await _renderPreviewMembers(
-        force: true,
-      );
+      await _renderPreviewMembers(force: true);
     }
   }
 
@@ -997,11 +921,9 @@ class GoMateMapboxLayerController {
     if (map == null) return;
 
     final transparent =
-        _transparentLocationPuckImage ??
-            await _buildTransparentLocationPuck();
+        _transparentLocationPuckImage ?? await _buildTransparentLocationPuck();
 
-    _transparentLocationPuckImage =
-        transparent;
+    _transparentLocationPuckImage = transparent;
 
     await map.location.updateSettings(
       LocationComponentSettings(
@@ -1017,8 +939,7 @@ class GoMateMapboxLayerController {
         puckBearingEnabled: false,
 
         locationPuck: LocationPuck(
-          locationPuck2D:
-          DefaultLocationPuck2D(
+          locationPuck2D: DefaultLocationPuck2D(
             topImage: transparent,
             bearingImage: Uint8List(0),
             shadowImage: Uint8List(0),
@@ -1030,11 +951,9 @@ class GoMateMapboxLayerController {
   }
 
   Future<void> _renderCurrentUserPulse() async {
-    final manager =
-        _currentUserPulseManager;
+    final manager = _currentUserPulseManager;
 
-    final position =
-        _currentUserPosition;
+    final position = _currentUserPosition;
 
     // Chỉ pulse khi:
     // - marker current user đang bật;
@@ -1051,21 +970,16 @@ class GoMateMapboxLayerController {
       return;
     }
 
-    final baseRadius =
-    _currentUserPulseBaseRadius();
+    final baseRadius = _currentUserPulseBaseRadius();
 
-    final point = Point(
-      coordinates: position,
-    );
+    final point = Point(coordinates: position);
 
-    final existing =
-        _currentUserPulseAnnotation;
+    final existing = _currentUserPulseAnnotation;
 
     if (existing == null) {
       await manager.deleteAll();
 
-      _currentUserPulseAnnotation =
-      await manager.create(
+      _currentUserPulseAnnotation = await manager.create(
         CircleAnnotationOptions(
           geometry: point,
 
@@ -1077,10 +991,7 @@ class GoMateMapboxLayerController {
           circleBlur: 0.04,
           circleStrokeWidth: 0,
 
-          customData:
-          <String, Object>{
-            'currentUserPulse': true,
-          },
+          customData: <String, Object>{'currentUserPulse': true},
         ),
       );
     } else {
@@ -1098,10 +1009,7 @@ class GoMateMapboxLayerController {
   }
 
   double _currentUserPulseBaseRadius() {
-    final iconSize =
-    _currentUserIconSizeForZoom(
-      _currentZoom,
-    );
+    final iconSize = _currentUserIconSizeForZoom(_currentZoom);
 
     // Avatar marker:
     // canvas radius ngoài ≈ 32px rồi nhân iconSize.
@@ -1110,8 +1018,7 @@ class GoMateMapboxLayerController {
   }
 
   void _startCurrentUserPulseAnimation() {
-    if (!_routeTrackingActive ||
-        _currentUserPulseAnnotation == null) {
+    if (!_routeTrackingActive || _currentUserPulseAnnotation == null) {
       return;
     }
 
@@ -1119,39 +1026,25 @@ class GoMateMapboxLayerController {
       return;
     }
 
-    _currentUserPulseStartedAtMs =
-        DateTime.now()
-            .millisecondsSinceEpoch;
+    _currentUserPulseStartedAtMs = DateTime.now().millisecondsSinceEpoch;
 
     // Reset frame đầu tiên để nhìn thấy rõ pulse bắt đầu sát avatar.
-    final pulse =
-        _currentUserPulseAnnotation;
+    final pulse = _currentUserPulseAnnotation;
 
     if (pulse != null) {
-      pulse.circleRadius =
-          _currentUserPulseBaseRadius();
+      pulse.circleRadius = _currentUserPulseBaseRadius();
       pulse.circleOpacity = 0.36;
 
-      unawaited(
-        _currentUserPulseManager?.update(
-          pulse,
-        ),
-      );
+      unawaited(_currentUserPulseManager?.update(pulse));
     }
 
-    _currentUserPulseTimer =
-        Timer.periodic(
-          _currentUserPulseFrameInterval,
-              (_) {
-            unawaited(
-              _updateCurrentUserPulseFrame(),
-            );
-          },
-        );
+    _currentUserPulseTimer = Timer.periodic(_currentUserPulseFrameInterval, (
+      _,
+    ) {
+      unawaited(_updateCurrentUserPulseFrame());
+    });
 
-    unawaited(
-      _updateCurrentUserPulseFrame(),
-    );
+    unawaited(_updateCurrentUserPulseFrame());
   }
 
   void _stopCurrentUserPulseAnimation() {
@@ -1160,16 +1053,14 @@ class GoMateMapboxLayerController {
     _currentUserPulseFrameInFlight = false;
   }
 
-  Future<void>
-  _updateCurrentUserPulseFrame() async {
+  Future<void> _updateCurrentUserPulseFrame() async {
     if (_currentUserPulseFrameInFlight ||
         !_routeTrackingActive ||
         _currentUserPulseAnnotation == null) {
       return;
     }
 
-    final manager =
-        _currentUserPulseManager;
+    final manager = _currentUserPulseManager;
 
     if (manager == null) {
       return;
@@ -1178,41 +1069,26 @@ class GoMateMapboxLayerController {
     _currentUserPulseFrameInFlight = true;
 
     try {
-      final now =
-          DateTime.now()
-              .millisecondsSinceEpoch;
+      final now = DateTime.now().millisecondsSinceEpoch;
 
       final elapsed =
-          (now - _currentUserPulseStartedAtMs) %
-              _currentUserPulseCycleMs;
+          (now - _currentUserPulseStartedAtMs) % _currentUserPulseCycleMs;
 
-      final t =
-          elapsed /
-              _currentUserPulseCycleMs;
+      final t = elapsed / _currentUserPulseCycleMs;
 
       // Native V9 có cảm giác "bung" nhanh rồi mờ dần.
       // easeOutQuad cho chuyển động rõ hơn nhưng vẫn mềm.
-      final eased =
-      Curves.easeOutQuad.transform(
-        t,
-      );
+      final eased = Curves.easeOutQuad.transform(t);
 
-      final baseRadius =
-      _currentUserPulseBaseRadius();
+      final baseRadius = _currentUserPulseBaseRadius();
 
       // Nở đủ để mắt nhận ra chuyển động, nhưng vẫn gọn quanh avatar.
-      final radius =
-          baseRadius +
-              (4.0 * eased);
+      final radius = baseRadius + (4.0 * eased);
 
       // Mờ dần rõ ràng từ đầu chu kỳ đến cuối.
-      final opacity =
-      (0.36 * (1.0 - t))
-          .clamp(0.0, 0.36)
-          .toDouble();
+      final opacity = (0.36 * (1.0 - t)).clamp(0.0, 0.36).toDouble();
 
-      final pulse =
-          _currentUserPulseAnnotation;
+      final pulse = _currentUserPulseAnnotation;
 
       if (pulse == null) {
         return;
@@ -1231,187 +1107,118 @@ class GoMateMapboxLayerController {
     }
   }
 
-  Future<Uint8List>
-  _buildTransparentLocationPuck() async {
-    final recorder =
-    ui.PictureRecorder();
+  Future<Uint8List> _buildTransparentLocationPuck() async {
+    final recorder = ui.PictureRecorder();
 
     // Transparent 2x2 bitmap.
     ui.Canvas(recorder);
 
-    final picture =
-    recorder.endRecording();
+    final picture = recorder.endRecording();
 
-    final image =
-    await picture.toImage(
-      2,
-      2,
-    );
+    final image = await picture.toImage(2, 2);
 
-    final data =
-    await image.toByteData(
-      format:
-      ui.ImageByteFormat.png,
-    );
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
 
     if (data == null) {
-      throw StateError(
-        'Không tạo được transparent location puck',
-      );
+      throw StateError('Không tạo được transparent location puck');
     }
 
-    return data.buffer
-        .asUint8List();
+    return data.buffer.asUint8List();
   }
 
-  Future<void> _renderCurrentUserMarker({
-    bool force = false,
-  }) async {
+  Future<void> _renderCurrentUserMarker({bool force = false}) async {
     if (!_locationAvatarEnabled) {
       return;
     }
 
-    final manager =
-        _currentUserManager;
+    final manager = _currentUserManager;
 
-    final position =
-        _currentUserPosition;
+    final position = _currentUserPosition;
 
-    if (manager == null ||
-        position == null) {
+    if (manager == null || position == null) {
       return;
     }
 
     // EXACTLY reuse member zoom behavior.
-    final mode =
-    _memberModeForZoom(
-      _currentZoom,
-    );
+    final mode = _memberModeForZoom(_currentZoom);
 
-    final nextBucket =
-    mode == _MemberMarkerMode.card
-        ? _memberZoomBucket(
-      _currentZoom,
-    )
+    final nextBucket = mode == _MemberMarkerMode.card
+        ? _memberZoomBucket(_currentZoom)
         : null;
 
-    final sameMode =
-        mode ==
-            _currentUserMarkerMode;
+    final sameMode = mode == _currentUserMarkerMode;
 
     final sameBucket =
         mode != _MemberMarkerMode.card ||
-            nextBucket ==
-                _currentUserMarkerBucket;
+        nextBucket == _currentUserMarkerBucket;
 
-    if (!force &&
-        sameMode &&
-        sameBucket) {
+    if (!force && sameMode && sameBucket) {
       return;
     }
 
     _currentUserMarkerMode = mode;
-    _currentUserMarkerBucket =
-        nextBucket;
+    _currentUserMarkerBucket = nextBucket;
 
-    final image =
-    await _currentUserMarkerImage(
-      active: _routeTrackingActive,
-    );
+    final image = await _currentUserMarkerImage(active: _routeTrackingActive);
 
-    final iconSize =
-    _currentUserIconSizeForZoom(
-      _currentZoom,
-    );
+    final iconSize = _currentUserIconSizeForZoom(_currentZoom);
 
     await manager.deleteAll();
 
     await manager.create(
       PointAnnotationOptions(
-        geometry: Point(
-          coordinates: position,
-        ),
+        geometry: Point(coordinates: position),
         image: image,
-        iconAnchor:
-        IconAnchor.CENTER,
+        iconAnchor: IconAnchor.CENTER,
         iconSize: iconSize,
         symbolSortKey: 650,
-        customData:
-        <String, Object>{
-          'currentUser': true,
-        },
+        customData: <String, Object>{'currentUser': true},
       ),
     );
   }
 
-  Future<Uint8List>
-  _currentUserMarkerImage({
-    required bool active,
-  }) async {
+  Future<Uint8List> _currentUserMarkerImage({required bool active}) async {
     final key = <String>[
       _locationAvatarAsset,
       active ? 'active' : 'idle',
     ].join('|');
 
-    final cached =
-    _currentUserMarkerCache[key];
+    final cached = _currentUserMarkerCache[key];
 
     if (cached != null) {
       return cached;
     }
 
-    final avatar =
-    await _memberAvatarImage(
-      _locationAvatarAsset,
-    );
+    final avatar = await _memberAvatarImage(_locationAvatarAsset);
 
-    final image =
-    await _buildCurrentUserCompactMarker(
+    final image = await _buildCurrentUserCompactMarker(
       avatar: avatar,
       active: active,
     );
 
-    _currentUserMarkerCache[key] =
-        image;
+    _currentUserMarkerCache[key] = image;
 
     return image;
   }
 
-  Future<Uint8List>
-  _buildCurrentUserCompactMarker({
+  Future<Uint8List> _buildCurrentUserCompactMarker({
     required ui.Image? avatar,
     required bool active,
   }) async {
     // Same dimensions as approved member compact marker.
     const size = 76.0;
-    const center =
-    ui.Offset(
-      size / 2,
-      size / 2,
-    );
+    const center = ui.Offset(size / 2, size / 2);
     const radius = 30.0;
 
-    final recorder =
-    ui.PictureRecorder();
-    final canvas =
-    ui.Canvas(recorder);
+    final recorder = ui.PictureRecorder();
+    final canvas = ui.Canvas(recorder);
 
     canvas.drawCircle(
-      center.translate(
-        0,
-        2,
-      ),
+      center.translate(0, 2),
       radius + 2,
       ui.Paint()
-        ..color =
-        const ui.Color(
-          0x26000000,
-        )
-        ..maskFilter =
-        const ui.MaskFilter.blur(
-          ui.BlurStyle.normal,
-          3,
-        ),
+        ..color = const ui.Color(0x26000000)
+        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 3),
     );
 
     canvas.drawCircle(
@@ -1419,12 +1226,8 @@ class GoMateMapboxLayerController {
       radius + 2,
       ui.Paint()
         ..color = active
-            ? const ui.Color(
-          0xFF0A43A8,
-        )
-            : const ui.Color(
-          0xFF9AA8BA,
-        ),
+            ? const ui.Color(0xFF0A43A8)
+            : const ui.Color(0xFF9AA8BA),
     );
 
     _drawAvatarCircle(
@@ -1432,66 +1235,43 @@ class GoMateMapboxLayerController {
       avatar: avatar,
       center: center,
       radius: radius - 2,
-      fallbackColor:
-      const ui.Color(
-        0xFFDCE8FA,
-      ),
+      fallbackColor: const ui.Color(0xFFDCE8FA),
       opacity: 1,
     );
 
-    return _pictureToPng(
-      recorder,
-      width: size,
-      height: size,
-    );
+    return _pictureToPng(recorder, width: size, height: size);
   }
 
-  Future<void> renderPlaces(
-      List<GoMateMapPlace> places,
-      ) async {
-    _explorePlaces =
-    List<GoMateMapPlace>.unmodifiable(
-      places,
-    );
+  Future<void> renderPlaces(List<GoMateMapPlace> places) async {
+    _explorePlaces = List<GoMateMapPlace>.unmodifiable(places);
 
     _exploreMarkersEnabled = true;
 
-    await _renderExploreMarkers(
-      force: true,
-    );
+    await _renderExploreMarkers(force: true);
   }
 
-  Future<void> _renderExploreMarkers({
-    bool force = false,
-  }) async {
+  Future<void> _renderExploreMarkers({bool force = false}) async {
     if (!_exploreMarkersEnabled) return;
 
     final pointManager = _placeManager;
     final dotManager = _placeDotManager;
 
-    if (pointManager == null ||
-        dotManager == null) {
+    if (pointManager == null || dotManager == null) {
       return;
     }
 
-    final mode =
-    _markerModeForZoom(_currentZoom);
+    final mode = _markerModeForZoom(_currentZoom);
 
-    final nextNearBucket =
-    mode == _ExploreMarkerMode.near
+    final nextNearBucket = mode == _ExploreMarkerMode.near
         ? _nearZoomBucket(_currentZoom)
         : null;
 
-    final sameMode =
-        mode == _placeMarkerMode;
+    final sameMode = mode == _placeMarkerMode;
 
     final sameNearBucket =
-        mode != _ExploreMarkerMode.near ||
-            nextNearBucket == _nearMarkerBucket;
+        mode != _ExploreMarkerMode.near || nextNearBucket == _nearMarkerBucket;
 
-    if (!force &&
-        sameMode &&
-        sameNearBucket) {
+    if (!force && sameMode && sameNearBucket) {
       return;
     }
 
@@ -1504,59 +1284,40 @@ class GoMateMapboxLayerController {
     await dotManager.deleteAll();
 
     if (mode == _ExploreMarkerMode.near) {
-      await _renderPlaceIcons(
-        iconSize:
-        _nearIconSizeForZoom(_currentZoom),
-      );
+      await _renderPlaceIcons(iconSize: _nearIconSizeForZoom(_currentZoom));
       return;
     }
 
-    await _renderPlaceDots(
-      medium:
-      mode == _ExploreMarkerMode.medium,
-    );
+    await _renderPlaceDots(medium: mode == _ExploreMarkerMode.medium);
   }
 
-  Future<void> _renderPlaceDots({
-    required bool medium,
-  }) async {
+  Future<void> _renderPlaceDots({required bool medium}) async {
     final manager = _placeDotManager;
 
     if (manager == null) return;
 
-    final options =
-    <CircleAnnotationOptions>[];
+    final options = <CircleAnnotationOptions>[];
 
     for (final place in _explorePlaces) {
       options.add(
         CircleAnnotationOptions(
-          geometry: Point(
-            coordinates: place.position,
-          ),
+          geometry: Point(coordinates: place.position),
 
-          circleColor:
-          _visualColor(
-            _visualTypeForPlace(place),
-          ),
+          circleColor: _visualColor(_visualTypeForPlace(place)),
 
-          circleRadius:
-          medium ? _mediumDotRadius : _farDotRadius,
+          circleRadius: medium ? _mediumDotRadius : _farDotRadius,
 
           circleOpacity: 1,
 
-          circleStrokeColor:
-          0xFFFFFFFF,
+          circleStrokeColor: 0xFFFFFFFF,
 
-          circleStrokeWidth:
-          medium ? 2.2 : 1.6,
+          circleStrokeWidth: medium ? 2.2 : 1.6,
 
           circleStrokeOpacity: 1,
 
           circleSortKey: 10,
 
-          customData: <String, Object>{
-            'placeId': place.placeId,
-          },
+          customData: <String, Object>{'placeId': place.placeId},
         ),
       );
     }
@@ -1566,30 +1327,23 @@ class GoMateMapboxLayerController {
     }
   }
 
-  Future<void> _renderPlaceIcons({
-    required double iconSize,
-  }) async {
+  Future<void> _renderPlaceIcons({required double iconSize}) async {
     final manager = _placeManager;
 
     if (manager == null) return;
 
-    final options =
-    <PointAnnotationOptions>[];
+    final options = <PointAnnotationOptions>[];
 
     for (final place in _explorePlaces) {
-      final visual =
-      _visualTypeForPlace(place);
+      final visual = _visualTypeForPlace(place);
 
-      final image =
-      _placeMarkerImages[visual];
+      final image = _placeMarkerImages[visual];
 
       if (image == null) continue;
 
       options.add(
         PointAnnotationOptions(
-          geometry: Point(
-            coordinates: place.position,
-          ),
+          geometry: Point(coordinates: place.position),
           image: image,
           iconAnchor: IconAnchor.CENTER,
 
@@ -1598,9 +1352,7 @@ class GoMateMapboxLayerController {
 
           symbolSortKey: 10,
 
-          customData: <String, Object>{
-            'placeId': place.placeId,
-          },
+          customData: <String, Object>{'placeId': place.placeId},
         ),
       );
     }
@@ -1610,20 +1362,14 @@ class GoMateMapboxLayerController {
     }
   }
 
-  Future<void> updateExploreZoom(
-      double zoom,
-      ) async {
-    final previousMode =
-        _placeMarkerMode;
+  Future<void> updateExploreZoom(double zoom) async {
+    final previousMode = _placeMarkerMode;
 
-    final previousNearBucket =
-        _nearMarkerBucket;
+    final previousNearBucket = _nearMarkerBucket;
 
-    final previousMemberMode =
-        _memberMarkerMode;
+    final previousMemberMode = _memberMarkerMode;
 
-    final previousMemberBucket =
-        _memberMarkerBucket;
+    final previousMemberBucket = _memberMarkerBucket;
 
     _currentZoom = zoom;
 
@@ -1632,27 +1378,19 @@ class GoMateMapboxLayerController {
     }
 
     if (_previewMembersEnabled) {
-      final nextMemberMode =
-      _memberModeForZoom(zoom);
+      final nextMemberMode = _memberModeForZoom(zoom);
 
-      final nextMemberBucket =
-      nextMemberMode ==
-          _MemberMarkerMode.card
+      final nextMemberBucket = nextMemberMode == _MemberMarkerMode.card
           ? _memberZoomBucket(zoom)
           : null;
 
-      final memberModeChanged =
-          nextMemberMode !=
-              previousMemberMode;
+      final memberModeChanged = nextMemberMode != previousMemberMode;
 
       final memberSizeChanged =
-          nextMemberMode ==
-              _MemberMarkerMode.card &&
-              nextMemberBucket !=
-                  previousMemberBucket;
+          nextMemberMode == _MemberMarkerMode.card &&
+          nextMemberBucket != previousMemberBucket;
 
-      if (memberModeChanged ||
-          memberSizeChanged) {
+      if (memberModeChanged || memberSizeChanged) {
         await _renderPreviewMembers();
       }
     }
@@ -1661,26 +1399,19 @@ class GoMateMapboxLayerController {
       return;
     }
 
-    final nextMode =
-    _markerModeForZoom(zoom);
+    final nextMode = _markerModeForZoom(zoom);
 
-    final nextNearBucket =
-    nextMode ==
-        _ExploreMarkerMode.near
+    final nextNearBucket = nextMode == _ExploreMarkerMode.near
         ? _nearZoomBucket(zoom)
         : null;
 
-    final modeChanged =
-        nextMode != previousMode;
+    final modeChanged = nextMode != previousMode;
 
     final nearSizeChanged =
-        nextMode ==
-            _ExploreMarkerMode.near &&
-            nextNearBucket !=
-                previousNearBucket;
+        nextMode == _ExploreMarkerMode.near &&
+        nextNearBucket != previousNearBucket;
 
-    if (!modeChanged &&
-        !nearSizeChanged) {
+    if (!modeChanged && !nearSizeChanged) {
       return;
     }
 
@@ -1695,22 +1426,16 @@ class GoMateMapboxLayerController {
   ///
   /// Chưa gắn business rule "chỉ lịch trình nhóm mới hiện".
   Future<void> showPreviewMembers(
-      List<GoMateMapMember> members, {
-        required String currentUserId,
-      }) async {
-    _previewMembers =
-    List<GoMateMapMember>.unmodifiable(
-      members,
-    );
+    List<GoMateMapMember> members, {
+    required String currentUserId,
+  }) async {
+    _previewMembers = List<GoMateMapMember>.unmodifiable(members);
 
-    _previewCurrentUserId =
-        currentUserId;
+    _previewCurrentUserId = currentUserId;
 
     _previewMembersEnabled = true;
 
-    await _renderPreviewMembers(
-      force: true,
-    );
+    await _renderPreviewMembers(force: true);
   }
 
   Future<void> hidePreviewMembers() async {
@@ -1721,35 +1446,25 @@ class GoMateMapboxLayerController {
     await _memberManager?.deleteAll();
   }
 
-  Future<void> _renderPreviewMembers({
-    bool force = false,
-  }) async {
+  Future<void> _renderPreviewMembers({bool force = false}) async {
     if (!_previewMembersEnabled) return;
 
     final manager = _memberManager;
 
     if (manager == null) return;
 
-    final mode =
-    _memberModeForZoom(_currentZoom);
+    final mode = _memberModeForZoom(_currentZoom);
 
-    final nextBucket =
-    mode == _MemberMarkerMode.card
-        ? _memberZoomBucket(
-      _currentZoom,
-    )
+    final nextBucket = mode == _MemberMarkerMode.card
+        ? _memberZoomBucket(_currentZoom)
         : null;
 
-    final sameMode =
-        mode == _memberMarkerMode;
+    final sameMode = mode == _memberMarkerMode;
 
     final sameBucket =
-        mode != _MemberMarkerMode.card ||
-            nextBucket == _memberMarkerBucket;
+        mode != _MemberMarkerMode.card || nextBucket == _memberMarkerBucket;
 
-    if (!force &&
-        sameMode &&
-        sameBucket) {
+    if (!force && sameMode && sameBucket) {
       return;
     }
 
@@ -1758,51 +1473,33 @@ class GoMateMapboxLayerController {
 
     await manager.deleteAll();
 
-    final options =
-    <PointAnnotationOptions>[];
+    final options = <PointAnnotationOptions>[];
 
     for (final member in _previewMembers) {
       // Chính mình dùng Mapbox location puck khi GPS/avatar puck đang bật.
       // Tránh render trùng một avatar ở cùng người dùng.
-      if (_locationAvatarEnabled &&
-          _isPreviewCurrentUser(member)) {
+      if (_locationAvatarEnabled && _isPreviewCurrentUser(member)) {
         continue;
       }
 
-      final compact =
-          mode == _MemberMarkerMode.far;
+      final compact = mode == _MemberMarkerMode.far;
 
-      final image =
-      await _memberMarkerImage(
-        member,
-        compact: compact,
-      );
+      final image = await _memberMarkerImage(member, compact: compact);
 
       final baseSize = compact
           ? _memberFarIconSize
-          : _memberCardIconSizeForZoom(
-        _currentZoom,
-      );
+          : _memberCardIconSizeForZoom(_currentZoom);
 
-      final iconSize = member.isStale
-          ? baseSize * 0.90
-          : baseSize;
+      final iconSize = member.isStale ? baseSize * 0.90 : baseSize;
 
       options.add(
         PointAnnotationOptions(
-          geometry: Point(
-            coordinates: member.position,
-          ),
+          geometry: Point(coordinates: member.position),
           image: image,
           iconAnchor: IconAnchor.CENTER,
           iconSize: iconSize,
-          symbolSortKey:
-          _isPreviewCurrentUser(member)
-              ? 520
-              : 500,
-          customData: <String, Object>{
-            'userId': member.userId,
-          },
+          symbolSortKey: _isPreviewCurrentUser(member) ? 520 : 500,
+          customData: <String, Object>{'userId': member.userId},
         ),
       );
     }
@@ -1813,77 +1510,56 @@ class GoMateMapboxLayerController {
   }
 
   Future<Uint8List> _memberMarkerImage(
-      GoMateMapMember member, {
-        required bool compact,
-      }) async {
-    final subtitle =
-    compact ? '' : _memberSubtitle(member);
+    GoMateMapMember member, {
+    required bool compact,
+  }) async {
+    final subtitle = compact ? '' : _memberSubtitle(member);
 
     final cacheKey = <String>[
       member.assetIcon,
       member.displayName,
       subtitle,
       compact ? 'compact' : 'card',
-      _isPreviewCurrentUser(member)
-          ? 'self'
-          : 'other',
-      member.isStale
-          ? 'stale'
-          : 'fresh',
+      _isPreviewCurrentUser(member) ? 'self' : 'other',
+      member.isStale ? 'stale' : 'fresh',
     ].join('|');
 
-    final cached =
-    _memberMarkerCache[cacheKey];
+    final cached = _memberMarkerCache[cacheKey];
 
     if (cached != null) {
       return cached;
     }
 
-    final avatar =
-    await _memberAvatarImage(
-      member.assetIcon,
-    );
+    final avatar = await _memberAvatarImage(member.assetIcon);
 
-    final image =
-    await _buildMemberMarker(
+    final image = await _buildMemberMarker(
       member: member,
       avatar: avatar,
       subtitle: subtitle,
       compact: compact,
-      isCurrentUser:
-      _isPreviewCurrentUser(member),
+      isCurrentUser: _isPreviewCurrentUser(member),
     );
 
-    _memberMarkerCache[cacheKey] =
-        image;
+    _memberMarkerCache[cacheKey] = image;
 
     return image;
   }
 
-  Future<ui.Image?> _memberAvatarImage(
-      String path,
-      ) async {
-    final cached =
-    _memberAvatarImages[path];
+  Future<ui.Image?> _memberAvatarImage(String path) async {
+    final cached = _memberAvatarImages[path];
 
     if (cached != null) {
       return cached;
     }
 
     try {
-      final bytes =
-      await rootBundle.load(path);
+      final bytes = await rootBundle.load(path);
 
-      final codec =
-      await ui.instantiateImageCodec(
-        bytes.buffer.asUint8List(),
-      );
+      final codec = await ui.instantiateImageCodec(bytes.buffer.asUint8List());
 
-      final frame =
-      await codec.getNextFrame();
+      final frame = await codec.getNextFrame();
 
-      _memberAvatarImages[path] =
-          frame.image;
+      _memberAvatarImages[path] = frame.image;
 
       return frame.image;
     } catch (_) {
@@ -1922,29 +1598,21 @@ class GoMateMapboxLayerController {
   }) async {
     const size = 76.0;
 
-    const center =
-    ui.Offset(size / 2, size / 2);
+    const center = ui.Offset(size / 2, size / 2);
 
     const radius = 30.0;
 
-    final recorder =
-    ui.PictureRecorder();
+    final recorder = ui.PictureRecorder();
 
-    final canvas =
-    ui.Canvas(recorder);
+    final canvas = ui.Canvas(recorder);
 
     // Zoom xa: chỉ avatar, không có card trắng.
     canvas.drawCircle(
       center.translate(0, 2),
       radius + 2,
       ui.Paint()
-        ..color =
-        const ui.Color(0x26000000)
-        ..maskFilter =
-        const ui.MaskFilter.blur(
-          ui.BlurStyle.normal,
-          3,
-        ),
+        ..color = const ui.Color(0x26000000)
+        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 3),
     );
 
     canvas.drawCircle(
@@ -1964,15 +1632,10 @@ class GoMateMapboxLayerController {
       fallbackColor: isCurrentUser
           ? const ui.Color(0xFFDCE8FA)
           : const ui.Color(0xFFE7ECF3),
-      opacity:
-      isStale ? 0.65 : 1,
+      opacity: isStale ? 0.65 : 1,
     );
 
-    return _pictureToPng(
-      recorder,
-      width: size,
-      height: size,
-    );
+    return _pictureToPng(recorder, width: size, height: size);
   }
 
   Future<Uint8List> _buildMemberCardMarker({
@@ -1985,73 +1648,45 @@ class GoMateMapboxLayerController {
     const width = 136.0;
 
     // Self không có dòng phụ nên card thấp hơn.
-    final height =
-    isCurrentUser ? 124.0 : 148.0;
+    final height = isCurrentUser ? 124.0 : 148.0;
 
-    const avatarCenter =
-    ui.Offset(width / 2, 35);
+    const avatarCenter = ui.Offset(width / 2, 35);
 
     const avatarRadius = 30.0;
 
-    final recorder =
-    ui.PictureRecorder();
+    final recorder = ui.PictureRecorder();
 
-    final canvas =
-    ui.Canvas(recorder);
+    final canvas = ui.Canvas(recorder);
 
     // Card bắt đầu thấp hơn avatar để đúng kiểu Zenly:
     // avatar nằm trên, khung trắng nằm phía dưới.
     final cardTop = 57.0;
 
-    final cardHeight =
-    isCurrentUser ? 56.0 : 78.0;
+    final cardHeight = isCurrentUser ? 56.0 : 78.0;
 
-    final cardRect =
-    ui.RRect.fromRectAndRadius(
-      ui.Rect.fromLTWH(
-        7,
-        cardTop,
-        width - 14,
-        cardHeight,
-      ),
+    final cardRect = ui.RRect.fromRectAndRadius(
+      ui.Rect.fromLTWH(7, cardTop, width - 14, cardHeight),
       const ui.Radius.circular(18),
     );
 
     // Card shadow.
     canvas.drawRRect(
-      cardRect.shift(
-        const ui.Offset(0, 3),
-      ),
+      cardRect.shift(const ui.Offset(0, 3)),
       ui.Paint()
-        ..color =
-        const ui.Color(0x24000000)
-        ..maskFilter =
-        const ui.MaskFilter.blur(
-          ui.BlurStyle.normal,
-          4,
-        ),
+        ..color = const ui.Color(0x24000000)
+        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 4),
     );
 
     // White card.
-    canvas.drawRRect(
-      cardRect,
-      ui.Paint()
-        ..color =
-        const ui.Color(0xFFFFFFFF),
-    );
+    canvas.drawRRect(cardRect, ui.Paint()..color = const ui.Color(0xFFFFFFFF));
 
     // Avatar shadow.
     canvas.drawCircle(
       avatarCenter.translate(0, 2),
       avatarRadius + 3,
       ui.Paint()
-        ..color =
-        const ui.Color(0x22000000)
-        ..maskFilter =
-        const ui.MaskFilter.blur(
-          ui.BlurStyle.normal,
-          3,
-        ),
+        ..color = const ui.Color(0x22000000)
+        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 3),
     );
 
     // Marker của mình có ring xanh GoMate.
@@ -2073,12 +1708,10 @@ class GoMateMapboxLayerController {
       fallbackColor: isCurrentUser
           ? const ui.Color(0xFFDCE8FA)
           : const ui.Color(0xFFE7ECF3),
-      opacity:
-      isStale ? 0.65 : 1,
+      opacity: isStale ? 0.65 : 1,
     );
 
-    final namePainter =
-    TextPainter(
+    final namePainter = TextPainter(
       text: TextSpan(
         text: member.displayName,
         style: const TextStyle(
@@ -2091,29 +1724,20 @@ class GoMateMapboxLayerController {
       maxLines: 1,
       ellipsis: '…',
       textAlign: TextAlign.center,
-      textDirection:
-      TextDirection.ltr,
-    )..layout(
-      maxWidth: width - 22,
-    );
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: width - 22);
 
-    final nameY =
-    isCurrentUser ? 79.0 : 77.0;
+    final nameY = isCurrentUser ? 79.0 : 77.0;
 
     namePainter.paint(
       canvas,
-      ui.Offset(
-        (width - namePainter.width) / 2,
-        nameY,
-      ),
+      ui.Offset((width - namePainter.width) / 2, nameY),
     );
 
     // Người khác: hiện khoảng cách màu xanh GoMate.
     // Chính mình: không có dòng phụ.
-    if (!isCurrentUser &&
-        subtitle.trim().isNotEmpty) {
-      final subtitlePainter =
-      TextPainter(
+    if (!isCurrentUser && subtitle.trim().isNotEmpty) {
+      final subtitlePainter = TextPainter(
         text: TextSpan(
           text: subtitle,
           style: const TextStyle(
@@ -2125,100 +1749,61 @@ class GoMateMapboxLayerController {
         ),
         maxLines: 1,
         textAlign: TextAlign.center,
-        textDirection:
-        TextDirection.ltr,
-      )..layout(
-        maxWidth: width - 22,
-      );
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: width - 22);
 
       subtitlePainter.paint(
         canvas,
-        ui.Offset(
-          (width - subtitlePainter.width) / 2,
-          105,
-        ),
+        ui.Offset((width - subtitlePainter.width) / 2, 105),
       );
     }
 
-    return _pictureToPng(
-      recorder,
-      width: width,
-      height: height,
-    );
+    return _pictureToPng(recorder, width: width, height: height);
   }
 
   void _drawAvatarCircle(
-      ui.Canvas canvas, {
-        required ui.Image? avatar,
-        required ui.Offset center,
-        required double radius,
-        required ui.Color fallbackColor,
-        required double opacity,
-      }) {
-    final rect =
-    ui.Rect.fromCircle(
-      center: center,
-      radius: radius,
-    );
+    ui.Canvas canvas, {
+    required ui.Image? avatar,
+    required ui.Offset center,
+    required double radius,
+    required ui.Color fallbackColor,
+    required double opacity,
+  }) {
+    final rect = ui.Rect.fromCircle(center: center, radius: radius);
 
     canvas.save();
 
-    canvas.clipPath(
-      ui.Path()
-        ..addOval(rect),
-    );
+    canvas.clipPath(ui.Path()..addOval(rect));
 
     if (avatar != null) {
-      final src =
-      _coverSourceRect(
-        avatar,
-      );
+      final src = _coverSourceRect(avatar);
 
       canvas.drawImageRect(
         avatar,
         src,
         rect,
-        ui.Paint()
-          ..color = ui.Color.fromRGBO(
-            255,
-            255,
-            255,
-            opacity,
-          ),
+        ui.Paint()..color = ui.Color.fromRGBO(255, 255, 255, opacity),
       );
     } else {
-      canvas.drawCircle(
-        center,
-        radius,
-        ui.Paint()
-          ..color = fallbackColor,
-      );
+      canvas.drawCircle(center, radius, ui.Paint()..color = fallbackColor);
 
-      final iconPainter =
-      TextPainter(
+      final iconPainter = TextPainter(
         text: TextSpan(
-          text: String.fromCharCode(
-            Icons.person.codePoint,
-          ),
+          text: String.fromCharCode(Icons.person.codePoint),
           style: TextStyle(
-            fontFamily:
-            Icons.person.fontFamily,
-            fontSize:
-            radius * 1.15,
+            fontFamily: Icons.person.fontFamily,
+            fontSize: radius * 1.15,
             color: Colors.white,
           ),
         ),
-        textDirection:
-        TextDirection.ltr,
+        textDirection: TextDirection.ltr,
       )..layout();
 
       iconPainter.paint(
         canvas,
         ui.Offset(
-          center.dx -
-              (iconPainter.width / 2),
-          center.dy -
-              (iconPainter.height / 2),
+          center.dx - (iconPainter.width / 2),
+          center.dy - (iconPainter.height / 2),
         ),
       );
     }
@@ -2226,17 +1811,12 @@ class GoMateMapboxLayerController {
     canvas.restore();
   }
 
-  ui.Rect _coverSourceRect(
-      ui.Image image,
-      ) {
-    final width =
-    image.width.toDouble();
+  ui.Rect _coverSourceRect(ui.Image image) {
+    final width = image.width.toDouble();
 
-    final height =
-    image.height.toDouble();
+    final height = image.height.toDouble();
 
-    final side =
-    math.min(width, height);
+    final side = math.min(width, height);
 
     return ui.Rect.fromLTWH(
       (width - side) / 2,
@@ -2247,38 +1827,24 @@ class GoMateMapboxLayerController {
   }
 
   Future<Uint8List> _pictureToPng(
-      ui.PictureRecorder recorder, {
-        required double width,
-        required double height,
-      }) async {
-    final picture =
-    recorder.endRecording();
+    ui.PictureRecorder recorder, {
+    required double width,
+    required double height,
+  }) async {
+    final picture = recorder.endRecording();
 
-    final image =
-    await picture.toImage(
-      width.round(),
-      height.round(),
-    );
+    final image = await picture.toImage(width.round(), height.round());
 
-    final data =
-    await image.toByteData(
-      format:
-      ui.ImageByteFormat.png,
-    );
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
 
     if (data == null) {
-      throw StateError(
-        'Không tạo được member marker image',
-      );
+      throw StateError('Không tạo được member marker image');
     }
 
-    return data.buffer
-        .asUint8List();
+    return data.buffer.asUint8List();
   }
 
-  Future<void> renderSelected(
-      GoMateMapPlace? place,
-      ) async {
+  Future<void> renderSelected(GoMateMapPlace? place) async {
     _selectedPlace = place;
     await _renderSelectedMarker();
   }
@@ -2295,11 +1861,9 @@ class GoMateMapboxLayerController {
       return;
     }
 
-    final visual =
-    _visualTypeForPlace(place);
+    final visual = _visualTypeForPlace(place);
 
-    final image =
-    _selectedMarkerImages[visual];
+    final image = _selectedMarkerImages[visual];
 
     if (image == null) {
       return;
@@ -2307,16 +1871,12 @@ class GoMateMapboxLayerController {
 
     await manager.create(
       PointAnnotationOptions(
-        geometry:
-        Point(coordinates: place.position),
+        geometry: Point(coordinates: place.position),
         image: image,
         iconAnchor: IconAnchor.CENTER,
-        iconSize:
-        _selectedIconSizeForZoom(_currentZoom),
+        iconSize: _selectedIconSizeForZoom(_currentZoom),
         symbolSortKey: 100,
-        customData: {
-          'placeId': place.placeId,
-        },
+        customData: {'placeId': place.placeId},
       ),
     );
   }
@@ -2325,6 +1885,19 @@ class GoMateMapboxLayerController {
     await _routeShadowManager?.deleteAll();
     await _routeManager?.deleteAll();
     await _originManager?.deleteAll();
+    await _clearRouteStyleLine();
+  }
+
+  Future<void> renderTripRouteLine({
+    required GoMateMapRoute route,
+    bool fitCamera = false,
+  }) async {
+    await clearRouteLayers();
+    await _drawRouteLine(route);
+
+    if (fitCamera) {
+      await fitRoute(route.geometry, bottomPadding: 260, pitch: 18);
+    }
   }
 
   Future<void> clearTripLayers() async {
@@ -2366,11 +1939,9 @@ class GoMateMapboxLayerController {
       ),
     );
 
-    final destinationVisual =
-    _visualTypeForPlace(destination);
+    final destinationVisual = _visualTypeForPlace(destination);
 
-    final destinationImage =
-    _selectedMarkerImages[destinationVisual];
+    final destinationImage = _selectedMarkerImages[destinationVisual];
 
     if (destinationImage != null) {
       await _selectedManager?.create(
@@ -2378,21 +1949,14 @@ class GoMateMapboxLayerController {
           geometry: Point(coordinates: destination.position),
           image: destinationImage,
           iconAnchor: IconAnchor.CENTER,
-          iconSize:
-          _selectedIconSizeForZoom(_currentZoom),
+          iconSize: _selectedIconSizeForZoom(_currentZoom),
           symbolSortKey: 200,
-          customData: {
-            'placeId': destination.placeId,
-          },
+          customData: {'placeId': destination.placeId},
         ),
       );
     }
 
-    await fitRoute(
-      route.geometry,
-      bottomPadding: 265,
-      pitch: 18,
-    );
+    await fitRoute(route.geometry, bottomPadding: 265, pitch: 18);
   }
 
   Future<void> renderTrip({
@@ -2414,20 +1978,16 @@ class GoMateMapboxLayerController {
 
     for (var i = 0; i < stops.length; i++) {
       final number = i + 1;
-      final isDestination =
-          i == stops.length - 1;
+      final isDestination = i == stops.length - 1;
 
-      final image =
-      await _tripStopMarkerImage(
+      final image = await _tripStopMarkerImage(
         number,
         isDestination: isDestination,
       );
 
       stopOptions.add(
         PointAnnotationOptions(
-          geometry: Point(
-            coordinates: stops[i].position,
-          ),
+          geometry: Point(coordinates: stops[i].position),
           image: image,
 
           // Marker tròn nằm đúng tâm tọa độ,
@@ -2435,17 +1995,11 @@ class GoMateMapboxLayerController {
           iconAnchor: IconAnchor.CENTER,
 
           // Điểm đến lớn hơn nhẹ để nhận biết ngay.
-          iconSize:
-          isDestination ? 0.82 : 0.74,
+          iconSize: isDestination ? 0.82 : 0.74,
 
-          symbolSortKey:
-          isDestination
-              ? 280
-              : 220 + i.toDouble(),
+          symbolSortKey: isDestination ? 280 : 220 + i.toDouble(),
 
-          customData: {
-            'placeId': stops[i].placeId,
-          },
+          customData: {'placeId': stops[i].placeId},
         ),
       );
     }
@@ -2478,9 +2032,7 @@ class GoMateMapboxLayerController {
     if (stops.isNotEmpty) {
       await _checkinRadiusManager?.create(
         CircleAnnotationOptions(
-          geometry: Point(
-            coordinates: stops.first.position,
-          ),
+          geometry: Point(coordinates: stops.first.position),
 
           // Giữ nguyên semantics vùng check-in,
           // chỉ đổi visual sang GoMate.
@@ -2493,24 +2045,21 @@ class GoMateMapboxLayerController {
       );
     }
 
-    await fitRoute(
-      route.geometry,
-      bottomPadding: 260,
-      pitch: 18,
-    );
+    await fitRoute(route.geometry, bottomPadding: 260, pitch: 18);
   }
 
-  Future<void> _drawRouteLine(
-      GoMateMapRoute route,
-      ) async {
+  Future<void> _drawRouteLine(GoMateMapRoute route) async {
     if (route.geometry.length < 2) {
       return;
     }
 
-    final line = LineString(
-      coordinates: route.geometry,
-    );
+    await _drawRouteStyleLine(route.geometry);
 
+    final line = LineString(coordinates: route.geometry);
+
+    // Annotation fallback for older devices/SDK paths. The visible route is
+    // owned by the style LineLayer above; annotations are kept as a secondary
+    // renderer and are safe to clear with the same route lifecycle.
     // Outer route:
     // xanh rất nhạt + viền trắng để tuyến đường tách rõ khỏi map
     // nhưng không tạo cảm giác quá nặng như route navigation.
@@ -2543,11 +2092,102 @@ class GoMateMapboxLayerController {
     );
   }
 
+  Future<void> _drawRouteStyleLine(List<Position> coordinates) async {
+    final map = _map;
+    if (map == null || coordinates.length < 2) {
+      return;
+    }
+
+    try {
+      await _ensureRouteStyleLine();
+      final source = await map.style.getSource(_routeSourceId);
+      if (source is GeoJsonSource) {
+        await source.updateGeoJSON(
+          jsonEncode(LineString(coordinates: coordinates)),
+        );
+      }
+    } catch (error) {
+      debugPrint('[GoMate Maps] Route style line draw failed: $error');
+    }
+  }
+
+  Future<void> _clearRouteStyleLine() async {
+    final map = _map;
+    if (map == null) {
+      return;
+    }
+
+    try {
+      if (!await map.style.styleSourceExists(_routeSourceId)) {
+        return;
+      }
+
+      final source = await map.style.getSource(_routeSourceId);
+      if (source is GeoJsonSource) {
+        await source.updateGeoJSON(_emptyRouteGeoJson);
+      }
+    } catch (error) {
+      debugPrint('[GoMate Maps] Route style line clear failed: $error');
+    }
+  }
+
+  Future<void> _ensureRouteStyleLine() async {
+    final map = _map;
+    if (map == null) {
+      return;
+    }
+
+    if (!await map.style.styleSourceExists(_routeSourceId)) {
+      await map.style.addSource(
+        GeoJsonSource(id: _routeSourceId, data: _emptyRouteGeoJson),
+      );
+    }
+
+    if (!await map.style.styleLayerExists(_routeShadowLayerId)) {
+      await map.style.addLayer(
+        LineLayer(
+          id: _routeShadowLayerId,
+          sourceId: _routeSourceId,
+          lineJoin: LineJoin.ROUND,
+          lineCap: LineCap.ROUND,
+          lineColor: 0xFFDCEBFF,
+          lineWidth: 16,
+          lineOpacity: .98,
+          lineBorderColor: 0xFFFFFFFF,
+          lineBorderWidth: 2.2,
+        ),
+      );
+    }
+
+    if (!await map.style.styleLayerExists(_routeLayerId)) {
+      await map.style.addLayer(
+        LineLayer(
+          id: _routeLayerId,
+          sourceId: _routeSourceId,
+          lineJoin: LineJoin.ROUND,
+          lineCap: LineCap.ROUND,
+          lineColor: 0xFF0C6ECF,
+          lineWidth: 8,
+          lineOpacity: 1,
+          lineBorderColor: 0x660A43A8,
+          lineBorderWidth: 1,
+        ),
+      );
+    }
+  }
+
+  String get _emptyRouteGeoJson {
+    return jsonEncode(const <String, Object>{
+      'type': 'FeatureCollection',
+      'features': <Object>[],
+    });
+  }
+
   Future<void> fitRoute(
-      List<Position> coordinates, {
-        double bottomPadding = 250,
-        double pitch = 18,
-      }) async {
+    List<Position> coordinates, {
+    double bottomPadding = 250,
+    double pitch = 18,
+  }) async {
     final map = _map;
 
     if (map == null || coordinates.isEmpty) {
@@ -2556,26 +2196,15 @@ class GoMateMapboxLayerController {
 
     try {
       final camera = await map.cameraForCoordinates(
-        coordinates
-            .map((p) => Point(coordinates: p))
-            .toList(),
-        MbxEdgeInsets(
-          top: 120,
-          left: 48,
-          bottom: bottomPadding,
-          right: 48,
-        ),
+        coordinates.map((p) => Point(coordinates: p)).toList(),
+        MbxEdgeInsets(top: 120, left: 48, bottom: bottomPadding, right: 48),
         0,
         pitch,
       );
 
-      await map.easeTo(
-        camera,
-        MapAnimationOptions(duration: 750),
-      );
+      await map.easeTo(camera, MapAnimationOptions(duration: 750));
     } catch (_) {
-      final middle =
-      coordinates[coordinates.length ~/ 2];
+      final middle = coordinates[coordinates.length ~/ 2];
 
       await map.easeTo(
         CameraOptions(
@@ -2589,34 +2218,22 @@ class GoMateMapboxLayerController {
     }
   }
 
-  Future<void> focusPlace(
-      GoMateMapPlace place,
-      ) async {
+  Future<void> focusPlace(GoMateMapPlace place) async {
     final map = _map;
     if (map == null) return;
 
     await map.easeTo(
       CameraOptions(
-        center: Point(
-          coordinates: place.position,
-        ),
+        center: Point(coordinates: place.position),
         zoom: 15.3,
         pitch: 15,
-        padding: MbxEdgeInsets(
-          top: 80,
-          left: 20,
-          bottom: 245,
-          right: 20,
-        ),
+        padding: MbxEdgeInsets(top: 80, left: 20, bottom: 245, right: 20),
       ),
       MapAnimationOptions(duration: 650),
     );
   }
 
-  Future<void> focusCoordinate(
-      Position position, {
-        double zoom = 16,
-      }) async {
+  Future<void> focusCoordinate(Position position, {double zoom = 16}) async {
     final map = _map;
     if (map == null) return;
 
@@ -2630,9 +2247,7 @@ class GoMateMapboxLayerController {
     );
   }
 
-  Future<void> showExplorePlaces(
-      List<GoMateMapPlace> places,
-      ) async {
+  Future<void> showExplorePlaces(List<GoMateMapPlace> places) async {
     await clearTripLayers();
     await _selectedManager?.deleteAll();
 
@@ -2643,9 +2258,7 @@ class GoMateMapboxLayerController {
     if (_previewMembers.isNotEmpty) {
       _previewMembersEnabled = true;
 
-      await _renderPreviewMembers(
-        force: true,
-      );
+      await _renderPreviewMembers(force: true);
     }
   }
 
@@ -2657,53 +2270,35 @@ class GoMateMapboxLayerController {
     _tripTapSubscription?.cancel();
   }
 
-  Future<Uint8List> _load(
-      String path,
-      ) async {
+  Future<Uint8List> _load(String path) async {
     final bytes = await rootBundle.load(path);
     return bytes.buffer.asUint8List();
   }
 
   Future<Uint8List> _buildPlaceMarker(
-      _PlaceVisualType visual, {
-        required bool selected,
-      }) async {
+    _PlaceVisualType visual, {
+    required bool selected,
+  }) async {
     // Raster tương đối lớn để icon nét trên màn hình DPI cao.
-    final canvasSize =
-    selected ? 92.0 : 80.0;
+    final canvasSize = selected ? 92.0 : 80.0;
 
-    final center = ui.Offset(
-      canvasSize / 2,
-      canvasSize / 2,
-    );
+    final center = ui.Offset(canvasSize / 2, canvasSize / 2);
 
-    final recorder =
-    ui.PictureRecorder();
+    final recorder = ui.PictureRecorder();
 
-    final canvas =
-    ui.Canvas(recorder);
+    final canvas = ui.Canvas(recorder);
 
-    final markerColor =
-    ui.Color(_visualColor(visual));
+    final markerColor = ui.Color(_visualColor(visual));
 
-    final outerRadius =
-    selected ? 37.0 : 33.0;
+    final outerRadius = selected ? 37.0 : 33.0;
 
     // Shadow mềm.
     canvas.drawCircle(
-      center.translate(
-        0,
-        selected ? 2.8 : 2.4,
-      ),
+      center.translate(0, selected ? 2.8 : 2.4),
       outerRadius,
       ui.Paint()
-        ..color =
-        const ui.Color(0x26000000)
-        ..maskFilter =
-        const ui.MaskFilter.blur(
-          ui.BlurStyle.normal,
-          4,
-        ),
+        ..color = const ui.Color(0x26000000)
+        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 4),
     );
 
     if (selected) {
@@ -2711,161 +2306,108 @@ class GoMateMapboxLayerController {
       canvas.drawCircle(
         center,
         36.0,
-        ui.Paint()
-          ..color =
-          const ui.Color(0xFF0A43A8),
+        ui.Paint()..color = const ui.Color(0xFF0A43A8),
       );
 
       // White separator.
       canvas.drawCircle(
         center,
         32.0,
-        ui.Paint()
-          ..color =
-          const ui.Color(0xFFFFFFFF),
+        ui.Paint()..color = const ui.Color(0xFFFFFFFF),
       );
 
-      canvas.drawCircle(
-        center,
-        28.5,
-        ui.Paint()
-          ..color = markerColor,
-      );
+      canvas.drawCircle(center, 28.5, ui.Paint()..color = markerColor);
     } else {
       // Marker thường có viền trắng rõ.
       canvas.drawCircle(
         center,
         33.0,
-        ui.Paint()
-          ..color =
-          const ui.Color(0xFFFFFFFF),
+        ui.Paint()..color = const ui.Color(0xFFFFFFFF),
       );
 
-      canvas.drawCircle(
-        center,
-        29.0,
-        ui.Paint()
-          ..color = markerColor,
-      );
+      canvas.drawCircle(center, 29.0, ui.Paint()..color = markerColor);
     }
 
-    final icon =
-    _visualIcon(visual);
+    final icon = _visualIcon(visual);
 
-    final iconPainter =
-    TextPainter(
+    final iconPainter = TextPainter(
       text: TextSpan(
-        text: String.fromCharCode(
-          icon.codePoint,
-        ),
+        text: String.fromCharCode(icon.codePoint),
         style: TextStyle(
           fontFamily: icon.fontFamily,
-          fontSize:
-          selected ? 34.0 : 32.0,
+          fontSize: selected ? 34.0 : 32.0,
           color: Colors.white,
         ),
       ),
-      textDirection:
-      TextDirection.ltr,
+      textDirection: TextDirection.ltr,
     )..layout();
 
     iconPainter.paint(
       canvas,
       ui.Offset(
-        center.dx -
-            (iconPainter.width / 2),
-        center.dy -
-            (iconPainter.height / 2),
+        center.dx - (iconPainter.width / 2),
+        center.dy - (iconPainter.height / 2),
       ),
     );
 
-    final picture =
-    recorder.endRecording();
+    final picture = recorder.endRecording();
 
-    final image =
-    await picture.toImage(
-      canvasSize.round(),
-      canvasSize.round(),
-    );
+    final image = await picture.toImage(canvasSize.round(), canvasSize.round());
 
-    final data =
-    await image.toByteData(
-      format:
-      ui.ImageByteFormat.png,
-    );
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
 
     if (data == null) {
-      throw StateError(
-        'Không tạo được marker image cho $visual',
-      );
+      throw StateError('Không tạo được marker image cho $visual');
     }
 
-    return data.buffer
-        .asUint8List();
+    return data.buffer.asUint8List();
   }
 
   Future<Uint8List> _tripStopMarkerImage(
-      int number, {
-        required bool isDestination,
-      }) async {
-    final safeNumber =
-    number.clamp(1, 999).toInt();
+    int number, {
+    required bool isDestination,
+  }) async {
+    final safeNumber = number.clamp(1, 999).toInt();
 
-    final cacheKey =
-        '$safeNumber:${isDestination ? 'destination' : 'normal'}';
+    final cacheKey = '$safeNumber:${isDestination ? 'destination' : 'normal'}';
 
-    final cached =
-    _tripStopMarkerCache[cacheKey];
+    final cached = _tripStopMarkerCache[cacheKey];
 
     if (cached != null) {
       return cached;
     }
 
-    final marker =
-    await _buildTripStopMarker(
+    final marker = await _buildTripStopMarker(
       safeNumber,
       isDestination: isDestination,
     );
 
-    _tripStopMarkerCache[cacheKey] =
-        marker;
+    _tripStopMarkerCache[cacheKey] = marker;
 
     return marker;
   }
 
   Future<Uint8List> _buildTripStopMarker(
-      int number, {
-        required bool isDestination,
-      }) async {
-    final canvasSize =
-    isDestination ? 92.0 : 82.0;
+    int number, {
+    required bool isDestination,
+  }) async {
+    final canvasSize = isDestination ? 92.0 : 82.0;
 
-    final center = ui.Offset(
-      canvasSize / 2,
-      canvasSize / 2,
-    );
+    final center = ui.Offset(canvasSize / 2, canvasSize / 2);
 
-    final recorder =
-    ui.PictureRecorder();
+    final recorder = ui.PictureRecorder();
 
-    final canvas =
-    ui.Canvas(recorder);
+    final canvas = ui.Canvas(recorder);
 
-    final shadowRadius =
-    isDestination ? 36.0 : 32.0;
+    final shadowRadius = isDestination ? 36.0 : 32.0;
 
     // Shadow mềm.
     canvas.drawCircle(
       center.translate(0, 2.5),
       shadowRadius,
       ui.Paint()
-        ..color =
-        const ui.Color(0x26000000)
-        ..maskFilter =
-        const ui.MaskFilter.blur(
-          ui.BlurStyle.normal,
-          4,
-        ),
+        ..color = const ui.Color(0x26000000)
+        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 4),
     );
 
     if (isDestination) {
@@ -2874,37 +2416,23 @@ class GoMateMapboxLayerController {
       canvas.drawCircle(
         center,
         38,
-        ui.Paint()
-          ..color =
-          const ui.Color(0xFFDCEBFF),
+        ui.Paint()..color = const ui.Color(0xFFDCEBFF),
       );
 
       canvas.drawCircle(
         center,
         34.5,
-        ui.Paint()
-          ..color =
-          const ui.Color(0xFFFFFFFF),
+        ui.Paint()..color = const ui.Color(0xFFFFFFFF),
       );
 
       canvas.drawCircle(
         center,
         30.5,
         ui.Paint()
-          ..shader =
-          ui.Gradient.linear(
-            ui.Offset(
-              center.dx - 22,
-              center.dy - 22,
-            ),
-            ui.Offset(
-              center.dx + 22,
-              center.dy + 22,
-            ),
-            const <ui.Color>[
-              ui.Color(0xFF0A43A8),
-              ui.Color(0xFF0D8AE8),
-            ],
+          ..shader = ui.Gradient.linear(
+            ui.Offset(center.dx - 22, center.dy - 22),
+            ui.Offset(center.dx + 22, center.dy + 22),
+            const <ui.Color>[ui.Color(0xFF0A43A8), ui.Color(0xFF0D8AE8)],
           ),
       );
     } else {
@@ -2912,105 +2440,70 @@ class GoMateMapboxLayerController {
       canvas.drawCircle(
         center,
         33,
-        ui.Paint()
-          ..color =
-          const ui.Color(0xFFFFFFFF),
+        ui.Paint()..color = const ui.Color(0xFFFFFFFF),
       );
 
       canvas.drawCircle(
         center,
         29,
         ui.Paint()
-          ..shader =
-          ui.Gradient.linear(
-            ui.Offset(
-              center.dx - 20,
-              center.dy - 20,
-            ),
-            ui.Offset(
-              center.dx + 20,
-              center.dy + 20,
-            ),
+          ..shader = ui.Gradient.linear(
+            ui.Offset(center.dx - 20, center.dy - 20),
+            ui.Offset(center.dx + 20, center.dy + 20),
             const <ui.Color>[
               ui.Color(0xFF0A43A8),
               ui.Color(0xFF0C6ECF),
               ui.Color(0xFF0D8AE8),
             ],
-            const <double>[
-              0,
-              0.57,
-              1,
-            ],
+            const <double>[0, 0.57, 1],
           ),
       );
     }
 
-    final numberPainter =
-    TextPainter(
+    final numberPainter = TextPainter(
       text: TextSpan(
         text: '$number',
         style: TextStyle(
-          fontSize:
-          isDestination ? 29 : 27,
+          fontSize: isDestination ? 29 : 27,
           height: 1,
-          fontWeight:
-          FontWeight.w800,
+          fontWeight: FontWeight.w800,
           color: Colors.white,
         ),
       ),
       maxLines: 1,
-      textAlign:
-      TextAlign.center,
-      textDirection:
-      TextDirection.ltr,
+      textAlign: TextAlign.center,
+      textDirection: TextDirection.ltr,
     )..layout();
 
     numberPainter.paint(
       canvas,
       ui.Offset(
-        center.dx -
-            (numberPainter.width / 2),
-        center.dy -
-            (numberPainter.height / 2),
+        center.dx - (numberPainter.width / 2),
+        center.dy - (numberPainter.height / 2),
       ),
     );
 
-    final picture =
-    recorder.endRecording();
+    final picture = recorder.endRecording();
 
-    final image =
-    await picture.toImage(
-      canvasSize.round(),
-      canvasSize.round(),
-    );
+    final image = await picture.toImage(canvasSize.round(), canvasSize.round());
 
-    final data =
-    await image.toByteData(
-      format:
-      ui.ImageByteFormat.png,
-    );
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
 
     if (data == null) {
-      throw StateError(
-        'Không tạo được Trip stop marker $number',
-      );
+      throw StateError('Không tạo được Trip stop marker $number');
     }
 
-    return data.buffer
-        .asUint8List();
+    return data.buffer.asUint8List();
   }
 
   Future<void> _loadAssets() async {
-    for (final visual
-    in _PlaceVisualType.values) {
-      _placeMarkerImages[visual] =
-      await _buildPlaceMarker(
+    for (final visual in _PlaceVisualType.values) {
+      _placeMarkerImages[visual] = await _buildPlaceMarker(
         visual,
         selected: false,
       );
 
-      _selectedMarkerImages[visual] =
-      await _buildPlaceMarker(
+      _selectedMarkerImages[visual] = await _buildPlaceMarker(
         visual,
         selected: true,
       );
@@ -3022,8 +2515,7 @@ class GoMateMapboxLayerController {
     ]) {
       _memberImages[path] = await _load(path);
 
-      final avatar =
-      await _memberAvatarImage(path);
+      final avatar = await _memberAvatarImage(path);
 
       if (avatar != null) {
         _memberAvatarImages[path] = avatar;
@@ -3031,10 +2523,8 @@ class GoMateMapboxLayerController {
     }
   }
 }
-enum _MemberMarkerMode {
-  far,
-  card,
-}
+
+enum _MemberMarkerMode { far, card }
 
 enum _PlaceVisualType {
   attraction,
@@ -3059,9 +2549,4 @@ enum _PlaceVisualType {
   entertainment,
 }
 
-enum _ExploreMarkerMode {
-  far,
-  medium,
-  near,
-}
-
+enum _ExploreMarkerMode { far, medium, near }

@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
+import '../../../core/services/auth_service.dart';
 import '../../../core/widgets/gomate_emoji.dart';
 import '../models/moment_models.dart';
 
@@ -26,6 +29,13 @@ abstract class MomentsRepository extends ChangeNotifier {
 
   MomentItem? momentById(String id);
 
+  Future<void> refresh();
+
+  Future<void> createFromImagePath({
+    required String imagePath,
+    String? locationText,
+  });
+
   void markViewed(String momentId);
 
   void muteUser(String userId);
@@ -37,7 +47,391 @@ abstract class MomentsRepository extends ChangeNotifier {
   Future<void> sendMessage({
     required String receiverUserId,
     required String message,
+    String? momentId,
   });
+}
+
+class ApiMomentsRepository extends MomentsRepository {
+  ApiMomentsRepository._() {
+    _activeUserId = _currentUserId();
+    _auth.addListener(_handleAuthChanged);
+    unawaited(refresh());
+  }
+
+  static final ApiMomentsRepository instance = ApiMomentsRepository._();
+
+  final AuthService _auth = AuthService.instance;
+  final Map<GoMateEmojiType, int> _reactionUsage = <GoMateEmojiType, int>{};
+  List<MomentFriendPreview> _stripItems = const [];
+  List<MomentItem> _availableFriendMoments = const [];
+  List<MomentItem> _myMoments = const [];
+  String? lastError;
+  bool loading = false;
+  String? _activeUserId;
+  int _refreshGeneration = 0;
+
+  @override
+  List<MomentFriendPreview> get stripItems => _stripItems;
+
+  @override
+  List<MomentItem> get myMoments => _myMoments;
+
+  @override
+  List<MomentItem> get activeOwnMoments {
+    return myMoments.where(_isWithin24Hours).toList(growable: false);
+  }
+
+  @override
+  int get activeOwnMomentCount => activeOwnMoments.length;
+
+  @override
+  List<MomentItem> get availableFriendMoments => _availableFriendMoments;
+
+  @override
+  int get availableFriendMomentCount => _availableFriendMoments.length;
+
+  @override
+  List<GoMateEmojiType> get frequentReactions {
+    final ranked = _reactionUsage.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final result = ranked.map((entry) => entry.key).take(3).toList();
+    for (final fallback in GoMateEmojiCatalog.defaults) {
+      if (result.length >= 3) break;
+      if (!result.contains(fallback)) result.add(fallback);
+    }
+    return result;
+  }
+
+  @override
+  Future<void> refresh() async {
+    final userId = _currentUserId();
+    if (!_auth.signedIn || userId == null) {
+      _activeUserId = null;
+      _clearData(notify: true);
+      return;
+    }
+    _activeUserId = userId;
+    final generation = ++_refreshGeneration;
+    loading = true;
+    lastError = null;
+    notifyListeners();
+    try {
+      final result = await _auth.request('GET', '/moments/home');
+      if (generation != _refreshGeneration || _currentUserId() != userId) {
+        return;
+      }
+      _stripItems = _parsePreviews(result['stripItems']);
+      _availableFriendMoments = _parseMoments(result['availableFriendMoments']);
+      _myMoments = _parseMoments(result['myMoments']);
+    } catch (error) {
+      if (generation != _refreshGeneration || _currentUserId() != userId) {
+        return;
+      }
+      lastError = error.toString();
+    } finally {
+      if (generation == _refreshGeneration && _currentUserId() == userId) {
+        loading = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  @override
+  Future<void> createFromImagePath({
+    required String imagePath,
+    String? locationText,
+  }) async {
+    final media = await _auth.multipartRequest(
+      '/moments/media',
+      fileField: 'file',
+      filePath: imagePath,
+    );
+    final created = await _auth.request(
+      'POST',
+      '/moments',
+      body: {
+        'mediaUrl': media['mediaUrl'],
+        'publicId': media['publicId'],
+        if (locationText != null && locationText.trim().isNotEmpty)
+          'locationText': locationText.trim(),
+      },
+    );
+    _upsertCreatedMoment(MomentItem.fromJson(created));
+    unawaited(refresh());
+  }
+
+  @override
+  bool hasAvailableMomentForName(String name) {
+    return stripItems.any(
+      (item) => !item.isSelf && item.name == name && item.hasAvailableMoment,
+    );
+  }
+
+  @override
+  List<MomentItem> availableQueue({required String startUserId}) {
+    final activeFriends = stripItems
+        .where((item) => !item.isSelf && item.hasAvailableMoment)
+        .toList();
+    final startIndex = activeFriends.indexWhere(
+      (item) => item.userId == startUserId,
+    );
+    if (startIndex > 0) {
+      final before = activeFriends.take(startIndex).toList();
+      final after = activeFriends.skip(startIndex).toList();
+      activeFriends
+        ..clear()
+        ..addAll(after)
+        ..addAll(before);
+    }
+    return [
+      for (final friend in activeFriends)
+        ...availableFriendMoments.where(
+          (moment) => moment.ownerId == friend.userId,
+        ),
+    ];
+  }
+
+  @override
+  MomentItem? momentById(String id) {
+    for (final moment in [..._availableFriendMoments, ..._myMoments]) {
+      if (moment.id == id) return moment;
+    }
+    return null;
+  }
+
+  @override
+  void markViewed(String momentId) {
+    final index = _availableFriendMoments.indexWhere(
+      (moment) => moment.id == momentId,
+    );
+    if (index < 0 || _availableFriendMoments[index].isViewedByCurrentUser) {
+      return;
+    }
+    final ownerId = _availableFriendMoments[index].ownerId;
+    _availableFriendMoments = [
+      for (final moment in _availableFriendMoments)
+        if (moment.id != momentId) moment,
+    ];
+    if (!_availableFriendMoments.any((moment) => moment.ownerId == ownerId)) {
+      _stripItems = [
+        for (final item in _stripItems)
+          if (item.isSelf || item.userId != ownerId) item,
+      ];
+    }
+    notifyListeners();
+    unawaited(
+      _auth
+          .request('POST', '/moments/$momentId/view')
+          .then((_) => refresh())
+          .catchError((_) {}),
+    );
+  }
+
+  @override
+  void muteUser(String userId) {
+    _stripItems = [
+      for (final item in _stripItems)
+        item.userId == userId
+            ? MomentFriendPreview(
+                userId: item.userId,
+                name: item.name,
+                avatarAsset: item.avatarAsset,
+                isSelf: item.isSelf,
+                isMutualFriend: item.isMutualFriend,
+                isMuted: true,
+                hasAvailableMoment: false,
+                latestMomentAt: null,
+              )
+            : item,
+    ];
+    _availableFriendMoments = _availableFriendMoments
+        .where((moment) => moment.ownerId != userId)
+        .toList(growable: false);
+    notifyListeners();
+    unawaited(
+      _auth
+          .request('POST', '/moment-mutes/$userId')
+          .then((_) => refresh())
+          .catchError((_) {}),
+    );
+  }
+
+  @override
+  void reactToMoment(String momentId, GoMateEmojiType emoji) {
+    _reactionUsage.update(emoji, (value) => value + 1, ifAbsent: () => 1);
+    notifyListeners();
+    unawaited(
+      _auth
+          .request(
+            'POST',
+            '/moments/$momentId/reactions',
+            body: {'type': momentEmojiCode(emoji)},
+          )
+          .then((_) => refresh())
+          .catchError((_) {}),
+    );
+  }
+
+  @override
+  void deleteMoments(Set<String> momentIds) {
+    if (momentIds.isEmpty) return;
+    _myMoments = _myMoments
+        .where((moment) => !momentIds.contains(moment.id))
+        .toList(growable: false);
+    notifyListeners();
+    unawaited(
+      _auth
+          .request(
+            'DELETE',
+            '/moments',
+            body: {'momentIds': momentIds.toList()},
+          )
+          .then((_) => refresh())
+          .catchError((_) {}),
+    );
+  }
+
+  @override
+  Future<void> sendMessage({
+    required String receiverUserId,
+    required String message,
+    String? momentId,
+  }) async {
+    if (momentId != null) {
+      final moment = momentById(momentId);
+      if (moment != null && moment.ownerId == receiverUserId && !moment.isOwn) {
+        await _auth.request(
+          'POST',
+          '/moments/$momentId/message',
+          body: {'text': message},
+        );
+        return;
+      }
+    }
+    final conversation = await _auth.request(
+      'POST',
+      '/conversations/direct',
+      body: {'targetUserId': receiverUserId},
+    );
+    await _auth.request(
+      'POST',
+      '/conversations/${conversation['conversationId']}/messages',
+      body: {
+        'text': message,
+        if (momentId != null)
+          'context': {'type': 'MOMENT', 'momentId': momentId},
+      },
+    );
+  }
+
+  bool _isWithin24Hours(MomentItem moment) {
+    return DateTime.now().difference(moment.createdAt) <
+        const Duration(hours: 24);
+  }
+
+  List<MomentFriendPreview> _parsePreviews(Object? raw) {
+    return [
+      for (final item in (raw as List? ?? const []))
+        if (item is Map)
+          MomentFriendPreview.fromJson(Map<String, dynamic>.from(item)),
+    ];
+  }
+
+  List<MomentItem> _parseMoments(Object? raw) {
+    final values = [
+      for (final item in (raw as List? ?? const []))
+        if (item is Map) MomentItem.fromJson(Map<String, dynamic>.from(item)),
+    ];
+    values.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return values;
+  }
+
+  void _upsertCreatedMoment(MomentItem item) {
+    _myMoments = [
+      item,
+      for (final existing in _myMoments)
+        if (existing.id != item.id) existing,
+    ];
+    _stripItems = _upsertSelfPreview(
+      hasAvailableMoment: activeOwnMomentCount > 0,
+      latestMomentAt: activeOwnMoments.isEmpty
+          ? item.createdAt
+          : activeOwnMoments.first.createdAt,
+    );
+    notifyListeners();
+  }
+
+  List<MomentFriendPreview> _upsertSelfPreview({
+    required bool hasAvailableMoment,
+    required DateTime latestMomentAt,
+  }) {
+    final userId = _currentUserId() ?? _itemOwnerFallback();
+    final user = _auth.user;
+    final name =
+        (user?['displayName'] as String?) ??
+        (user?['fullName'] as String?) ??
+        (user?['nickname'] as String?) ??
+        'Bạn';
+    final avatar = (user?['avatarUrl'] as String?) ?? '';
+    final selfPreview = MomentFriendPreview(
+      userId: userId,
+      name: name,
+      avatarAsset: avatar,
+      isSelf: true,
+      isMutualFriend: true,
+      isMuted: false,
+      hasAvailableMoment: hasAvailableMoment,
+      latestMomentAt: latestMomentAt,
+    );
+
+    var replaced = false;
+    final next = <MomentFriendPreview>[];
+    for (final preview in _stripItems) {
+      if (preview.isSelf) {
+        next.add(selfPreview);
+        replaced = true;
+      } else {
+        next.add(preview);
+      }
+    }
+    if (!replaced) {
+      next.insert(0, selfPreview);
+    }
+    return next;
+  }
+
+  String _itemOwnerFallback() {
+    return _myMoments.isEmpty ? 'me' : _myMoments.first.ownerId;
+  }
+
+  void _handleAuthChanged() {
+    final userId = _currentUserId();
+    if (!_auth.signedIn || userId == null) {
+      _activeUserId = null;
+      _clearData(notify: true);
+      return;
+    }
+    if (userId == _activeUserId) return;
+    _activeUserId = userId;
+    _clearData(notify: true);
+    unawaited(refresh());
+  }
+
+  String? _currentUserId() {
+    final user = _auth.user;
+    final raw = user?['userId'] ?? user?['id'];
+    return raw?.toString();
+  }
+
+  void _clearData({required bool notify}) {
+    _refreshGeneration++;
+    _stripItems = const [];
+    _availableFriendMoments = const [];
+    _myMoments = const [];
+    lastError = null;
+    loading = false;
+    if (notify) notifyListeners();
+  }
 }
 
 class DemoMomentsRepository extends MomentsRepository {
@@ -281,7 +675,8 @@ class DemoMomentsRepository extends MomentsRepository {
   }
 
   bool _isWithin24Hours(MomentItem moment) {
-    return DateTime.now().difference(moment.createdAt) < const Duration(hours: 24);
+    return DateTime.now().difference(moment.createdAt) <
+        const Duration(hours: 24);
   }
 
   List<MomentItem> _availableForUser(String userId) {
@@ -299,23 +694,30 @@ class DemoMomentsRepository extends MomentsRepository {
 
   @override
   List<MomentFriendPreview> get stripItems {
-    final self = _friends.firstWhere((friend) => friend.userId == currentUserId);
+    final self = _friends.firstWhere(
+      (friend) => friend.userId == currentUserId,
+    );
 
     final friendItems = _friends
-        .where((friend) => friend.userId != currentUserId && friend.isMutualFriend)
+        .where(
+          (friend) => friend.userId != currentUserId && friend.isMutualFriend,
+        )
         .map((friend) {
-      final available = _availableForUser(friend.userId);
-      return MomentFriendPreview(
-        userId: friend.userId,
-        name: friend.name,
-        avatarAsset: friend.avatarAsset,
-        isSelf: false,
-        isMutualFriend: true,
-        isMuted: _mutedUserIds.contains(friend.userId),
-        hasAvailableMoment: available.isNotEmpty,
-        latestMomentAt: available.isEmpty ? null : available.first.createdAt,
-      );
-    }).toList();
+          final available = _availableForUser(friend.userId);
+          return MomentFriendPreview(
+            userId: friend.userId,
+            name: friend.name,
+            avatarAsset: friend.avatarAsset,
+            isSelf: false,
+            isMutualFriend: true,
+            isMuted: _mutedUserIds.contains(friend.userId),
+            hasAvailableMoment: available.isNotEmpty,
+            latestMomentAt: available.isEmpty
+                ? null
+                : available.first.createdAt,
+          );
+        })
+        .toList();
 
     friendItems.sort((a, b) {
       if (a.hasAvailableMoment != b.hasAvailableMoment) {
@@ -338,8 +740,9 @@ class DemoMomentsRepository extends MomentsRepository {
         isMutualFriend: true,
         isMuted: false,
         hasAvailableMoment: activeOwnMomentCount > 0,
-        latestMomentAt:
-            activeOwnMoments.isEmpty ? null : activeOwnMoments.first.createdAt,
+        latestMomentAt: activeOwnMoments.isEmpty
+            ? null
+            : activeOwnMoments.first.createdAt,
       ),
       ...friendItems,
     ];
@@ -405,7 +808,9 @@ class DemoMomentsRepository extends MomentsRepository {
         .where((item) => !item.isSelf && item.hasAvailableMoment)
         .toList();
 
-    final startIndex = activeFriends.indexWhere((item) => item.userId == startUserId);
+    final startIndex = activeFriends.indexWhere(
+      (item) => item.userId == startUserId,
+    );
     if (startIndex > 0) {
       final before = activeFriends.take(startIndex).toList();
       final after = activeFriends.skip(startIndex).toList();
@@ -429,9 +834,38 @@ class DemoMomentsRepository extends MomentsRepository {
   }
 
   @override
+  Future<void> refresh() async {}
+
+  @override
+  Future<void> createFromImagePath({
+    required String imagePath,
+    String? locationText,
+  }) async {
+    final now = DateTime.now();
+    _moments.insert(
+      0,
+      MomentItem(
+        id: 'me-${now.microsecondsSinceEpoch}',
+        ownerId: currentUserId,
+        ownerName: 'Bạn',
+        ownerAvatarAsset: 'assets/images/checkin.jpg',
+        imageAsset: imagePath,
+        createdAt: now,
+        locationText: locationText,
+        isOwn: true,
+        isViewedByCurrentUser: true,
+        reactions: const [],
+      ),
+    );
+    notifyListeners();
+  }
+
+  @override
   void markViewed(String momentId) {
     final index = _moments.indexWhere((moment) => moment.id == momentId);
-    if (index < 0 || _moments[index].isOwn || _moments[index].isViewedByCurrentUser) {
+    if (index < 0 ||
+        _moments[index].isOwn ||
+        _moments[index].isViewedByCurrentUser) {
       return;
     }
 
@@ -472,7 +906,9 @@ class DemoMomentsRepository extends MomentsRepository {
   @override
   void deleteMoments(Set<String> momentIds) {
     if (momentIds.isEmpty) return;
-    _moments.removeWhere((moment) => moment.isOwn && momentIds.contains(moment.id));
+    _moments.removeWhere(
+      (moment) => moment.isOwn && momentIds.contains(moment.id),
+    );
     notifyListeners();
   }
 
@@ -480,6 +916,7 @@ class DemoMomentsRepository extends MomentsRepository {
   Future<void> sendMessage({
     required String receiverUserId,
     required String message,
+    String? momentId,
   }) async {
     // UI boundary only. Backend messaging will replace this implementation.
     await Future<void>.delayed(const Duration(milliseconds: 180));

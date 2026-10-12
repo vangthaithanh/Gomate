@@ -10,6 +10,8 @@ import '../../messages/screens/chat_screen.dart';
 import '../../messages/screens/group_management_screen.dart';
 import '../../messages/widgets/message_widgets.dart';
 import '../../map/state/map_ui_session.dart';
+import '../../map/services/location_service.dart';
+import '../data/trip_repository.dart';
 import '../models/trip_ui_models.dart';
 import '../widgets/trip_shared_sheets.dart';
 import '../../../core/widgets/gomate_name_editor_content.dart';
@@ -17,21 +19,24 @@ import '../../../core/widgets/gomate_name_editor_content.dart';
 class TripDetailScreen extends StatefulWidget {
   final TripUi trip;
   final MessageRepository? messageRepository;
+  final RealTripRepository? tripRepository;
 
   const TripDetailScreen({
     super.key,
     required this.trip,
     this.messageRepository,
+    this.tripRepository,
   });
 
   @override
-  State<TripDetailScreen> createState() =>
-      _TripDetailScreenState();
+  State<TripDetailScreen> createState() => _TripDetailScreenState();
 }
 
 class _TripDetailScreenState extends State<TripDetailScreen> {
   late TripUi _trip;
   late final MessageRepository _messageRepository;
+  late final RealTripRepository _tripRepository;
+  final GoMateLocationService _locationService = GoMateLocationService();
 
   @override
   void initState() {
@@ -40,6 +45,20 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     _trip = widget.trip;
     _messageRepository =
         widget.messageRepository ?? DemoMessageRepository.instance;
+    _tripRepository = widget.tripRepository ?? RealTripRepository.instance;
+  }
+
+  Future<void> _refreshTrip() async {
+    try {
+      final latest = await _tripRepository.detail(_trip.id);
+      if (!mounted) return;
+      setState(() {
+        _trip = latest.copyWith(isActive: _trip.isActive);
+      });
+      GoMateMapUiSession.updateTrip(_trip);
+    } catch (_) {
+      // Detail refresh is best-effort after returning from chat.
+    }
   }
 
   Future<void> _editName() async {
@@ -56,18 +75,21 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
 
     if (!mounted || value == null) return;
 
-    setState(() {
-      _trip = _trip.copyWith(title: value);
-    });
+    try {
+      final updated = await _tripRepository.update(_trip.id, title: value);
+      if (!mounted) return;
+      setState(() {
+        _trip = updated.copyWith(isActive: _trip.isActive);
+      });
 
-    GoMateMapUiSession.updateTrip(_trip);
-
-    final conversationId = _trip.conversationId;
-
-    if (_trip.isGroup && conversationId != null) {
-      _messageRepository.renameGroup(
-        conversationId,
-        value,
+      GoMateMapUiSession.updateTrip(_trip);
+      await _messageRepository.refresh();
+    } catch (error) {
+      if (!mounted) return;
+      GoMateSnackBar.show(
+        context,
+        message: error.toString(),
+        icon: Icons.error_outline,
       );
     }
   }
@@ -75,8 +97,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
   Future<void> _editDate() async {
     if (!_trip.canEditTrip) return;
 
-    final result =
-        await GoMateBottomSheet.show<TripDateRangeResult>(
+    final result = await GoMateBottomSheet.show<TripDateRangeResult>(
       context: context,
       size: GoMateBottomSheetSize.expanded,
       child: TripDateRangeContent(
@@ -87,25 +108,38 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
 
     if (!mounted || result == null) return;
 
-    setState(() {
-      _trip = _trip.copyWith(
+    try {
+      final updated = await _tripRepository.update(
+        _trip.id,
         startDate: result.startDate,
         endDate: result.endDate,
-        days: result.days,
       );
-    });
-
-    GoMateMapUiSession.updateTrip(_trip);
+      if (!mounted) return;
+      setState(() {
+        _trip = updated.copyWith(isActive: _trip.isActive);
+      });
+      GoMateMapUiSession.updateTrip(_trip);
+    } catch (error) {
+      if (!mounted) return;
+      GoMateSnackBar.show(
+        context,
+        message: error.toString(),
+        icon: Icons.error_outline,
+      );
+    }
   }
 
-  void _openChat() {
+  Future<void> _openChat() async {
     final conversationId = _trip.conversationId;
 
     if (!_trip.hasChat || conversationId == null) {
       return;
     }
 
-    Navigator.of(context).push(
+    await _messageRepository.refresh();
+    if (!mounted) return;
+
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => MessageChatScreen(
           conversationId: conversationId,
@@ -113,12 +147,17 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         ),
       ),
     );
+
+    await _messageRepository.refresh();
+    await _refreshTrip();
   }
 
   Future<void> _openMembers() async {
     final conversationId = _trip.conversationId;
 
     if (_trip.hasChat && conversationId != null) {
+      await _messageRepository.refresh();
+      if (!mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => RoleAwareGroupMembersScreen(
@@ -130,24 +169,26 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
       return;
     }
 
-    // Trip vẫn là cá nhân: quản lý lời mời cục bộ trong module Trip.
-    final pending = await Navigator.of(context).push<Set<String>>(
+    // Trip cá nhân cũng dùng API thật: thêm member thành công sẽ chuyển GROUP
+    // và backend tự tạo linked group chat.
+    final updated = await Navigator.of(context).push<TripUi>(
       MaterialPageRoute(
         builder: (_) => TripDraftMembersScreen(
           repository: _messageRepository,
+          tripRepository: _tripRepository,
+          trip: _trip,
           members: _trip.members,
-          pendingInviteIds: _trip.pendingInviteIds.toSet(),
         ),
       ),
     );
 
-    if (!mounted || pending == null) return;
+    if (!mounted || updated == null) return;
 
     setState(() {
-      _trip = _trip.copyWith(
-        pendingInviteIds: List<String>.unmodifiable(pending),
-      );
+      _trip = updated.copyWith(isActive: _trip.isActive);
     });
+    GoMateMapUiSession.updateTrip(_trip);
+    await _messageRepository.refresh();
   }
 
   void _openPlaceFlow() {
@@ -166,51 +207,25 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
       expandDayRoute: true,
     );
 
-    Navigator.of(context).popUntil(
-      (route) => route.isFirst,
-    );
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   Future<void> _openActions() async {
-    final result =
-        await GoMateBottomSheet.show<_TripDetailAction>(
+    final result = await GoMateBottomSheet.show<_TripDetailAction>(
       context: context,
       contentPadding: EdgeInsets.zero,
-      child: _TripActionContent(
-        trip: _trip,
-      ),
+      child: _TripActionContent(trip: _trip),
     );
 
     if (!mounted || result == null) return;
 
     switch (result) {
       case _TripDetailAction.pin:
-        setState(() {
-          _trip = _trip.copyWith(isActive: true);
-        });
-
-        GoMateMapUiSession.updateTrip(_trip);
-
-        GoMateSnackBar.show(
-          context,
-          message: 'Đã ghim lịch trình',
-        );
+        await _pin();
         break;
 
       case _TripDetailAction.unpin:
-        setState(() {
-          _trip = _trip.copyWith(isActive: false);
-        });
-
-        GoMateMapUiSession.updateTrip(_trip);
-        GoMateMapUiSession.clearPinnedTrip(
-          tripId: _trip.id,
-        );
-
-        GoMateSnackBar.show(
-          context,
-          message: 'Đã bỏ ghim lịch trình',
-        );
+        await _unpin();
         break;
 
       case _TripDetailAction.delete:
@@ -223,6 +238,106 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     }
   }
 
+  Future<void> _pin() async {
+    final permission = await _locationService.ensureAlwaysForPinnedTrip();
+    if (!mounted) return;
+
+    if (permission.state != GoMateLocationState.ready) {
+      await _handlePinPermissionBlock(permission.state);
+      return;
+    }
+
+    try {
+      final pinned = await _tripRepository.pin(_trip.id);
+      final current = await _locationService.getCurrentLocation();
+      if (current.state == GoMateLocationState.ready) {
+        final p = current.position!;
+        try {
+          await _tripRepository.publishLocation(
+            _trip.id,
+            latitude: p.latitude,
+            longitude: p.longitude,
+            accuracyM: p.accuracy,
+          );
+        } catch (_) {
+          // Pin đã thành công; vị trí snapshot không được làm hỏng pin.
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _trip = pinned;
+      });
+      GoMateMapUiSession.updateTrip(_trip);
+      GoMateSnackBar.show(context, message: 'Đã ghim lịch trình');
+    } catch (error) {
+      if (!mounted) return;
+      GoMateSnackBar.show(
+        context,
+        message: error.toString(),
+        icon: Icons.error_outline,
+      );
+    }
+  }
+
+  Future<void> _unpin() async {
+    try {
+      await _tripRepository.unpin(_trip.id);
+      if (!mounted) return;
+      setState(() {
+        _trip = _trip.copyWith(isActive: false);
+      });
+      GoMateMapUiSession.updateTrip(_trip);
+      GoMateMapUiSession.clearPinnedTrip(tripId: _trip.id);
+      GoMateSnackBar.show(context, message: 'Đã bỏ ghim lịch trình');
+    } catch (error) {
+      if (!mounted) return;
+      GoMateSnackBar.show(
+        context,
+        message: error.toString(),
+        icon: Icons.error_outline,
+      );
+    }
+  }
+
+  Future<void> _handlePinPermissionBlock(GoMateLocationState state) async {
+    switch (state) {
+      case GoMateLocationState.serviceOff:
+        GoMateSnackBar.show(
+          context,
+          message: 'Hãy bật dịch vụ vị trí trước khi ghim lịch trình.',
+          icon: Icons.location_off_outlined,
+        );
+        await _locationService.openLocationSettings();
+        break;
+      case GoMateLocationState.whileInUseOnly:
+        GoMateSnackBar.show(
+          context,
+          message: 'Ghim lịch trình cần quyền vị trí Luôn cho phép.',
+          icon: Icons.location_on_outlined,
+        );
+        await _locationService.openAppSettings();
+        break;
+      case GoMateLocationState.permissionDeniedForever:
+        GoMateSnackBar.show(
+          context,
+          message:
+              'Quyền vị trí đã bị chặn. Hãy bật Luôn cho phép trong Settings.',
+          icon: Icons.location_off_outlined,
+        );
+        await _locationService.openAppSettings();
+        break;
+      case GoMateLocationState.permissionDenied:
+        GoMateSnackBar.show(
+          context,
+          message: 'GoMate cần quyền vị trí Luôn cho phép để ghim lịch trình.',
+          icon: Icons.location_off_outlined,
+        );
+        break;
+      case GoMateLocationState.ready:
+        break;
+    }
+  }
+
   Future<void> _confirmDelete() async {
     final confirmed = await GoMateBottomSheet.show<bool>(
       context: context,
@@ -230,36 +345,35 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         title: 'Xoá lịch trình?',
         description: _trip.isGroup
             ? 'Xoá lịch trình nhóm đồng nghĩa với việc xoá đoạn chat nhóm. '
-                'Hành động này không thể hoàn tác.'
+                  'Hành động này không thể hoàn tác.'
             : 'Lịch trình này sẽ bị xoá vĩnh viễn. '
-                'Hành động này không thể hoàn tác.',
+                  'Hành động này không thể hoàn tác.',
         onConfirm: () => Navigator.of(context).pop(true),
       ),
     );
 
     if (!mounted || confirmed != true) return;
 
-    final conversationId = _trip.conversationId;
+    try {
+      await _tripRepository.delete(_trip.id);
+      await _messageRepository.refresh();
 
-    if (_trip.isGroup && conversationId != null) {
-      _messageRepository.deleteGroupAndItinerary(
-        conversationId,
+      if (!mounted) return;
+      GoMateSnackBar.show(context, message: 'Đã xoá lịch trình');
+
+      GoMateMapUiSession.removeTrip(_trip.id);
+
+      Navigator.of(
+        context,
+      ).pop(TripDetailResult(trip: _trip, removeFromList: true));
+    } catch (error) {
+      if (!mounted) return;
+      GoMateSnackBar.show(
+        context,
+        message: error.toString(),
+        icon: Icons.error_outline,
       );
     }
-
-    GoMateSnackBar.show(
-      context,
-      message: 'Đã xoá lịch trình',
-    );
-
-    GoMateMapUiSession.removeTrip(_trip.id);
-
-    Navigator.of(context).pop(
-      TripDetailResult(
-        trip: _trip,
-        removeFromList: true,
-      ),
-    );
   }
 
   Future<void> _confirmLeave() async {
@@ -275,35 +389,17 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
 
     if (!mounted || confirmed != true) return;
 
-    final conversationId = _trip.conversationId;
-
-    if (conversationId != null) {
-      _messageRepository.leaveGroup(
-        conversationId,
-      );
-    }
-
     GoMateSnackBar.show(
       context,
-      message: 'Đã rời lịch trình',
-    );
-
-    GoMateMapUiSession.removeTrip(_trip.id);
-
-    Navigator.of(context).pop(
-      TripDetailResult(
-        trip: _trip,
-        removeFromList: true,
-      ),
+      message: 'Rời lịch trình nhóm sẽ được kết nối ở phase sau',
+      icon: Icons.info_outline,
     );
   }
 
   void _close() {
     GoMateMapUiSession.updateTrip(_trip);
 
-    Navigator.of(context).pop(
-      TripDetailResult(trip: _trip),
-    );
+    Navigator.of(context).pop(TripDetailResult(trip: _trip));
   }
 
   @override
@@ -313,7 +409,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     final memberSubtitle = _trip.pendingInviteIds.isEmpty
         ? '${_trip.memberCount} thành viên'
         : '${_trip.memberCount} thành viên • '
-            '${_trip.pendingInviteIds.length} lời mời';
+              '${_trip.pendingInviteIds.length} lời mời';
 
     return WillPopScope(
       onWillPop: () async {
@@ -332,14 +428,9 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
               (width * 0.080).clamp(26.0, 34.0).toDouble(),
             ),
             children: [
-              _DetailHeader(
-                onBack: _close,
-                onMore: _openActions,
-              ),
+              _DetailHeader(onBack: _close, onMore: _openActions),
 
-              SizedBox(
-                height: (width * 0.010).clamp(3.0, 5.0).toDouble(),
-              ),
+              SizedBox(height: (width * 0.010).clamp(3.0, 5.0).toDouble()),
 
               Center(
                 child: ClipRRect(
@@ -362,9 +453,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 ),
               ),
 
-              SizedBox(
-                height: (width * 0.020).clamp(7.0, 9.0).toDouble(),
-              ),
+              SizedBox(height: (width * 0.020).clamp(7.0, 9.0).toDouble()),
 
               Center(
                 child: Row(
@@ -376,8 +465,9 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize:
-                              (width * 0.043).clamp(15.0, 17.0).toDouble(),
+                          fontSize: (width * 0.043)
+                              .clamp(15.0, 17.0)
+                              .toDouble(),
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -388,8 +478,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                         onTap: _editName,
                         child: Icon(
                           LucideIcons.pencil,
-                          size:
-                              (width * 0.040).clamp(14.0, 16.0).toDouble(),
+                          size: (width * 0.040).clamp(14.0, 16.0).toDouble(),
                           color: AppColors.grayText,
                         ),
                       ),
@@ -398,9 +487,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 ),
               ),
 
-              SizedBox(
-                height: (width * 0.045).clamp(16.0, 19.0).toDouble(),
-              ),
+              SizedBox(height: (width * 0.045).clamp(16.0, 19.0).toDouble()),
 
               // Tin nhắn chỉ xuất hiện khi đã thật sự là group
               // VÀ đã có linked group chat.
@@ -433,9 +520,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 icon: _trip.canEditTrip
                     ? LucideIcons.plus
                     : Icons.route_outlined,
-                title: _trip.canEditTrip
-                    ? 'Thêm địa điểm'
-                    : 'Xem lộ trình',
+                title: _trip.canEditTrip ? 'Thêm địa điểm' : 'Xem lộ trình',
                 onTap: _openPlaceFlow,
               ),
             ],
@@ -448,29 +533,30 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
 
 class TripDraftMembersScreen extends StatefulWidget {
   final MessageRepository repository;
+  final RealTripRepository tripRepository;
+  final TripUi trip;
   final List<TripMemberUi> members;
-  final Set<String> pendingInviteIds;
 
   const TripDraftMembersScreen({
     super.key,
     required this.repository,
+    required this.tripRepository,
+    required this.trip,
     required this.members,
-    required this.pendingInviteIds,
   });
 
   @override
-  State<TripDraftMembersScreen> createState() =>
-      _TripDraftMembersScreenState();
+  State<TripDraftMembersScreen> createState() => _TripDraftMembersScreenState();
 }
 
-class _TripDraftMembersScreenState
-    extends State<TripDraftMembersScreen> {
+class _TripDraftMembersScreenState extends State<TripDraftMembersScreen> {
   late final Set<String> _pending;
+  bool _submitting = false;
 
   @override
   void initState() {
     super.initState();
-    _pending = <String>{...widget.pendingInviteIds};
+    _pending = <String>{};
   }
 
   Set<String> get _acceptedIds {
@@ -495,6 +581,7 @@ class _TripDraftMembersScreenState
         contacts: widget.repository.contacts,
         initialPendingInviteIds: _pending,
         acceptedMemberIds: _acceptedIds,
+        searchContacts: widget.tripRepository.searchMemberCandidates,
         onPendingChanged: (value) {
           if (!mounted) return;
 
@@ -508,10 +595,40 @@ class _TripDraftMembersScreenState
     );
   }
 
+  Future<void> _commit() async {
+    if (_pending.isEmpty || _submitting) return;
+    setState(() {
+      _submitting = true;
+    });
+    try {
+      final updated = await widget.tripRepository.addMembers(
+        widget.trip.id,
+        _pending,
+      );
+      if (!mounted) return;
+      GoMateSnackBar.show(
+        context,
+        message: 'Đã thêm ${_pending.length} thành viên vào lịch trình',
+      );
+      Navigator.of(context).pop(updated);
+    } catch (error) {
+      if (!mounted) return;
+      GoMateSnackBar.show(
+        context,
+        message: error.toString(),
+        icon: Icons.error_outline,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _submitting = false;
+        });
+      }
+    }
+  }
+
   void _close() {
-    Navigator.of(context).pop(
-      Set<String>.unmodifiable(_pending),
-    );
+    Navigator.of(context).pop();
   }
 
   @override
@@ -543,8 +660,9 @@ class _TripDraftMembersScreenState
                       Text(
                         'Thành viên',
                         style: TextStyle(
-                          fontSize:
-                              (width * 0.043).clamp(15.0, 17.0).toDouble(),
+                          fontSize: (width * 0.043)
+                              .clamp(15.0, 17.0)
+                              .toDouble(),
                           fontWeight: FontWeight.w800,
                           color: AppColors.primaryText,
                         ),
@@ -555,8 +673,9 @@ class _TripDraftMembersScreenState
                           onTap: _close,
                           customBorder: const CircleBorder(),
                           child: SizedBox.square(
-                            dimension:
-                                (width * 0.10).clamp(36.0, 42.0).toDouble(),
+                            dimension: (width * 0.10)
+                                .clamp(36.0, 42.0)
+                                .toDouble(),
                             child: Center(
                               child: Icon(
                                 LucideIcons.chevron_left,
@@ -570,21 +689,39 @@ class _TripDraftMembersScreenState
                       ),
                       Align(
                         alignment: Alignment.centerRight,
-                        child: InkWell(
-                          onTap: _invite,
-                          customBorder: const CircleBorder(),
-                          child: SizedBox.square(
-                            dimension:
-                                (width * 0.10).clamp(36.0, 42.0).toDouble(),
-                            child: Center(
-                              child: Icon(
-                                LucideIcons.plus,
-                                size: (width * 0.065)
-                                    .clamp(23.0, 26.0)
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_pending.isNotEmpty)
+                              TextButton(
+                                onPressed: _submitting ? null : _commit,
+                                child: _submitting
+                                    ? const SizedBox.square(
+                                        dimension: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : Text('Thêm (${_pending.length})'),
+                              ),
+                            InkWell(
+                              onTap: _invite,
+                              customBorder: const CircleBorder(),
+                              child: SizedBox.square(
+                                dimension: (width * 0.10)
+                                    .clamp(36.0, 42.0)
                                     .toDouble(),
+                                child: Center(
+                                  child: Icon(
+                                    LucideIcons.plus,
+                                    size: (width * 0.065)
+                                        .clamp(23.0, 26.0)
+                                        .toDouble(),
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ),
                       ),
                     ],
@@ -607,22 +744,22 @@ class _TripDraftMembersScreenState
                         name: member.name,
                         subtitle: member.subtitle,
                         avatarAsset: member.avatarAsset,
-                        trailingText: member.id ==
-                                widget.repository.currentUserId
+                        trailingText:
+                            member.id == widget.repository.currentUserId
                             ? 'Bạn'
                             : '',
                       ),
 
                     if (_pending.isNotEmpty) ...[
                       SizedBox(
-                        height:
-                            (width * 0.035).clamp(12.0, 15.0).toDouble(),
+                        height: (width * 0.035).clamp(12.0, 15.0).toDouble(),
                       ),
                       Text(
                         'Lời mời đang chờ',
                         style: TextStyle(
-                          fontSize:
-                              (width * 0.030).clamp(11.0, 12.0).toDouble(),
+                          fontSize: (width * 0.030)
+                              .clamp(11.0, 12.0)
+                              .toDouble(),
                           fontWeight: FontWeight.w700,
                           color: AppColors.grayText,
                         ),
@@ -665,6 +802,9 @@ class _DraftMemberRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final avatar = (width * 0.095).clamp(34.0, 40.0).toDouble();
+    final avatarValue = avatarAsset.trim();
+    final isNetworkAvatar =
+        avatarValue.startsWith('http://') || avatarValue.startsWith('https://');
 
     return Padding(
       padding: EdgeInsets.symmetric(
@@ -681,14 +821,24 @@ class _DraftMemberRow extends StatelessWidget {
               color: const Color(0x1A0A43A8),
               border: Border.all(color: AppColors.grayBorder),
             ),
-            child: avatarAsset.trim().isEmpty
+            child: avatarValue.isEmpty
                 ? Icon(
                     LucideIcons.user_round,
                     size: avatar * 0.55,
                     color: Colors.white,
                   )
+                : isNetworkAvatar
+                ? Image.network(
+                    avatarValue,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Icon(
+                      LucideIcons.user_round,
+                      size: avatar * 0.55,
+                      color: Colors.white,
+                    ),
+                  )
                 : Image.asset(
-                    avatarAsset,
+                    avatarValue,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Icon(
                       LucideIcons.user_round,
@@ -705,9 +855,7 @@ class _DraftMemberRow extends StatelessWidget {
                 Text(
                   name,
                   style: TextStyle(
-                    fontSize: (width * 0.032)
-                        .clamp(11.5, 12.5)
-                        .toDouble(),
+                    fontSize: (width * 0.032).clamp(11.5, 12.5).toDouble(),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -715,9 +863,7 @@ class _DraftMemberRow extends StatelessWidget {
                   Text(
                     subtitle,
                     style: TextStyle(
-                      fontSize: (width * 0.027)
-                          .clamp(9.5, 10.5)
-                          .toDouble(),
+                      fontSize: (width * 0.027).clamp(9.5, 10.5).toDouble(),
                       color: AppColors.grayText,
                     ),
                   ),
@@ -728,8 +874,7 @@ class _DraftMemberRow extends StatelessWidget {
             Text(
               trailingText,
               style: TextStyle(
-                fontSize:
-                    (width * 0.026).clamp(9.5, 10.5).toDouble(),
+                fontSize: (width * 0.026).clamp(9.5, 10.5).toDouble(),
                 fontWeight: FontWeight.w600,
                 color: trailingText == 'Đang chờ'
                     ? AppColors.primaryText
@@ -742,19 +887,12 @@ class _DraftMemberRow extends StatelessWidget {
   }
 }
 
-enum _TripDetailAction {
-  pin,
-  unpin,
-  delete,
-  leave,
-}
+enum _TripDetailAction { pin, unpin, delete, leave }
 
 class _TripActionContent extends StatelessWidget {
   final TripUi trip;
 
-  const _TripActionContent({
-    required this.trip,
-  });
+  const _TripActionContent({required this.trip});
 
   @override
   Widget build(BuildContext context) {
@@ -771,40 +909,28 @@ class _TripActionContent extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _ActionRow(
-            icon: trip.isActive
-                ? LucideIcons.pin_off
-                : LucideIcons.pin,
-            label: trip.isActive
-                ? 'Bỏ ghim lịch trình'
-                : 'Ghim lịch trình',
+            icon: trip.isActive ? LucideIcons.pin_off : LucideIcons.pin,
+            label: trip.isActive ? 'Bỏ ghim lịch trình' : 'Ghim lịch trình',
             onTap: () => Navigator.of(context).pop(
-              trip.isActive
-                  ? _TripDetailAction.unpin
-                  : _TripDetailAction.pin,
+              trip.isActive ? _TripDetailAction.unpin : _TripDetailAction.pin,
             ),
           ),
 
-          const Divider(
-            color: AppColors.grayBorder,
-          ),
+          const Divider(color: AppColors.grayBorder),
 
           if (trip.canDeleteTrip)
             _ActionRow(
               icon: LucideIcons.trash,
               label: 'Xoá lịch trình',
               color: AppColors.primaryText,
-              onTap: () => Navigator.of(context).pop(
-                _TripDetailAction.delete,
-              ),
+              onTap: () => Navigator.of(context).pop(_TripDetailAction.delete),
             )
           else if (trip.canLeaveTrip)
             _ActionRow(
               icon: LucideIcons.log_out,
               label: 'Rời lịch trình',
               color: AppColors.primaryText,
-              onTap: () => Navigator.of(context).pop(
-                _TripDetailAction.leave,
-              ),
+              onTap: () => Navigator.of(context).pop(_TripDetailAction.leave),
             ),
         ],
       ),
@@ -840,14 +966,11 @@ class _ActionRow extends StatelessWidget {
               size: (width * 0.060).clamp(21.0, 24.0).toDouble(),
               color: color,
             ),
-            SizedBox(
-              width: (width * 0.045).clamp(15.0, 18.0).toDouble(),
-            ),
+            SizedBox(width: (width * 0.045).clamp(15.0, 18.0).toDouble()),
             Text(
               label,
               style: TextStyle(
-                fontSize:
-                    (width * 0.032).clamp(11.5, 12.5).toDouble(),
+                fontSize: (width * 0.032).clamp(11.5, 12.5).toDouble(),
                 fontWeight: FontWeight.w600,
                 color: color,
               ),
@@ -863,17 +986,13 @@ class _DetailHeader extends StatelessWidget {
   final VoidCallback onBack;
   final VoidCallback onMore;
 
-  const _DetailHeader({
-    required this.onBack,
-    required this.onMore,
-  });
+  const _DetailHeader({required this.onBack, required this.onMore});
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
 
-    final height =
-        (width * 0.11).clamp(40.0, 44.0).toDouble();
+    final height = (width * 0.11).clamp(40.0, 44.0).toDouble();
 
     return SizedBox(
       height: height,
@@ -887,8 +1006,7 @@ class _DetailHeader extends StatelessWidget {
               child: Center(
                 child: Icon(
                   LucideIcons.chevron_left,
-                  size:
-                      (width * 0.070).clamp(24.0, 28.0).toDouble(),
+                  size: (width * 0.070).clamp(24.0, 28.0).toDouble(),
                 ),
               ),
             ),
@@ -902,8 +1020,7 @@ class _DetailHeader extends StatelessWidget {
               child: Center(
                 child: Icon(
                   LucideIcons.ellipsis_vertical,
-                  size:
-                      (width * 0.060).clamp(21.0, 24.0).toDouble(),
+                  size: (width * 0.060).clamp(21.0, 24.0).toDouble(),
                 ),
               ),
             ),
@@ -933,27 +1050,22 @@ class _DetailRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
 
-    final minHeight =
-        (width * 0.145).clamp(52.0, 58.0).toDouble();
+    final minHeight = (width * 0.145).clamp(52.0, 58.0).toDouble();
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: ConstrainedBox(
-        constraints: BoxConstraints(
-          minHeight: minHeight,
-        ),
+        constraints: BoxConstraints(minHeight: minHeight),
         child: Row(
           children: [
             SizedBox(
-              width:
-                  (width * 0.090).clamp(32.0, 38.0).toDouble(),
+              width: (width * 0.090).clamp(32.0, 38.0).toDouble(),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Icon(
                   icon,
-                  size:
-                      (width * 0.062).clamp(22.0, 24.0).toDouble(),
+                  size: (width * 0.062).clamp(22.0, 24.0).toDouble(),
                 ),
               ),
             ),
@@ -966,8 +1078,7 @@ class _DetailRow extends StatelessWidget {
                   Text(
                     title,
                     style: TextStyle(
-                      fontSize:
-                          (width * 0.032).clamp(11.5, 12.5).toDouble(),
+                      fontSize: (width * 0.032).clamp(11.5, 12.5).toDouble(),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -976,8 +1087,7 @@ class _DetailRow extends StatelessWidget {
                     Text(
                       subtitle,
                       style: TextStyle(
-                        fontSize:
-                            (width * 0.027).clamp(9.5, 10.5).toDouble(),
+                        fontSize: (width * 0.027).clamp(9.5, 10.5).toDouble(),
                         color: AppColors.grayText,
                         fontWeight: FontWeight.w500,
                       ),
@@ -989,8 +1099,7 @@ class _DetailRow extends StatelessWidget {
             if (showChevron)
               Icon(
                 LucideIcons.chevron_right,
-                size:
-                    (width * 0.060).clamp(21.0, 24.0).toDouble(),
+                size: (width * 0.060).clamp(21.0, 24.0).toDouble(),
                 color: AppColors.grayText,
               ),
           ],
@@ -1032,8 +1141,7 @@ class TripRoutePlaceholderScreen extends StatelessWidget {
                     onTap: () => Navigator.of(context).pop(),
                     child: Icon(
                       LucideIcons.chevron_left,
-                      size:
-                          (width * 0.070).clamp(24.0, 28.0).toDouble(),
+                      size: (width * 0.070).clamp(24.0, 28.0).toDouble(),
                     ),
                   ),
                   Expanded(
@@ -1041,25 +1149,19 @@ class TripRoutePlaceholderScreen extends StatelessWidget {
                       title,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize:
-                            (width * 0.043).clamp(15.0, 17.0).toDouble(),
+                        fontSize: (width * 0.043).clamp(15.0, 17.0).toDouble(),
                         fontWeight: FontWeight.w800,
                         color: AppColors.primaryText,
                       ),
                     ),
                   ),
-                  SizedBox(
-                    width:
-                        (width * 0.070).clamp(24.0, 28.0).toDouble(),
-                  ),
+                  SizedBox(width: (width * 0.070).clamp(24.0, 28.0).toDouble()),
                 ],
               ),
             ),
             const Spacer(),
             Icon(
-              canEdit
-                  ? LucideIcons.plus
-                  : Icons.route_outlined,
+              canEdit ? LucideIcons.plus : Icons.route_outlined,
               size: 42,
               color: AppColors.grayText,
             ),
@@ -1069,9 +1171,7 @@ class TripRoutePlaceholderScreen extends StatelessWidget {
                   ? 'Trang thêm địa điểm sẽ phát triển ở bước sau'
                   : 'Trang xem lộ trình sẽ phát triển ở bước sau',
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.grayText,
-              ),
+              style: const TextStyle(color: AppColors.grayText),
             ),
             const Spacer(),
           ],

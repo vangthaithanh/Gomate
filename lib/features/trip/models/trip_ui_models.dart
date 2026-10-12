@@ -1,18 +1,17 @@
-enum TripAccessRole {
-  personal,
-  member,
-  deputy,
-  leader,
-}
+enum TripAccessRole { personal, member, leader }
 
 class TripPlaceUi {
   /// UI id tạm thời để reorder/xóa ổn định.
-  /// Backend sau này thay bằng tripPlaceId/placeId thật.
+  /// Khi lấy từ backend, đây là trip_stops.id.
   final String id;
+
+  /// GoMate places.id thật, dùng để gọi Trip Stop API và kiểm tra trùng kề nhau.
+  final String placeId;
 
   final String name;
   final String startTime;
   final String endTime;
+  final bool hasCompleteInterval;
   final int day;
 
   /// Chỉ phục vụ UI Map hiện tại.
@@ -21,37 +20,40 @@ class TripPlaceUi {
 
   const TripPlaceUi({
     this.id = '',
+    this.placeId = '',
     required this.name,
     this.startTime = '',
     this.endTime = '',
+    this.hasCompleteInterval = false,
     required this.day,
     this.imageAsset,
     this.imageUrl,
   });
 
-  bool get hasStartTime =>
-      startTime.trim().isNotEmpty;
+  bool get hasStartTime => startTime.trim().isNotEmpty;
 
-  bool get hasEndTime =>
-      endTime.trim().isNotEmpty;
+  bool get hasEndTime => endTime.trim().isNotEmpty;
 
-  bool get hasFullTime =>
-      hasStartTime && hasEndTime;
+  bool get hasFullTime => hasCompleteInterval && hasStartTime && hasEndTime;
 
   TripPlaceUi copyWith({
     String? id,
+    String? placeId,
     String? name,
     String? startTime,
     String? endTime,
+    bool? hasCompleteInterval,
     int? day,
     String? imageAsset,
     String? imageUrl,
   }) {
     return TripPlaceUi(
       id: id ?? this.id,
+      placeId: placeId ?? this.placeId,
       name: name ?? this.name,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
+      hasCompleteInterval: hasCompleteInterval ?? this.hasCompleteInterval,
       day: day ?? this.day,
       imageAsset: imageAsset ?? this.imageAsset,
       imageUrl: imageUrl ?? this.imageUrl,
@@ -77,14 +79,9 @@ class TripMemberUi {
     this.lastSeen = 'Vừa xong',
   }) : role = isOwner ? TripAccessRole.leader : role;
 
-  bool get isOwner =>
-      role == TripAccessRole.leader;
+  bool get isOwner => role == TripAccessRole.leader;
 
-  bool get isLeader =>
-      role == TripAccessRole.leader;
-
-  bool get isDeputy =>
-      role == TripAccessRole.deputy;
+  bool get isLeader => role == TripAccessRole.leader;
 }
 
 class TripUi {
@@ -126,29 +123,20 @@ class TripUi {
   });
 
   /// Giữ logic quyền hiện tại của project:
-  /// personal/leader được chỉnh; deputy/member chỉ xem.
-  bool get canEditTrip =>
-      !isGroup ||
-      currentUserRole == TripAccessRole.leader;
+  /// personal/leader được chỉnh; member chỉ xem.
+  bool get canEditTrip => !isGroup || currentUserRole == TripAccessRole.leader;
 
   bool get canDeleteTrip =>
-      !isGroup ||
-      currentUserRole == TripAccessRole.leader;
+      !isGroup || currentUserRole == TripAccessRole.leader;
 
-  bool get canLeaveTrip =>
-      isGroup &&
-      currentUserRole != TripAccessRole.leader;
+  bool get canLeaveTrip => isGroup && currentUserRole != TripAccessRole.leader;
 
   bool get hasChat =>
-      isGroup &&
-      conversationId != null &&
-      conversationId!.trim().isNotEmpty;
+      isGroup && conversationId != null && conversationId!.trim().isNotEmpty;
 
-  int get memberCount =>
-      members.isEmpty ? 1 : members.length;
+  int get memberCount => members.isEmpty ? 1 : members.length;
 
-  bool get hasPendingInvites =>
-      pendingInviteIds.isNotEmpty;
+  bool get hasPendingInvites => pendingInviteIds.isNotEmpty;
 
   String get roleLabel {
     switch (currentUserRole) {
@@ -156,16 +144,13 @@ class TripUi {
         return 'Cá nhân';
       case TripAccessRole.member:
         return 'Thành viên';
-      case TripAccessRole.deputy:
-        return 'Nhóm phó';
       case TripAccessRole.leader:
         return 'Nhóm trưởng';
     }
   }
 
   String get dateRangeLabel {
-    if (startDate == null ||
-        endDate == null) {
+    if (startDate == null || endDate == null) {
       return 'Chưa chọn ngày';
     }
 
@@ -173,8 +158,7 @@ class TripUi {
   }
 
   String get weekdayRangeLabel {
-    if (startDate == null ||
-        endDate == null) {
+    if (startDate == null || endDate == null) {
       return '';
     }
 
@@ -201,44 +185,26 @@ class TripUi {
       id: id ?? this.id,
       title: title ?? this.title,
       days: days ?? this.days,
-      destination:
-          destination ?? this.destination,
-      coverAsset:
-          coverAsset ?? this.coverAsset,
-      isActive:
-          isActive ?? this.isActive,
-      isGroup:
-          isGroup ?? this.isGroup,
-      currentUserRole:
-          currentUserRole ??
-              this.currentUserRole,
-      startDate:
-          startDate ?? this.startDate,
-      endDate:
-          endDate ?? this.endDate,
-      places:
-          places ?? this.places,
-      members:
-          members ?? this.members,
-      pendingInviteIds:
-          pendingInviteIds ??
-              this.pendingInviteIds,
-      conversationId:
-          conversationId ??
-              this.conversationId,
+      destination: destination ?? this.destination,
+      coverAsset: coverAsset ?? this.coverAsset,
+      isActive: isActive ?? this.isActive,
+      isGroup: isGroup ?? this.isGroup,
+      currentUserRole: currentUserRole ?? this.currentUserRole,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      places: places ?? this.places,
+      members: members ?? this.members,
+      pendingInviteIds: pendingInviteIds ?? this.pendingInviteIds,
+      conversationId: conversationId ?? this.conversationId,
     );
   }
 
-  static String _date(
-    DateTime value,
-  ) {
+  static String _date(DateTime value) {
     return '${value.day.toString().padLeft(2, '0')}/'
         '${value.month.toString().padLeft(2, '0')}';
   }
 
-  static String _weekday(
-    DateTime value,
-  ) {
+  static String _weekday(DateTime value) {
     const labels = <String>[
       '',
       'Thứ 2',
@@ -258,22 +224,14 @@ class TripDateRangeResult {
   final DateTime startDate;
   final DateTime endDate;
 
-  const TripDateRangeResult({
-    required this.startDate,
-    required this.endDate,
-  });
+  const TripDateRangeResult({required this.startDate, required this.endDate});
 
-  int get days =>
-      endDate.difference(startDate).inDays +
-      1;
+  int get days => endDate.difference(startDate).inDays + 1;
 }
 
 class TripDetailResult {
   final TripUi trip;
   final bool removeFromList;
 
-  const TripDetailResult({
-    required this.trip,
-    this.removeFromList = false,
-  });
+  const TripDetailResult({required this.trip, this.removeFromList = false});
 }

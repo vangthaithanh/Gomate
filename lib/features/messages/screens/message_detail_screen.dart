@@ -7,6 +7,7 @@ import '../../../core/widgets/snackbar.dart';
 import '../../home/widgets/report_reason_content.dart';
 import '../../map/state/map_ui_session.dart';
 import '../../trip/models/trip_ui_models.dart';
+import '../../trip/data/trip_repository.dart';
 import '../../trip/screens/trip_detail_screen.dart';
 import '../data/message_repository.dart';
 import '../models/message_models.dart';
@@ -85,10 +86,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
 
     if (!mounted || reason == null) return;
 
-    GoMateSnackBar.show(
-      context,
-      message: 'Đã gửi báo cáo',
-    );
+    GoMateSnackBar.show(context, message: 'Đã gửi báo cáo');
   }
 
   Future<void> _block(MessageConversation conversation) async {
@@ -145,10 +143,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
 
     if (!mounted) return;
 
-    GoMateSnackBar.show(
-      context,
-      message: 'Đã rời nhóm ${conversation.title}',
-    );
+    GoMateSnackBar.show(context, message: 'Đã rời nhóm ${conversation.title}');
 
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
@@ -178,9 +173,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
-  Future<void> _renameGroup(
-      MessageConversation conversation,
-      ) async {
+  Future<void> _renameGroup(MessageConversation conversation) async {
     final value = await GoMateBottomSheet.show<String>(
       context: context,
       child: GoMateNameEditorContent(
@@ -192,10 +185,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
 
     if (!mounted || value == null) return;
 
-    widget.repository.renameGroup(
-      conversation.id,
-      value,
-    );
+    widget.repository.renameGroup(conversation.id, value);
   }
 
   void _toggleMute(MessageConversation conversation) {
@@ -210,28 +200,8 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
     );
   }
 
-  TripAccessRole _toTripRole(
-    MessageGroupRole role,
-  ) {
-    switch (role) {
-      case MessageGroupRole.leader:
-        return TripAccessRole.leader;
-
-      case MessageGroupRole.deputy:
-        return TripAccessRole.deputy;
-
-      case MessageGroupRole.member:
-        return TripAccessRole.member;
-    }
-  }
-
-  void _openLinkedItinerary(
-    MessageConversation conversation,
-  ) {
-    final itinerary =
-        widget.repository.linkedGroupItinerary(
-      conversation.id,
-    );
+  Future<void> _openLinkedItinerary(MessageConversation conversation) async {
+    final itinerary = widget.repository.linkedGroupItinerary(conversation.id);
 
     if (itinerary == null) {
       GoMateSnackBar.show(
@@ -243,7 +213,8 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
 
     TripUi? trip;
 
-    // Ưu tiên object Trip đang dùng chung trong app.
+    // Ưu tiên object Trip đang dùng chung trong app, sau đó refresh bằng API
+    // thật để tránh mở một Trip fake chỉ dựa trên tên group.
     for (final item in GoMateMapUiSession.availableTrips) {
       if (item.id == itinerary.id) {
         trip = item;
@@ -251,48 +222,32 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
       }
     }
 
-    // Fallback UI-only trong lúc backend Trip/Message
-    // chưa dùng chung DTO.
-    trip ??= TripUi(
-      id: itinerary.id,
-      title: itinerary.title,
-      days: 1,
-      destination: itinerary.title,
-      coverAsset: itinerary.imageAsset,
-      isGroup: true,
-      currentUserRole: _toTripRole(
-        conversation.roleOf(
-          widget.repository.currentUserId,
-        ),
-      ),
-      members: conversation.participants
-          .map(
-            (member) => TripMemberUi(
-              id: member.id,
-              name: member.displayName,
-              avatarAsset: member.avatarAsset ?? '',
-              role: _toTripRole(
-                member.role,
-              ),
-            ),
-          )
-          .toList(growable: false),
-      conversationId: conversation.id,
-    );
+    try {
+      trip = await RealTripRepository.instance.detail(itinerary.id);
+    } catch (error) {
+      if (!mounted) return;
+      GoMateSnackBar.show(
+        context,
+        message: error.toString(),
+        icon: Icons.error_outline,
+      );
+      return;
+    }
+
+    if (!mounted) return;
 
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => TripDetailScreen(
           trip: trip!,
           messageRepository: widget.repository,
+          tripRepository: RealTripRepository.instance,
         ),
       ),
     );
   }
 
-  Future<void> _openAddToItinerary(
-    MessageConversation conversation,
-  ) async {
+  Future<void> _openAddToItinerary(MessageConversation conversation) async {
     if (conversation.isGroup) return;
 
     if (conversation.isBlocked) {
@@ -308,9 +263,8 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
 
     final itinerary = await Navigator.of(context).push<MessageItinerary>(
       MaterialPageRoute<MessageItinerary>(
-        builder: (_) => MessageAddToItineraryScreen(
-          repository: widget.repository,
-        ),
+        builder: (_) =>
+            MessageAddToItineraryScreen(repository: widget.repository),
       ),
     );
 
@@ -365,204 +319,198 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
     final groupRole = conversation.isGroup
         ? conversation.roleOf(widget.repository.currentUserId)
         : MessageGroupRole.member;
-    final title =
-        conversation.isGroup ? conversation.title : (peer?.displayName ?? '');
+    final title = conversation.isGroup
+        ? conversation.title
+        : (peer?.displayName ?? '');
     final avatarSize = messageClamp(width * 0.19, 66, 74);
-    final canRenameGroup = conversation.isGroup &&
-        (groupRole == MessageGroupRole.leader ||
-            groupRole == MessageGroupRole.deputy);
+    final canRenameGroup =
+        conversation.isGroup && groupRole == MessageGroupRole.leader;
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: ListView(
-          padding: EdgeInsets.fromLTRB(
-            0,
-            width * 0.030,
-            0,
-            width * 0.050,
-          ),
+          padding: EdgeInsets.fromLTRB(0, width * 0.030, 0, width * 0.050),
           physics: const BouncingScrollPhysics(),
           children: [
             Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: width * 0.065,
-              ),
+              padding: EdgeInsets.symmetric(horizontal: width * 0.065),
               child: Column(
                 children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: InkWell(
-                onTap: () => Navigator.of(context).pop(),
-                child: Icon(
-                  LucideIcons.chevron_left,
-                  size: messageClamp(width * 0.070, 24, 28),
-                ),
-              ),
-            ),
-            SizedBox(height: width * 0.030),
-            Center(
-              child: conversation.isGroup
-                  ? MessageGroupAvatar(
-                      conversation: conversation,
-                      size: avatarSize,
-                    )
-                  : MessageAvatar(
-                      size: avatarSize,
-                      asset: peer?.avatarAsset,
-                    ),
-            ),
-            SizedBox(height: width * 0.012),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Flexible(
-                  child: Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: messageFont(width, 16),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                if (canRenameGroup) ...[
-                  SizedBox(width: width * 0.010),
-                  InkWell(
-                    onTap: () => _renameGroup(conversation),
-                    child: Icon(
-                      LucideIcons.pencil,
-                      size: messageClamp(width * 0.045, 16, 19),
-                      color: AppColors.grayText,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            SizedBox(height: width * 0.045),
-            Row(
-              children: [
-                MessageDetailAction(
-                  icon: conversation.isGroup
-                      ? LucideIcons.users_round
-                      : LucideIcons.user_round,
-                  label:
-                      conversation.isGroup ? 'Xem Thành Viên' : 'Trang cá nhân',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => conversation.isGroup
-                            ? RoleAwareGroupMembersScreen(
-                                conversationId: conversation.id,
-                                repository: widget.repository,
-                              )
-                            : MessageProfilePlaceholderScreen(
-                                participant: peer,
-                              ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: InkWell(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: Icon(
+                        LucideIcons.chevron_left,
+                        size: messageClamp(width * 0.070, 24, 28),
                       ),
-                    );
-                  },
-                ),
-                MessageDetailAction(
-                  icon: conversation.isMuted
-                      ? LucideIcons.bell_off
-                      : LucideIcons.bell,
-                  label: conversation.isMuted ? 'Bật' : 'Tắt',
-                  color: conversation.isMuted
-                      ? AppColors.primaryText
-                      : Colors.black,
-                  onTap: () => _toggleMute(conversation),
-                ),
-                MessageDetailAction(
-                  icon: LucideIcons.search,
-                  label: 'Tìm kiếm',
-                  onTap: () => _openSearch(conversation),
-                ),
-              ],
-            ),
-            SizedBox(height: width * 0.045),
-            MessageDetailMenuRow(
-              icon: LucideIcons.folder_pen,
-              label: 'Đặt biệt danh',
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => MessageNicknameScreen(
-                      conversationId: conversation.id,
-                      repository: widget.repository,
                     ),
                   ),
-                );
-              },
-            ),
-            if (conversation.isGroup)
-              MessageDetailMenuRow(
-                icon: LucideIcons.calendar,
-                label: 'Xem lịch trình',
-                onTap: () => _openLinkedItinerary(conversation),
-              )
-            else
-              MessageDetailMenuRow(
-                icon: LucideIcons.users_round,
-                label: 'Thêm vào lịch trình',
-                trailing: _pendingItineraryInviteId == null
-                    ? null
-                    : Text(
-                        '(1) Thêm',
-                        style: TextStyle(
-                          fontSize: messageFont(width, 10),
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primaryText,
+                  SizedBox(height: width * 0.030),
+                  Center(
+                    child: conversation.isGroup
+                        ? MessageGroupAvatar(
+                            conversation: conversation,
+                            size: avatarSize,
+                          )
+                        : MessageAvatar(
+                            size: avatarSize,
+                            asset: peer?.avatarAsset,
+                          ),
+                  ),
+                  SizedBox(height: width * 0.012),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          title,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: messageFont(width, 16),
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                onTap: () => _openAddToItinerary(conversation),
-              ),
-            MessageDetailMenuRow(
-              icon: LucideIcons.message_square_warning,
-              label: 'Báo cáo',
-              onTap: _report,
-            ),
-            if (conversation.isGroup)
-              MessageDetailMenuRow(
-                icon: groupRole == MessageGroupRole.leader
-                    ? LucideIcons.trash
-                    : LucideIcons.log_out,
-                label: groupRole == MessageGroupRole.leader
-                    ? 'Xoá nhóm'
-                    : 'Rời nhóm',
-                color: AppColors.primaryText,
-                onTap: () => groupRole == MessageGroupRole.leader
-                    ? _deleteGroup(conversation)
-                    : _leaveGroup(conversation),
-              )
-            else
-              MessageDetailMenuRow(
-                icon: LucideIcons.ban,
-                label: conversation.isBlocked ? 'Bỏ chặn' : 'Chặn',
-                color: AppColors.primaryText,
-                onTap: () => conversation.isBlocked
-                    ? _unblock(conversation)
-                    : _block(conversation),
-              ),
-            SizedBox(height: width * 0.025),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _MediaTabIcon(
-                  icon: LucideIcons.images,
-                  active: !_showLinks,
-                  onTap: () => setState(() => _showLinks = false),
-                ),
-                _MediaTabIcon(
-                  icon: LucideIcons.link,
-                  active: _showLinks,
-                  onTap: () => setState(() => _showLinks = true),
-                ),
-              ],
-            ),
-            SizedBox(height: width * 0.025),
+                      if (canRenameGroup) ...[
+                        SizedBox(width: width * 0.010),
+                        InkWell(
+                          onTap: () => _renameGroup(conversation),
+                          child: Icon(
+                            LucideIcons.pencil,
+                            size: messageClamp(width * 0.045, 16, 19),
+                            color: AppColors.grayText,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  SizedBox(height: width * 0.045),
+                  Row(
+                    children: [
+                      MessageDetailAction(
+                        icon: conversation.isGroup
+                            ? LucideIcons.users_round
+                            : LucideIcons.user_round,
+                        label: conversation.isGroup
+                            ? 'Xem Thành Viên'
+                            : 'Trang cá nhân',
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => conversation.isGroup
+                                  ? RoleAwareGroupMembersScreen(
+                                      conversationId: conversation.id,
+                                      repository: widget.repository,
+                                    )
+                                  : MessageProfilePlaceholderScreen(
+                                      participant: peer,
+                                    ),
+                            ),
+                          );
+                        },
+                      ),
+                      MessageDetailAction(
+                        icon: conversation.isMuted
+                            ? LucideIcons.bell_off
+                            : LucideIcons.bell,
+                        label: conversation.isMuted ? 'Bật' : 'Tắt',
+                        color: conversation.isMuted
+                            ? AppColors.primaryText
+                            : Colors.black,
+                        onTap: () => _toggleMute(conversation),
+                      ),
+                      MessageDetailAction(
+                        icon: LucideIcons.search,
+                        label: 'Tìm kiếm',
+                        onTap: () => _openSearch(conversation),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: width * 0.045),
+                  MessageDetailMenuRow(
+                    icon: LucideIcons.folder_pen,
+                    label: 'Đặt biệt danh',
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => MessageNicknameScreen(
+                            conversationId: conversation.id,
+                            repository: widget.repository,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  if (conversation.isGroup)
+                    MessageDetailMenuRow(
+                      icon: LucideIcons.calendar,
+                      label: 'Xem lịch trình',
+                      onTap: () => _openLinkedItinerary(conversation),
+                    )
+                  else
+                    MessageDetailMenuRow(
+                      icon: LucideIcons.users_round,
+                      label: 'Thêm vào lịch trình',
+                      trailing: _pendingItineraryInviteId == null
+                          ? null
+                          : Text(
+                              '(1) Thêm',
+                              style: TextStyle(
+                                fontSize: messageFont(width, 10),
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primaryText,
+                              ),
+                            ),
+                      onTap: () => _openAddToItinerary(conversation),
+                    ),
+                  MessageDetailMenuRow(
+                    icon: LucideIcons.message_square_warning,
+                    label: 'Báo cáo',
+                    onTap: _report,
+                  ),
+                  if (conversation.isGroup)
+                    MessageDetailMenuRow(
+                      icon: groupRole == MessageGroupRole.leader
+                          ? LucideIcons.trash
+                          : LucideIcons.log_out,
+                      label: groupRole == MessageGroupRole.leader
+                          ? 'Xoá nhóm'
+                          : 'Rời nhóm',
+                      color: AppColors.primaryText,
+                      onTap: () => groupRole == MessageGroupRole.leader
+                          ? _deleteGroup(conversation)
+                          : _leaveGroup(conversation),
+                    )
+                  else
+                    MessageDetailMenuRow(
+                      icon: LucideIcons.ban,
+                      label: conversation.isBlocked ? 'Bỏ chặn' : 'Chặn',
+                      color: AppColors.primaryText,
+                      onTap: () => conversation.isBlocked
+                          ? _unblock(conversation)
+                          : _block(conversation),
+                    ),
+                  SizedBox(height: width * 0.025),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _MediaTabIcon(
+                        icon: LucideIcons.images,
+                        active: !_showLinks,
+                        onTap: () => setState(() => _showLinks = false),
+                      ),
+                      _MediaTabIcon(
+                        icon: LucideIcons.link,
+                        active: _showLinks,
+                        onTap: () => setState(() => _showLinks = true),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: width * 0.025),
                 ],
               ),
             ),
@@ -571,17 +519,11 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
             // Không nhận horizontal padding của phần detail phía trên.
             if (_showLinks)
               Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: width * 0.065,
-                ),
-                child: _LinkList(
-                  links: conversation.links,
-                ),
+                padding: EdgeInsets.symmetric(horizontal: width * 0.065),
+                child: _LinkList(links: conversation.links),
               )
             else
-              _MediaGrid(
-                assets: conversation.mediaAssets,
-              ),
+              _MediaGrid(assets: conversation.mediaAssets),
           ],
         ),
       ),
@@ -622,9 +564,7 @@ class _MediaTabIcon extends StatelessWidget {
 class _MediaGrid extends StatelessWidget {
   final List<String> assets;
 
-  const _MediaGrid({
-    required this.assets,
-  });
+  const _MediaGrid({required this.assets});
 
   @override
   Widget build(BuildContext context) {
@@ -640,10 +580,7 @@ class _MediaGrid extends StatelessWidget {
         crossAxisSpacing: 2,
       ),
       itemBuilder: (context, index) {
-        return Image.asset(
-          assets[index],
-          fit: BoxFit.cover,
-        );
+        return Image.asset(assets[index], fit: BoxFit.cover);
       },
     );
   }
@@ -652,9 +589,7 @@ class _MediaGrid extends StatelessWidget {
 class _LinkList extends StatelessWidget {
   final List<String> links;
 
-  const _LinkList({
-    required this.links,
-  });
+  const _LinkList({required this.links});
 
   @override
   Widget build(BuildContext context) {
@@ -694,10 +629,7 @@ class _BlockContent extends StatelessWidget {
   final String title;
   final VoidCallback onConfirm;
 
-  const _BlockContent({
-    required this.title,
-    required this.onConfirm,
-  });
+  const _BlockContent({required this.title, required this.onConfirm});
 
   @override
   Widget build(BuildContext context) {
@@ -739,10 +671,7 @@ class _BlockContent extends StatelessWidget {
             text: 'Họ sẽ không được thông báo là bạn đã chặn',
           ),
           SizedBox(height: width * 0.030),
-          MessageGradientButton(
-            label: 'Xác nhận',
-            onTap: onConfirm,
-          ),
+          MessageGradientButton(label: 'Xác nhận', onTap: onConfirm),
         ],
       ),
     );
@@ -753,10 +682,7 @@ class _BlockPoint extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const _BlockPoint({
-    required this.icon,
-    required this.text,
-  });
+  const _BlockPoint({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {

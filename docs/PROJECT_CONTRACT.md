@@ -11,7 +11,7 @@ GoMate is a smart travel system built around:
 - opt-in group location and auto check-in,
 - personal/group recommendation,
 - notifications/admin,
-- supporting social/follow/chat.
+- supporting social/follow/chat/moments.
 
 Target architecture:
 
@@ -23,13 +23,13 @@ The system is not intended to become a pure social network or a pure POI browser
 
 Priority:
 - P0: Auth/User, Place/Discovery, Trip/Group, Map/Location/Check-in, Recommendation, Notification/Admin.
-- P1: Social Post, Follow/Friend, Messaging.
-- Removed: Moments/Story.
+- P1: Social Post, Follow/Friend, Messaging, Moment.
+- Removed: legacy Story as a separate non-Moment domain.
 
 ## 2. Locked design decisions
 
 - Build new GoMate architecture; old project is reference for business/UI/assets/experience, not a 1:1 Supabase migration.
-- No Moments/Moment reactions/Moment reply.
+- Moment is in product scope as short-lived social media. Moment Backend V1 is implemented with MongoDB + Cloudinary and PostgreSQL-derived mutual-friend permissions.
 - Conversation metadata in PostgreSQL; message body/history in MongoDB.
 - PUBLIC/PRIVATE account model; mutual active follows imply friendship.
 - AI focuses on Place recommendation for user and Trip/group.
@@ -81,6 +81,7 @@ Business source of truth:
 Time-series/flexible-write domains:
 - interaction_events
 - messages
+- moments and moment social events
 - current_locations
 - location_history
 - location_archives
@@ -147,6 +148,9 @@ Spring -> AI. Flutter does not call AI directly. AI returns ranking/suggestion, 
 - Trip Chat membership mirrors active `trip_members`.
 - Kick/leave revokes ability to read new/send Trip messages.
 - Chat outage must not break Trip.
+- Group Chat must be linked to a successful Group Trip creation; do not create independent/orphan group conversations.
+- Group Trip and linked Group Chat names must synchronize both ways once the linkage exists.
+- Direct Message V1 is real one-to-one messaging and must not be rewritten while extending Group Messaging.
 
 ### Trip/group
 Lifecycle:
@@ -158,13 +162,28 @@ DRAFT -> PLANNED -> ACTIVE -> COMPLETED
 Core:
 - create Trip + leader membership in one transaction,
 - exactly one active LEADER,
+- group roles are only LEADER and MEMBER; deputy/co-leader/vice-leader roles are deprecated and must not be introduced in new Trip/Group Chat contracts,
 - only Leader edits title/date/description/stops, reorder, start/complete/cancel, kick, approve invite,
 - Member may invite but invitee must accept, then Leader approves,
 - Leader invite requires invitee acceptance only,
 - first other active member switches PERSONAL -> GROUP,
 - no automatic GROUP -> PERSONAL downgrade,
 - active member only sees Trip-member protected context,
-- stop order must stay unique/consistent.
+- create-trip UI must not expose a manual personal/group selector; a new trip is personal by default and becomes group when members are added,
+- `selectedMemberIds` is optional during creation; backend derives `PERSONAL/GROUP` from persisted membership and ignores client `tripType` as business intent,
+- selected members during creation must not receive notification until the trip + members + linked group chat transaction is successfully committed,
+- stop order must stay unique/consistent,
+- a Trip Stop is a Place occurrence, so `A -> B -> A` is valid but adjacent duplicate places such as `A -> A` are invalid,
+- Trip Stop time belongs to the stop occurrence; no start time means no complete interval and any end-only value must be ignored/cleared,
+- start-only stop time may be kept as a loose hint but must not be treated or rendered as a complete interval,
+- Trip Stop mutation APIs must use `tripStopId` for occurrence-specific edit/delete/reorder/time operations,
+- route optimization must keep unscheduled stops in the route and prioritize distance/km unless a later approved contract says otherwise.
+- pinned Trip is per user and must not be modeled as `trips.status=ACTIVE`.
+- the current Phase 3 member-location implementation is snapshot-only and returns last-known data, not realtime/live tracking.
+
+Pre-Big-Update Trip/Maps/Messaging rules are tracked in:
+- `GOMATE_TRIP_MAPS_MESSAGING_KNOWLEDGE_PRE_BIG_UPDATE_V1.md`
+- `GoMate_NghiepVu_Trip_Maps_Messaging_FULL.md`
 
 Invite statuses:
 ```text
@@ -241,8 +260,12 @@ PUT   /users/me/interests
 
 ### Follow/Search/Place
 ```text
-POST   /users/{id}/follow
+PUT    /users/{id}/follow
 DELETE /users/{id}/follow
+GET    /users/{id}/relationship
+GET    /users/me/following
+GET    /users/me/followers
+GET    /users/me/mutual-friends
 GET    /follow-requests
 POST   /follow-requests/{id}/accept
 POST   /follow-requests/{id}/reject
@@ -258,6 +281,12 @@ PATCH  /reviews/{id}
 DELETE /reviews/{id}
 POST   /place-submissions
 ```
+
+Current implemented Social Relationship V1:
+- `user_follows` stores directed follow edges in PostgreSQL.
+- Mutual friend is derived from reciprocal active follows.
+- Follow/unfollow are idempotent and resolve the actor from JWT.
+- `follow_requests`, global block, Message backend, Moment backend and Share backend remain separate follow-up scopes.
 
 ### Post
 ```text
@@ -277,13 +306,30 @@ DELETE /posts/{id}/bookmark
 
 ### Chat
 ```text
-POST /conversations/direct/{userId}
-POST /conversations
-GET  /conversations
-GET  /conversations/{id}/messages
-POST /conversations/{id}/accept
-POST /conversations/{id}/messages
+GET    /conversations
+POST   /conversations/direct
+GET    /conversations/{id}
+GET    /conversations/{id}/messages
+POST   /conversations/{id}/messages
+PATCH  /conversations/{id}/name
+POST   /conversations/{id}/read
+POST   /conversations/{id}/mute
+DELETE /conversations/{id}/mute
+POST   /conversations/{id}/block
+DELETE /conversations/{id}/block
+GET    /message-requests
+POST   /message-requests/{id}/accept
+DELETE /message-requests/{id}
 ```
+
+Current implemented Direct Message V1:
+- one-to-one direct chat only;
+- non-mutual users create a pending message request;
+- mutual friends open accepted conversation;
+- conversation metadata is PostgreSQL;
+- message bodies/history are MongoDB;
+- linked Group Trip Chat Phase 1.2 is implemented for create-time selected members;
+- add/remove member after an existing Trip, invite acceptance/approval lifecycle, realtime delivery, and media messages remain deferred.
 
 ### Trip/location
 ```text
@@ -291,7 +337,9 @@ POST   /trips
 GET    /trips/{id}
 PATCH  /trips/{id}
 POST   /trips/{id}/stops
+PATCH  /trips/{id}/stops/{stopId}
 PATCH  /trips/{id}/stops/reorder
+POST   /trips/{id}/stops/optimize
 DELETE /trips/{id}/stops/{stopId}
 POST   /trips/{id}/invites
 POST   /trip-invites/{id}/accept
@@ -304,6 +352,9 @@ POST   /trips/{id}/complete
 PUT /trips/{id}/location-sharing
 PUT /trips/{id}/location
 GET /trips/{id}/locations
+GET /trips/pinned
+POST /trips/{id}/pin
+DELETE /trips/{id}/pin
 ```
 
 ### Recommendation/notification/admin

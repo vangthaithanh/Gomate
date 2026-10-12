@@ -6,6 +6,7 @@ class GoMateMapMember {
   final String assetIcon;
   final Position position;
   final DateTime updatedAt;
+  final String locationState;
   final bool isStale;
 
   const GoMateMapMember({
@@ -14,6 +15,7 @@ class GoMateMapMember {
     required this.assetIcon,
     required this.position,
     required this.updatedAt,
+    this.locationState = 'LAST_KNOWN',
     this.isStale = false,
   });
 }

@@ -8,8 +8,8 @@ import '../models/message_models.dart';
 /// Adapter Messenger -> popup mời thành viên dùng chung.
 ///
 /// Quy ước:
-/// - leader + deputy đều được mời thêm thành viên.
-/// - leader + deputy đều được huỷ pending invite.
+/// - Chỉ leader được mời thêm thành viên.
+/// - Chỉ leader được huỷ pending invite.
 /// - accepted members không xuất hiện trong popup.
 /// - pending luôn nằm trên đầu.
 /// - UI thật nằm ở GoMateMemberInviteContent, không duplicate tại Messenger.
@@ -28,8 +28,7 @@ class MessageGroupInviteContent extends StatefulWidget {
       _MessageGroupInviteContentState();
 }
 
-class _MessageGroupInviteContentState
-    extends State<MessageGroupInviteContent> {
+class _MessageGroupInviteContentState extends State<MessageGroupInviteContent> {
   @override
   void initState() {
     super.initState();
@@ -48,19 +47,15 @@ class _MessageGroupInviteContentState
 
   @override
   Widget build(BuildContext context) {
-    final conversation =
-        widget.repository.conversation(widget.conversationId);
+    final conversation = widget.repository.conversation(widget.conversationId);
 
     if (conversation == null || !conversation.isGroup) {
       return const SizedBox.shrink();
     }
 
-    final role =
-        conversation.roleOf(widget.repository.currentUserId);
+    final role = conversation.roleOf(widget.repository.currentUserId);
 
-    final canManageInvite =
-        role == MessageGroupRole.leader ||
-        role == MessageGroupRole.deputy;
+    final canManageInvite = role == MessageGroupRole.leader;
 
     if (!canManageInvite) {
       return const SizedBox.shrink();
@@ -91,22 +86,17 @@ class _MessageGroupInviteContentState
       pendingInviteIds: pendingIds,
       excludedContactIds: acceptedIds,
 
-      // Đồng bộ leader/deputy:
-      // ai có quyền mời thì cũng có quyền huỷ pending invite.
-
+      // Đồng bộ rule mới: leader có quyền mời và huỷ pending invite.
       onAddInvites: (ids) {
         if (ids.isEmpty) return;
 
-        widget.repository.inviteGroupMembers(
-          widget.conversationId,
-          ids,
-        );
+        widget.repository.inviteGroupMembers(widget.conversationId, ids);
 
         if (!mounted) return;
 
         GoMateSnackBar.show(
           context,
-          message: 'Đã gửi ${ids.length} lời mời vào nhóm',
+          message: 'Đã thêm ${ids.length} thành viên vào nhóm',
         );
       },
 
@@ -120,10 +110,7 @@ class _MessageGroupInviteContentState
           }
         }
 
-        widget.repository.cancelGroupInvite(
-          widget.conversationId,
-          contactId,
-        );
+        widget.repository.cancelGroupInvite(widget.conversationId, contactId);
 
         if (!mounted) return;
 
@@ -133,6 +120,19 @@ class _MessageGroupInviteContentState
               ? 'Đã huỷ lời mời'
               : 'Đã huỷ lời mời ${contact.name}',
         );
+      },
+      onSearchContacts: (query) async {
+        final results = await widget.repository.fetchContactSuggestions(query);
+        return results
+            .map(
+              (contact) => GoMateInviteContact(
+                id: contact.id,
+                name: contact.name,
+                subtitle: contact.subtitle,
+                avatarAsset: contact.avatarAsset,
+              ),
+            )
+            .toList(growable: false);
       },
     );
   }

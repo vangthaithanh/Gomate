@@ -10,9 +10,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import vn.gomate.auth.*;
 import vn.gomate.common.Db;
+import vn.gomate.location.model.TripCurrentLocationDocument;
+import vn.gomate.location.repository.TripLocationMongoRepository;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static vn.gomate.common.Db.args;
@@ -25,9 +30,11 @@ class TripApiTest {
  @Autowired ObjectMapper json;
  @Autowired AuthService auth;
  @Autowired Db db;
+ @MockitoBean TripLocationMongoRepository locationMongo;
 
  private long lakeId;
  private long templeId;
+ private long gardenId;
 
  @BeforeEach
  void setup() {
@@ -38,10 +45,202 @@ class TripApiTest {
   long templeCategory=categoryId("temple");
   lakeId=insertPlace(lakeCategory,"Ho Xuan Huong",11.9419,108.4483);
   templeId=insertPlace(templeCategory,"Thien Vien Truc Lam",11.9037,108.4369);
+  gardenId=insertPlace(lakeCategory,"Vuon Hoa Thanh Pho",11.9470,108.4450);
   db.update("""
    INSERT INTO place_media(place_id,media_type,url,public_id,caption,sort_order)
    VALUES(:placeId,'IMAGE','https://res.cloudinary.com/demo/image/upload/sample.jpg','test/place-cover','cover',0)
    """,args("placeId",lakeId));
+ }
+
+ @Test
+ void pinAndMemberLocationSnapshotArePersistedAndProtected() throws Exception {
+  var leaderSession=registerSession("trip-phase3-leader");
+  var memberSession=registerSession("trip-phase3-member");
+  var outsiderSession=registerSession("trip-phase3-outsider");
+  String leaderToken="Bearer "+leaderSession.get("accessToken");
+  String memberToken="Bearer "+memberSession.get("accessToken");
+  String outsiderToken="Bearer "+outsiderSession.get("accessToken");
+  @SuppressWarnings("unchecked")
+  UUID leaderId=(UUID)((Map<String,Object>)leaderSession.get("user")).get("id");
+  @SuppressWarnings("unchecked")
+  UUID memberId=(UUID)((Map<String,Object>)memberSession.get("user")).get("id");
+
+  String tripId=performJson(post("/api/v1/trips"),leaderToken,Map.of(
+   "title","Phase 3 pinned group",
+   "selectedMemberIds",List.of(memberId.toString()),
+   "startDate","2026-10-01",
+   "endDate","2026-10-02"
+  ),201).get("id").asText();
+  UUID tripUuid=UUID.fromString(tripId);
+
+  JsonNode pinned=performJson(post("/api/v1/trips/"+tripId+"/pin"),leaderToken,null,200);
+  assertEquals(tripId,pinned.get("id").asText());
+  assertTrue(pinned.get("pinned").asBoolean());
+  assertEquals(1,db.count("SELECT COUNT(*) FROM trip_pins WHERE user_id=:userId AND trip_id=:tripId",args("userId",leaderId,"tripId",tripUuid)));
+  assertTrue(performJson(get("/api/v1/trips/pinned"),leaderToken,null,200).get("trip").get("pinned").asBoolean());
+
+  var doc=new TripCurrentLocationDocument();
+  doc.setTripId(tripUuid);
+  doc.setUserId(memberId);
+  doc.setLatitude(11.9419);
+  doc.setLongitude(108.4483);
+  doc.setAccuracyM(12.0);
+  doc.setCapturedAt(java.time.Instant.parse("2026-10-10T01:00:00Z"));
+  doc.setUpdatedAt(java.time.Instant.parse("2026-10-10T01:00:05Z"));
+  when(locationMongo.upsert(eq(tripUuid),eq(memberId),eq(11.9419),eq(108.4483),eq(12.0),any(),any())).thenReturn(doc);
+  when(locationMongo.findByTrip(tripUuid)).thenReturn(List.of(doc));
+
+  JsonNode published=performJson(put("/api/v1/trips/"+tripId+"/location"),memberToken,Map.of(
+   "latitude",11.9419,
+   "longitude",108.4483,
+   "accuracyM",12.0
+  ),200);
+  assertEquals(memberId.toString(),published.get("userId").asText());
+  assertEquals("LAST_KNOWN",published.get("locationState").asText());
+  assertEquals(1,db.count("""
+   SELECT COUNT(*) FROM trip_members
+   WHERE trip_id=:tripId AND user_id=:userId AND location_sharing_enabled=TRUE
+   """,args("tripId",tripUuid,"userId",memberId)));
+
+  JsonNode locations=performJson(get("/api/v1/trips/"+tripId+"/locations"),leaderToken,null,200);
+  assertEquals(1,locations.size());
+  assertEquals(memberId.toString(),locations.get(0).get("userId").asText());
+  assertEquals("LAST_KNOWN",locations.get(0).get("locationState").asText());
+
+  mvc.perform(get("/api/v1/trips/"+tripId+"/locations").header("Authorization",outsiderToken))
+   .andExpect(status().isNotFound());
+
+  mvc.perform(put("/api/v1/trips/"+tripId+"/location")
+    .header("Authorization",memberToken)
+    .contentType("application/json")
+    .content(json.writeValueAsBytes(Map.of("latitude",100,"longitude",108.4483))))
+   .andExpect(status().isBadRequest());
+
+  mvc.perform(delete("/api/v1/trips/"+tripId+"/pin").header("Authorization",leaderToken))
+   .andExpect(status().isNoContent());
+  assertEquals(0,db.count("SELECT COUNT(*) FROM trip_pins WHERE user_id=:userId",args("userId",leaderId)));
+ }
+
+ @Test
+ void tripStopOccurrenceTimeReorderAndOptimizeRules() throws Exception {
+  String token=registerToken("trip-phase2");
+  String tripId=performJson(post("/api/v1/trips"),token,Map.of(
+   "title","Phase 2 stop rules",
+   "startDate","2026-10-01",
+   "endDate","2026-10-03"
+  ),201).get("id").asText();
+
+  JsonNode a1=performJson(post("/api/v1/trips/"+tripId+"/stops"),token,Map.of(
+   "placeId",lakeId,
+   "dayNo",1,
+   "plannedStartAt","2026-10-01T08:00:00+07:00",
+   "plannedEndAt","2026-10-01T09:00:00+07:00"
+  ),201);
+  String a1Id=a1.get("stops").get(0).get("id").asText();
+  assertTrue(a1.get("stops").get(0).get("hasCompleteInterval").asBoolean());
+  assertFalse(a1.get("stops").get(0).get("plannedEndAt").isNull());
+  assertEquals(60,a1.get("stops").get(0).get("plannedDurationMin").asInt());
+
+  JsonNode b=performJson(post("/api/v1/trips/"+tripId+"/stops"),token,Map.of(
+   "placeId",templeId,
+   "dayNo",1
+  ),201);
+  String bId=b.get("stops").get(1).get("id").asText();
+
+  JsonNode aba=performJson(post("/api/v1/trips/"+tripId+"/stops"),token,Map.of(
+   "placeId",lakeId,
+   "dayNo",1,
+   "plannedStartAt","2026-10-01T18:00:00+07:00"
+  ),201);
+  assertEquals(3,aba.get("stops").size());
+  String a2Id=aba.get("stops").get(2).get("id").asText();
+  assertNotEquals(a1Id,a2Id);
+  assertEquals(lakeId,aba.get("stops").get(0).get("placeId").asLong());
+  assertEquals(lakeId,aba.get("stops").get(2).get("placeId").asLong());
+  assertFalse(aba.get("stops").get(2).get("hasCompleteInterval").asBoolean());
+  assertTrue(aba.get("stops").get(2).get("plannedEndAt").isNull());
+
+  mvc.perform(post("/api/v1/trips/"+tripId+"/stops")
+    .header("Authorization",token)
+    .contentType("application/json")
+    .content(json.writeValueAsBytes(Map.of("placeId",lakeId,"dayNo",1))))
+   .andExpect(status().isBadRequest())
+   .andExpect(jsonPath("$.code").value("TRIP_STOP_ADJACENT_DUPLICATE"));
+
+  mvc.perform(patch("/api/v1/trips/"+tripId+"/stops/"+bId)
+    .header("Authorization",token)
+    .contentType("application/json")
+    .content(json.writeValueAsBytes(Map.of("placeId",lakeId))))
+   .andExpect(status().isBadRequest())
+   .andExpect(jsonPath("$.code").value("TRIP_STOP_ADJACENT_DUPLICATE"));
+
+  mvc.perform(delete("/api/v1/trips/"+tripId+"/stops/"+bId).header("Authorization",token))
+   .andExpect(status().isBadRequest())
+   .andExpect(jsonPath("$.code").value("TRIP_STOP_ADJACENT_DUPLICATE"));
+  assertEquals(3,performJson(get("/api/v1/trips/"+tripId),token,null,200).get("stops").size());
+
+  JsonNode timedA2=performJson(patch("/api/v1/trips/"+tripId+"/stops/"+a2Id),token,Map.of(
+   "plannedStartAt","2026-10-01T18:00:00+07:00",
+   "plannedEndAt","2026-10-01T19:00:00+07:00"
+  ),200);
+  JsonNode a2AfterTime=stopById(timedA2,a2Id);
+  assertTrue(a2AfterTime.get("hasCompleteInterval").asBoolean());
+  assertFalse(a2AfterTime.get("plannedEndAt").isNull());
+  assertEquals(60,a2AfterTime.get("plannedDurationMin").asInt());
+  assertEquals(60,stopById(timedA2,a1Id).get("plannedDurationMin").asInt());
+
+  JsonNode clearedA1=performJson(patch("/api/v1/trips/"+tripId+"/stops/"+a1Id),token,Map.of(
+   "clearTime",true
+  ),200);
+  JsonNode a1AfterClear=stopById(clearedA1,a1Id);
+  assertTrue(a1AfterClear.get("plannedStartAt").isNull());
+  assertTrue(a1AfterClear.get("plannedEndAt").isNull());
+  assertFalse(a1AfterClear.get("hasCompleteInterval").asBoolean());
+
+  mvc.perform(patch("/api/v1/trips/"+tripId+"/stops/reorder")
+    .header("Authorization",token)
+    .contentType("application/json")
+    .content(json.writeValueAsBytes(Map.of(
+     "stops",List.of(
+      Map.of("stopId",bId,"dayNo",1,"orderNo",1),
+      Map.of("stopId",a1Id,"dayNo",1,"orderNo",2),
+      Map.of("stopId",a2Id,"dayNo",1,"orderNo",3)
+     )
+    ))))
+   .andExpect(status().isBadRequest())
+   .andExpect(jsonPath("$.code").value("TRIP_STOP_ADJACENT_DUPLICATE"));
+  JsonNode afterInvalidReorder=performJson(get("/api/v1/trips/"+tripId),token,null,200);
+  assertEquals(a1Id,afterInvalidReorder.get("stops").get(0).get("id").asText());
+  assertEquals(bId,afterInvalidReorder.get("stops").get(1).get("id").asText());
+  assertEquals(a2Id,afterInvalidReorder.get("stops").get(2).get("id").asText());
+
+  JsonNode validReorder=performJson(patch("/api/v1/trips/"+tripId+"/stops/reorder"),token,Map.of(
+   "stops",List.of(
+    Map.of("stopId",a2Id,"dayNo",1,"orderNo",1),
+    Map.of("stopId",bId,"dayNo",1,"orderNo",2),
+    Map.of("stopId",a1Id,"dayNo",1,"orderNo",3)
+   )
+  ),200);
+  assertEquals(a2Id,validReorder.get("stops").get(0).get("id").asText());
+  assertEquals(bId,validReorder.get("stops").get(1).get("id").asText());
+  assertEquals(a1Id,validReorder.get("stops").get(2).get("id").asText());
+  assertFalse(stopById(validReorder,a2Id).get("plannedStartAt").isNull());
+  assertEquals(60,stopById(validReorder,a2Id).get("plannedDurationMin").asInt());
+  assertTrue(stopById(validReorder,a1Id).get("plannedStartAt").isNull());
+
+  JsonNode withUnscheduled=performJson(post("/api/v1/trips/"+tripId+"/stops"),token,Map.of(
+   "placeId",gardenId,
+   "dayNo",1
+  ),201);
+  String gardenStopId=withUnscheduled.get("stops").get(3).get("id").asText();
+
+  JsonNode optimized=performJson(post("/api/v1/trips/"+tripId+"/stops/optimize"),token,Map.of("dayNo",1),200);
+  Set<String> optimizedIds=new HashSet<>();
+  for(JsonNode stop:optimized.get("stops")) optimizedIds.add(stop.get("id").asText());
+  assertEquals(Set.of(a1Id,bId,a2Id,gardenStopId),optimizedIds);
+  assertFalse(stopById(optimized,a2Id).get("plannedStartAt").isNull());
+  assertEquals(60,stopById(optimized,a2Id).get("plannedDurationMin").asInt());
+  assertNoAdjacentDuplicatePlaces(optimized);
  }
 
  @AfterEach
@@ -165,10 +364,27 @@ class TripApiTest {
  }
 
  private JsonNode performJson(org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder request,String token,Object body,int expectedStatus) throws Exception {
-  var result=mvc.perform(request.header("Authorization",token).contentType("application/json").content(json.writeValueAsBytes(body)))
+  var builder=request.header("Authorization",token).contentType("application/json");
+  if(body!=null) builder.content(json.writeValueAsBytes(body));
+  var result=mvc.perform(builder)
    .andExpect(status().is(expectedStatus))
    .andReturn();
   return json.readTree(result.getResponse().getContentAsByteArray());
+ }
+
+ private JsonNode stopById(JsonNode detail,String stopId) {
+  for(JsonNode stop:detail.get("stops")) {
+   if(stopId.equals(stop.get("id").asText())) return stop;
+  }
+  fail("Missing stop "+stopId);
+  return detail;
+ }
+
+ private void assertNoAdjacentDuplicatePlaces(JsonNode detail) {
+  JsonNode stops=detail.get("stops");
+  for(int i=1;i<stops.size();i++) {
+   assertNotEquals(stops.get(i-1).get("placeId").asLong(),stops.get(i).get("placeId").asLong());
+  }
  }
 
  private String registerToken(String prefix) {

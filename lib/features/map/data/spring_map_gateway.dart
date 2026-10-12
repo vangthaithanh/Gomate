@@ -1,3 +1,6 @@
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+
+import '../../../core/services/auth_service.dart';
 import '../models/map_member.dart';
 import '../models/map_place.dart';
 import '../models/map_route.dart';
@@ -44,6 +47,19 @@ class SpringGoMateMapGateway implements GoMateMapGateway {
   }
 
   @override
+  Future<GoMateMapRoute> loadTripRouteFromCurrentLocation({
+    required double originLatitude,
+    required double originLongitude,
+    required List<String> placeIds,
+  }) {
+    return _routes.calculateTripFromCurrentLocation(
+      originLatitude: originLatitude,
+      originLongitude: originLongitude,
+      placeIds: placeIds,
+    );
+  }
+
+  @override
   Future<GoMateMapRoute> loadTripRoute(String tripId) {
     throw UnsupportedError(
       'Trip route chưa được nối với Place API thật trong task này.',
@@ -52,6 +68,48 @@ class SpringGoMateMapGateway implements GoMateMapGateway {
 
   @override
   Future<List<GoMateMapMember>> loadTripMembers(String tripId) async {
-    return const <GoMateMapMember>[];
+    final response = await AuthService.instance.requestJson(
+      'GET',
+      '/trips/$tripId/locations',
+    );
+    final rows = response is List ? response : const <Object?>[];
+    return rows
+        .map(_member)
+        .where((item) => item != null)
+        .cast<GoMateMapMember>()
+        .toList(growable: false);
+  }
+
+  GoMateMapMember? _member(Object? value) {
+    final json = value is Map ? value : const <String, dynamic>{};
+    final lat = _double(json['latitude']);
+    final lng = _double(json['longitude']);
+    final userId = _text(json['userId']);
+    if (lat == null || lng == null || userId.isEmpty) return null;
+    final state = _text(json['locationState'], fallback: 'LAST_KNOWN');
+    return GoMateMapMember(
+      userId: userId,
+      displayName: _text(json['displayName'], fallback: 'Thành viên'),
+      assetIcon: userId.hashCode.isEven
+          ? 'assets/map/member_an.png'
+          : 'assets/map/member_thu.png',
+      position: Position(lng, lat),
+      updatedAt:
+          DateTime.tryParse(_text(json['updatedAt']))?.toLocal() ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+      locationState: state,
+      isStale: state != 'LIVE',
+    );
+  }
+
+  static double? _double(Object? value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
+  }
+
+  static String _text(Object? value, {String fallback = ''}) {
+    if (value is! String) return fallback;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? fallback : trimmed;
   }
 }

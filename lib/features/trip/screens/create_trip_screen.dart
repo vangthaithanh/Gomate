@@ -5,30 +5,34 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/bottom_sheet.dart';
 import '../../../core/widgets/snackbar.dart';
 import '../../messages/data/message_repository.dart';
+import '../data/trip_repository.dart';
 import '../models/trip_ui_models.dart';
 import '../widgets/trip_shared_sheets.dart';
 import '../../../core/widgets/gomate_name_editor_content.dart';
 
 class CreateTripScreen extends StatefulWidget {
   final MessageRepository? messageRepository;
+  final RealTripRepository? tripRepository;
 
   const CreateTripScreen({
     super.key,
     this.messageRepository,
+    this.tripRepository,
   });
 
   @override
-  State<CreateTripScreen> createState() =>
-      _CreateTripScreenState();
+  State<CreateTripScreen> createState() => _CreateTripScreenState();
 }
 
 class _CreateTripScreenState extends State<CreateTripScreen> {
   late final MessageRepository _messageRepository;
+  late final RealTripRepository _tripRepository;
 
   String _title = 'Lịch trình';
   bool _nameEdited = false;
 
-  String _coverAsset = 'assets/images/home_dalat.jpg';
+  final String _coverAsset = 'assets/images/home_dalat.jpg';
+  bool _submitting = false;
 
   /// Draft lời mời khi đang tạo trip.
   ///
@@ -44,14 +48,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
 
     _messageRepository =
         widget.messageRepository ?? DemoMessageRepository.instance;
-  }
-
-  int get _days {
-    if (_startDate == null || _endDate == null) {
-      return 1;
-    }
-
-    return _endDate!.difference(_startDate!).inDays + 1;
+    _tripRepository = widget.tripRepository ?? RealTripRepository.instance;
   }
 
   Future<void> _editName() async {
@@ -69,15 +66,12 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
     setState(() {
       _title = value;
       _nameEdited =
-          value.trim().isNotEmpty && value.trim() != 'Lịch trình';
+          value.trim().isNotEmpty && value.trim().toLowerCase() != 'lịch trình';
     });
   }
 
   void _pickCover() {
-    GoMateSnackBar.show(
-      context,
-      message: 'Chọn ảnh bìa sẽ được kết nối sau',
-    );
+    GoMateSnackBar.show(context, message: 'Chọn ảnh bìa sẽ được kết nối sau');
   }
 
   Future<void> _addMembers() async {
@@ -87,9 +81,8 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
       child: TripInviteMembersContent(
         contacts: _messageRepository.contacts,
         initialPendingInviteIds: _pendingInviteIds,
-        acceptedMemberIds: <String>{
-          _messageRepository.currentUserId,
-        },
+        acceptedMemberIds: <String>{_messageRepository.currentUserId},
+        searchContacts: _tripRepository.searchMemberCandidates,
         onPendingChanged: (pending) {
           if (!mounted) return;
 
@@ -104,8 +97,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   }
 
   Future<void> _pickDate() async {
-    final result =
-        await GoMateBottomSheet.show<TripDateRangeResult>(
+    final result = await GoMateBottomSheet.show<TripDateRangeResult>(
       context: context,
       size: GoMateBottomSheetSize.expanded,
       child: TripDateRangeContent(
@@ -122,7 +114,9 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
     });
   }
 
-  void _createTrip() {
+  Future<void> _createTrip() async {
+    if (_submitting) return;
+
     if (!_nameEdited) {
       GoMateSnackBar.show(
         context,
@@ -141,45 +135,36 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
       return;
     }
 
-    final tripId =
-        'trip_${DateTime.now().millisecondsSinceEpoch}';
+    setState(() {
+      _submitting = true;
+    });
 
-    // QUAN TRỌNG:
-    // Lời mời chưa được chấp nhận KHÔNG làm Trip trở thành group.
-    //
-    // Khi vừa tạo:
-    // - accepted members = chỉ current user;
-    // - isGroup = false;
-    // - conversationId = null;
-    // - pendingInviteIds = những người đã mời.
-    //
-    // Backend sau này:
-    // - sau create mới dispatch notification;
-    // - khi có người accept => add member;
-    // - accepted member count > 1 => chuyển group + tạo group chat.
-    final trip = TripUi(
-      id: tripId,
-      title: _title,
-      days: _days,
-      destination: 'Đang cập nhật',
-      coverAsset: _coverAsset,
-      isActive: false,
-      isGroup: false,
-      currentUserRole: TripAccessRole.personal,
-      startDate: _startDate,
-      endDate: _endDate,
-      members: <TripMemberUi>[
-        TripMemberUi(
-          id: _messageRepository.currentUserId,
-          name: _messageRepository.currentUserName,
-          role: TripAccessRole.personal,
+    try {
+      final trip = await _tripRepository.create(
+        TripCreateDraft(
+          title: _title,
+          startDate: _startDate!,
+          endDate: _endDate!,
+          selectedMemberIds: _pendingInviteIds.toList(growable: false),
         ),
-      ],
-      pendingInviteIds: List<String>.unmodifiable(_pendingInviteIds),
-      conversationId: null,
-    );
+      );
 
-    Navigator.of(context).pop(trip);
+      if (!mounted) return;
+      Navigator.of(context).pop(trip);
+    } catch (error) {
+      if (!mounted) return;
+      GoMateSnackBar.show(
+        context,
+        message: error.toString(),
+        icon: Icons.error_outline,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _submitting = false;
+        });
+      }
+    }
   }
 
   String _memberSubtitle() {
@@ -230,11 +215,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
 
-    double c(
-      double value,
-      double min,
-      double max,
-    ) {
+    double c(double value, double min, double max) {
       return value.clamp(min, max).toDouble();
     }
 
@@ -252,13 +233,9 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                 c(width * 0.28, 100, 116),
               ),
               children: [
-                _CreateHeader(
-                  onBack: () => Navigator.of(context).pop(),
-                ),
+                _CreateHeader(onBack: () => Navigator.of(context).pop()),
 
-                SizedBox(
-                  height: c(width * 0.035, 12, 15),
-                ),
+                SizedBox(height: c(width * 0.035, 12, 15)),
 
                 Center(
                   child: InkWell(
@@ -271,23 +248,22 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                         width: c(width * 0.20, 70, 78),
                         height: c(width * 0.20, 70, 78),
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          width: 75,
-                          height: 75,
-                          color: AppColors.grayBackground,
-                          child: const Icon(
-                            LucideIcons.image,
-                            color: AppColors.grayText,
-                          ),
-                        ),
+                        errorBuilder: (imageContext, error, stackTrace) =>
+                            Container(
+                              width: 75,
+                              height: 75,
+                              color: AppColors.grayBackground,
+                              child: const Icon(
+                                LucideIcons.image,
+                                color: AppColors.grayText,
+                              ),
+                            ),
                       ),
                     ),
                   ),
                 ),
 
-                SizedBox(
-                  height: c(width * 0.025, 8, 11),
-                ),
+                SizedBox(height: c(width * 0.025, 8, 11)),
 
                 Center(
                   child: Row(
@@ -301,16 +277,12 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                           color: Colors.black,
                         ),
                       ),
-                      SizedBox(
-                        width: c(width * 0.012, 4, 5),
-                      ),
+                      SizedBox(width: c(width * 0.012, 4, 5)),
                       InkWell(
                         onTap: _editName,
                         customBorder: const CircleBorder(),
                         child: Padding(
-                          padding: EdgeInsets.all(
-                            c(width * 0.006, 2, 3),
-                          ),
+                          padding: EdgeInsets.all(c(width * 0.006, 2, 3)),
                           child: Icon(
                             LucideIcons.pencil,
                             size: c(width * 0.040, 14, 16),
@@ -322,9 +294,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                   ),
                 ),
 
-                SizedBox(
-                  height: c(width * 0.040, 14, 17),
-                ),
+                SizedBox(height: c(width * 0.040, 14, 17)),
 
                 _CreateMenuRow(
                   icon: LucideIcons.users_round,
@@ -350,6 +320,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                 top: false,
                 child: Center(
                   child: _CreateTripButton(
+                    loading: _submitting,
                     onTap: _createTrip,
                   ),
                 ),
@@ -365,16 +336,13 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
 class _CreateHeader extends StatelessWidget {
   final VoidCallback onBack;
 
-  const _CreateHeader({
-    required this.onBack,
-  });
+  const _CreateHeader({required this.onBack});
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
 
-    final height =
-        (width * 0.11).clamp(40.0, 44.0).toDouble();
+    final height = (width * 0.11).clamp(40.0, 44.0).toDouble();
 
     return SizedBox(
       height: height,
@@ -429,16 +397,13 @@ class _CreateMenuRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
 
-    final minHeight =
-        (width * 0.145).clamp(52.0, 58.0).toDouble();
+    final minHeight = (width * 0.145).clamp(52.0, 58.0).toDouble();
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: ConstrainedBox(
-        constraints: BoxConstraints(
-          minHeight: minHeight,
-        ),
+        constraints: BoxConstraints(minHeight: minHeight),
         child: Row(
           children: [
             SizedBox(
@@ -461,8 +426,7 @@ class _CreateMenuRow extends StatelessWidget {
                   Text(
                     title,
                     style: TextStyle(
-                      fontSize:
-                          (width * 0.032).clamp(11.5, 12.5).toDouble(),
+                      fontSize: (width * 0.032).clamp(11.5, 12.5).toDouble(),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -471,8 +435,7 @@ class _CreateMenuRow extends StatelessWidget {
                     Text(
                       subtitle,
                       style: TextStyle(
-                        fontSize:
-                            (width * 0.027).clamp(9.5, 10.5).toDouble(),
+                        fontSize: (width * 0.027).clamp(9.5, 10.5).toDouble(),
                         color: AppColors.grayText,
                         fontWeight: FontWeight.w500,
                       ),
@@ -495,20 +458,17 @@ class _CreateMenuRow extends StatelessWidget {
 
 class _CreateTripButton extends StatelessWidget {
   final VoidCallback onTap;
+  final bool loading;
 
-  const _CreateTripButton({
-    required this.onTap,
-  });
+  const _CreateTripButton({required this.onTap, this.loading = false});
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
 
-    final buttonWidth =
-        (width * (160 / 375)).clamp(154.0, 166.0).toDouble();
+    final buttonWidth = (width * (160 / 375)).clamp(154.0, 166.0).toDouble();
 
-    final height =
-        (width * (45 / 375)).clamp(43.0, 47.0).toDouble();
+    final height = (width * (45 / 375)).clamp(43.0, 47.0).toDouble();
 
     return Material(
       color: Colors.transparent,
@@ -524,15 +484,24 @@ class _CreateTripButton extends StatelessWidget {
             boxShadow: AppColors.elevatedShadow,
           ),
           child: Center(
-            child: Text(
-              'Tạo lịch trình',
-              style: TextStyle(
-                fontSize:
-                    (width * (14 / 375)).clamp(13.0, 14.0).toDouble(),
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
+            child: loading
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text(
+                    'Tạo lịch trình',
+                    style: TextStyle(
+                      fontSize: (width * (14 / 375))
+                          .clamp(13.0, 14.0)
+                          .toDouble(),
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
           ),
         ),
       ),

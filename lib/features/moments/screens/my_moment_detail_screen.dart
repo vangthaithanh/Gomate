@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
@@ -273,6 +274,7 @@ class _MyMomentDetailScreenState extends State<MyMomentDetailScreen> {
     await widget.repository.sendMessage(
       receiverUserId: reaction.userId,
       message: message,
+      momentId: widget.momentId,
     );
 
     if (!mounted) return;
@@ -344,7 +346,7 @@ class _ReactionRow extends StatelessWidget {
               border: Border.all(color: AppColors.grayBorder),
             ),
             clipBehavior: Clip.antiAlias,
-            child: Image.asset(reaction.avatarAsset, fit: BoxFit.cover),
+            child: _SourceImage(source: reaction.avatarAsset),
           ),
           SizedBox(width: c(width * 0.027, 9, 11)),
           Expanded(
@@ -393,5 +395,32 @@ class _ReactionRow extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _SourceImage extends StatelessWidget {
+  final String source;
+
+  const _SourceImage({required this.source});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget fallback() {
+      return Container(
+        color: AppColors.blue50,
+        alignment: Alignment.center,
+        child: Icon(LucideIcons.user, color: AppColors.grayText),
+      );
+    }
+
+    final value = source.trim();
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return Image.network(value, fit: BoxFit.cover, errorBuilder: (_, __, ___) => fallback());
+    }
+    if (value.contains(':\\') || value.startsWith('/')) {
+      return Image.file(File(value), fit: BoxFit.cover, errorBuilder: (_, __, ___) => fallback());
+    }
+    if (value.isEmpty) return fallback();
+    return Image.asset(value, fit: BoxFit.cover, errorBuilder: (_, __, ___) => fallback());
   }
 }

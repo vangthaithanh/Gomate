@@ -44,6 +44,8 @@ dependencies:
   flutter_lucide: ^1.49.0
   flutter_twemoji: ^1.1.0
   image_picker: ^1.2.3
+  camera: ^0.12.0+2
+  http_parser: ^4.1.2
 
 
 dev_dependencies:

@@ -48,20 +48,11 @@ class _RoleAwareGroupMembersScreenState
   MessageConversation? get _conversation =>
       widget.repository.conversation(widget.conversationId);
 
-  bool _selectable(
-      MessageParticipant participant,
-      MessageGroupRole actorRole,
-      ) {
+  bool _selectable(MessageParticipant participant, MessageGroupRole actorRole) {
     if (participant.id == widget.repository.currentUserId) return false;
     if (participant.role == MessageGroupRole.leader) return false;
 
-    if (actorRole == MessageGroupRole.leader) return true;
-
-    if (actorRole == MessageGroupRole.deputy) {
-      return participant.role == MessageGroupRole.member;
-    }
-
-    return false;
+    return actorRole == MessageGroupRole.leader;
   }
 
   void _toggleSelectionMode() {
@@ -108,100 +99,6 @@ class _RoleAwareGroupMembersScreenState
     );
   }
 
-  List<MessageParticipant> _selectedParticipants(
-      MessageConversation conversation,
-      ) {
-    return conversation.participants
-        .where((participant) => _selected.contains(participant.id))
-        .toList(growable: false);
-  }
-
-  String? _roleActionLabel(MessageConversation conversation) {
-    final actorRole = conversation.roleOf(widget.repository.currentUserId);
-    if (actorRole != MessageGroupRole.leader || _selected.isEmpty) {
-      return null;
-    }
-
-    final selected = _selectedParticipants(conversation);
-    if (selected.length == 1 &&
-        selected.first.role == MessageGroupRole.deputy) {
-      return 'Hủy uỷ quyền';
-    }
-
-    if (selected.isNotEmpty &&
-        selected.every((participant) =>
-        participant.role == MessageGroupRole.member)) {
-      return 'Uỷ quyền';
-    }
-
-    return null;
-  }
-
-  Future<void> _handleRoleAction(MessageConversation conversation) async {
-    final selected = _selectedParticipants(conversation);
-    if (selected.isEmpty) return;
-
-    if (selected.length == 1 &&
-        selected.first.role == MessageGroupRole.deputy) {
-      final participant = selected.first;
-
-      await GoMateBottomSheet.show<void>(
-        context: context,
-        child: MessageConfirmContent(
-          title: 'Hủy uỷ quyền cho ${participant.displayName}',
-          description:
-          'Thành viên này sẽ trở lại quyền hạn của thành viên bình thường',
-          onConfirm: () {
-            widget.repository.revokeGroupDeputy(
-              conversation.id,
-              participant.id,
-            );
-            Navigator.of(context).pop();
-          },
-        ),
-      );
-
-      if (!mounted) return;
-      _selected.clear();
-      setState(() => _selectionMode = false);
-      GoMateSnackBar.show(
-        context,
-        message: 'Đã hủy uỷ quyền cho ${participant.displayName}',
-      );
-      return;
-    }
-
-    if (!selected.every(
-          (participant) => participant.role == MessageGroupRole.member,
-    )) {
-      return;
-    }
-
-    await GoMateBottomSheet.show<void>(
-      context: context,
-      child: MessageConfirmContent(
-        title: 'Uỷ quyền cho (${selected.length}) thành viên',
-        description:
-        'Những thành viên được uỷ quyền sẽ được cấp quyền phó nhóm',
-        onConfirm: () {
-          widget.repository.promoteGroupMembers(
-            conversation.id,
-            selected.map((e) => e.id),
-          );
-          Navigator.of(context).pop();
-        },
-      ),
-    );
-
-    if (!mounted) return;
-    _selected.clear();
-    setState(() => _selectionMode = false);
-    GoMateSnackBar.show(
-      context,
-      message: 'Đã uỷ quyền cho ${selected.length} thành viên',
-    );
-  }
-
   Future<void> _deleteSelected(MessageConversation conversation) async {
     if (_selected.isEmpty) return;
     final count = _selected.length;
@@ -211,13 +108,10 @@ class _RoleAwareGroupMembersScreenState
       child: MessageConfirmContent(
         title: 'Xoá ($count) thành viên',
         description:
-        'Những thành viên bị xoá khỏi đoạn chat cũng đồng nghĩa với việc '
+            'Những thành viên bị xoá khỏi đoạn chat cũng đồng nghĩa với việc '
             'họ sẽ bị xoá khỏi lịch trình du lịch nhóm',
         onConfirm: () {
-          widget.repository.removeGroupMembers(
-            conversation.id,
-            _selected,
-          );
+          widget.repository.removeGroupMembers(conversation.id, _selected);
           Navigator.of(context).pop();
         },
       ),
@@ -226,10 +120,7 @@ class _RoleAwareGroupMembersScreenState
     if (!mounted) return;
     _selected.clear();
     setState(() => _selectionMode = false);
-    GoMateSnackBar.show(
-      context,
-      message: 'Đã xoá $count thành viên khỏi nhóm',
-    );
+    GoMateSnackBar.show(context, message: 'Đã xoá $count thành viên khỏi nhóm');
   }
 
   @override
@@ -244,14 +135,14 @@ class _RoleAwareGroupMembersScreenState
 
     final width = MediaQuery.sizeOf(context).width;
     final role = conversation.roleOf(widget.repository.currentUserId);
-    final canManage = role != MessageGroupRole.member;
+    final canManage = role == MessageGroupRole.leader;
     final selectable = conversation.participants
         .where((participant) => _selectable(participant, role))
         .toList(growable: false);
-    final allSelected = selectable.isNotEmpty &&
+    final allSelected =
+        selectable.isNotEmpty &&
         _selected.length == selectable.length &&
         _selected.containsAll(selectable.map((e) => e.id));
-    final roleActionLabel = _roleActionLabel(conversation);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -315,9 +206,7 @@ class _RoleAwareGroupMembersScreenState
                           ),
                         ),
                       ] else
-                        SizedBox(
-                          width: messageClamp(width * 0.070, 24, 28),
-                        ),
+                        SizedBox(width: messageClamp(width * 0.070, 24, 28)),
                     ],
                   ),
                 ),
@@ -328,11 +217,11 @@ class _RoleAwareGroupMembersScreenState
                     TextSpan(
                       children: [
                         TextSpan(text: _descriptionLead(role)),
-                        if (role != MessageGroupRole.member) ...[
+                        if (role == MessageGroupRole.leader) ...[
                           const TextSpan(text: '\n'),
                           const TextSpan(
                             text:
-                            'Xoá thành viên ra khỏi nhóm đồng nghĩa với việc họ sẽ bị xoá khỏi lịch trình du lịch.',
+                                'Xoá thành viên ra khỏi nhóm đồng nghĩa với việc họ sẽ bị xoá khỏi lịch trình du lịch.',
                             style: TextStyle(color: AppColors.primaryText),
                           ),
                         ],
@@ -405,7 +294,7 @@ class _RoleAwareGroupMembersScreenState
                       return _GroupMemberRow(
                         participant: participant,
                         isCurrentUser:
-                        participant.id == widget.repository.currentUserId,
+                            participant.id == widget.repository.currentUserId,
                         reserveSelectionSpace: canManage,
                         selectionMode: _selectionMode && canManage,
                         selectable: canSelect,
@@ -429,13 +318,6 @@ class _RoleAwareGroupMembersScreenState
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      if (roleActionLabel != null) ...[
-                        MessageGradientButton(
-                          label: roleActionLabel,
-                          onTap: () => _handleRoleAction(conversation),
-                        ),
-                        SizedBox(width: width * 0.075),
-                      ],
                       InkWell(
                         onTap: () => _deleteSelected(conversation),
                         customBorder: const CircleBorder(),
@@ -468,11 +350,9 @@ class _RoleAwareGroupMembersScreenState
   String _descriptionLead(MessageGroupRole role) {
     switch (role) {
       case MessageGroupRole.member:
-        return 'Bạn không thể thêm người vào nhóm. Chỉ trưởng nhóm và phó nhóm mới có thể thêm và xoá thành viên ra khỏi đoạn chat.';
-      case MessageGroupRole.deputy:
-        return 'Bạn không thể xoá trưởng nhóm và các phó nhóm.';
+        return 'Bạn không thể thêm hoặc xoá thành viên. Chỉ trưởng nhóm mới có quyền quản lý thành viên.';
       case MessageGroupRole.leader:
-        return 'Bạn có thể uỷ quyền cho bất kì thành viên nào đang có mặt trong nhóm.';
+        return 'Bạn có thể thêm hoặc xoá thành viên khỏi nhóm.';
     }
   }
 }
@@ -506,7 +386,6 @@ class _GroupMemberRow extends StatelessWidget {
     final selectionSlotWidth = messageClamp(width * 0.078, 28, 31);
     final selectionCircleSize = messageClamp(width * 0.052, 19, 21);
     final chevronSize = messageClamp(width * 0.067, 24, 27);
-    final keySize = messageClamp(width * 0.040, 14, 16);
 
     return Material(
       color: Colors.transparent,
@@ -536,20 +415,14 @@ class _GroupMemberRow extends StatelessWidget {
                               color: selected
                                   ? const Color(0xCC0A43A8)
                                   : const Color(0xCCDADADA),
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 1,
-                              ),
+                              border: Border.all(color: Colors.white, width: 1),
                             ),
                           ),
                         )
                       : const SizedBox.shrink(),
                 ),
 
-              MessageAvatar(
-                size: avatarSize,
-                asset: participant.avatarAsset,
-              ),
+              MessageAvatar(size: avatarSize, asset: participant.avatarAsset),
               SizedBox(width: messageClamp(width * 0.032, 11, 13)),
 
               Expanded(
@@ -573,14 +446,12 @@ class _GroupMemberRow extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (participant.role != MessageGroupRole.member) ...[
+                        if (participant.role == MessageGroupRole.leader) ...[
                           SizedBox(width: width * 0.010),
                           Icon(
                             LucideIcons.key,
-                            size: keySize,
-                            color: participant.role == MessageGroupRole.leader
-                                ? AppColors.primaryIcon
-                                : AppColors.grayText,
+                            size: messageClamp(width * 0.040, 14, 16),
+                            color: AppColors.primaryIcon,
                           ),
                         ],
                       ],
@@ -618,17 +489,17 @@ class _GroupMemberRow extends StatelessWidget {
 
               // Quy ước mới: chỉ chính current user không có mũi tên.
               // Mọi thành viên còn lại đều giữ cùng một trailing slot để hàng
-              // thẳng nhau, không phụ thuộc role member/deputy/leader.
+              // thẳng nhau, không phụ thuộc role member/leader.
               SizedBox(
                 width: chevronSize,
                 height: chevronSize,
                 child: isCurrentUser
                     ? const SizedBox.shrink()
                     : Icon(
-                  LucideIcons.chevron_right,
-                  size: chevronSize,
-                  color: AppColors.grayText,
-                ),
+                        LucideIcons.chevron_right,
+                        size: chevronSize,
+                        color: AppColors.grayText,
+                      ),
               ),
             ],
           ),

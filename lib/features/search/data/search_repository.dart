@@ -10,10 +10,8 @@ import '../models/search_models.dart';
 ///
 /// Hiện tại:
 /// - Gợi ý địa điểm dùng Recommendation backend đang có của GoMate.
-/// - Search user/post, lịch sử và hashtag dùng dữ liệu UI mẫu.
-///
-/// Khi backend `/search` hoàn thiện, chỉ cần thay phần triển khai các method
-/// ở file này; SearchScreen không cần đổi layout/state machine.
+/// - Search user dùng `/api/v1/users/search` và quan hệ follow thật.
+/// - Search post, lịch sử và hashtag vẫn là dữ liệu UI mẫu.
 class SearchRepository {
   final RecommendationRepository _recommendationRepository;
   final GoMateLocationService _locationService;
@@ -21,9 +19,9 @@ class SearchRepository {
   SearchRepository({
     RecommendationRepository? recommendationRepository,
     GoMateLocationService? locationService,
-  })  : _recommendationRepository =
-      recommendationRepository ?? RecommendationRepository(),
-        _locationService = locationService ?? GoMateLocationService();
+  }) : _recommendationRepository =
+           recommendationRepository ?? RecommendationRepository(),
+       _locationService = locationService ?? GoMateLocationService();
 
   List<SearchPlaceItem> _cachedRecommendedPlaces = const <SearchPlaceItem>[];
 
@@ -31,51 +29,6 @@ class SearchRepository {
     // UI demo theo mockup. Khi nối backend, thay bằng lịch sử thật.
     'Thune',
     'Biển hồ',
-  ];
-
-  static const List<SearchUserItem> _demoUsers = <SearchUserItem>[
-    SearchUserItem(
-      id: 1,
-      name: 'DaDaDa',
-      subtitle: 'Thanh Thuý',
-      avatarAsset: 'assets/images/home/user_1.jpg',
-      relation: SearchUserRelation.friend,
-    ),
-    SearchUserItem(
-      id: 2,
-      name: 'DaDaDa',
-      subtitle: 'Thanh Thuý',
-      avatarAsset: 'assets/images/home/user_2.jpg',
-      relation: SearchUserRelation.following,
-    ),
-    SearchUserItem(
-      id: 3,
-      name: 'DaDaDa',
-      subtitle: 'Thanh Thuý',
-      avatarAsset: 'assets/images/home/user_3.jpg',
-      relation: SearchUserRelation.followsYou,
-    ),
-    SearchUserItem(
-      id: 4,
-      name: 'DaDaDa',
-      subtitle: 'Thanh Thuý',
-      avatarAsset: 'assets/images/home/moment_chithanh.jpg',
-      relation: SearchUserRelation.none,
-    ),
-    SearchUserItem(
-      id: 5,
-      name: 'DaDaDa',
-      subtitle: 'Thanh Thuý',
-      avatarAsset: 'assets/images/home/moment_buji.jpg',
-      relation: SearchUserRelation.pending,
-    ),
-    SearchUserItem(
-      id: 6,
-      name: 'Thune',
-      subtitle: 'Thành phố Hồ Chí Minh',
-      avatarAsset: 'assets/images/home/moment_thune.jpg',
-      relation: SearchUserRelation.friend,
-    ),
   ];
 
   static const List<SearchPostItem> _demoPosts = <SearchPostItem>[
@@ -156,7 +109,7 @@ class SearchRepository {
 
     _cachedRecommendedPlaces = List<SearchPlaceItem>.generate(
       items.length,
-          (index) => _fromRecommended(items[index], index),
+      (index) => _fromRecommended(items[index], index),
       growable: false,
     );
 
@@ -172,7 +125,7 @@ class SearchRepository {
     if (clean.isEmpty) return;
 
     _recentSearches.removeWhere(
-          (item) => _normalize(item) == _normalize(clean),
+      (item) => _normalize(item) == _normalize(clean),
     );
     _recentSearches.insert(0, clean);
 
@@ -183,7 +136,7 @@ class SearchRepository {
 
   Future<void> removeRecentSearch(String query) async {
     _recentSearches.removeWhere(
-          (item) => _normalize(item) == _normalize(query),
+      (item) => _normalize(item) == _normalize(query),
     );
   }
 
@@ -203,38 +156,43 @@ class SearchRepository {
       }
     }
 
-    final placeResults = places.where((place) {
-      final matchesQuery = normalizedQuery.isEmpty ||
-          _normalize(place.name).contains(normalizedQuery) ||
-          _normalize(place.location).contains(normalizedQuery) ||
-          _normalize(place.category ?? '').contains(normalizedQuery);
+    final placeResults = places
+        .where((place) {
+          final matchesQuery =
+              normalizedQuery.isEmpty ||
+              _normalize(place.name).contains(normalizedQuery) ||
+              _normalize(place.location).contains(normalizedQuery) ||
+              _normalize(place.category ?? '').contains(normalizedQuery);
 
-      final matchesFilters = placeFilters.isEmpty ||
-          placeFilters.every(
+          final matchesFilters =
+              placeFilters.isEmpty ||
+              placeFilters.every(
                 (filter) => place.filterTags.contains(filter.id),
-          );
+              );
 
-      return matchesQuery && matchesFilters;
-    }).toList(growable: false);
+          return matchesQuery && matchesFilters;
+        })
+        .toList(growable: false);
 
-    final userResults = _demoUsers.where((user) {
-      if (normalizedQuery.isEmpty) return true;
-      return _normalize(user.name).contains(normalizedQuery) ||
-          _normalize(user.subtitle).contains(normalizedQuery);
-    }).toList(growable: false);
+    final userResults = normalizedQuery.isEmpty
+        ? const <SearchUserItem>[]
+        : await _searchUsers(query, size: 20);
 
-    final postResults = _demoPosts.where((post) {
-      final matchesQuery = normalizedQuery.isEmpty ||
-          _normalize(post.caption).contains(normalizedQuery) ||
-          post.hashtags.any(
+    final postResults = _demoPosts
+        .where((post) {
+          final matchesQuery =
+              normalizedQuery.isEmpty ||
+              _normalize(post.caption).contains(normalizedQuery) ||
+              post.hashtags.any(
                 (tag) => _normalize(tag).contains(normalizedQuery),
-          );
+              );
 
-      final matchesHashtags = hashtags.isEmpty ||
-          hashtags.every(post.hashtags.contains);
+          final matchesHashtags =
+              hashtags.isEmpty || hashtags.every(post.hashtags.contains);
 
-      return matchesQuery && matchesHashtags;
-    }).toList(growable: false);
+          return matchesQuery && matchesHashtags;
+        })
+        .toList(growable: false);
 
     return SearchBundle(
       places: placeResults,
@@ -251,15 +209,57 @@ class SearchRepository {
     }
 
     return _hashtags
-        .where(
-          (item) => _normalize(item.tag).contains(normalizedQuery),
-    )
+        .where((item) => _normalize(item.tag).contains(normalizedQuery))
+        .toList(growable: false);
+  }
+
+  Future<SearchUserProfile> getUserProfile(String userId) async {
+    final response = await AuthService.instance.request(
+      'GET',
+      '/users/${Uri.encodeComponent(userId)}',
+    );
+    return _profileFromJson(response);
+  }
+
+  Future<SearchUserRelation> followUser(String userId) async {
+    final response = await AuthService.instance.request(
+      'PUT',
+      '/users/${Uri.encodeComponent(userId)}/follow',
+    );
+    return _relationFromJson(response);
+  }
+
+  Future<SearchUserRelation> unfollowUser(String userId) async {
+    final response = await AuthService.instance.request(
+      'DELETE',
+      '/users/${Uri.encodeComponent(userId)}/follow',
+    );
+    return _relationFromJson(response);
+  }
+
+  Future<List<SearchUserItem>> _searchUsers(
+    String query, {
+    int size = 20,
+  }) async {
+    final uri = Uri(
+      path: '/users/search',
+      queryParameters: <String, String>{
+        'q': query.trim(),
+        'page': '0',
+        'size': size.toString(),
+      },
+    );
+    final response = await AuthService.instance.request('GET', uri.toString());
+    return _asList(response['items'])
+        .map(_userFromJson)
+        .where((item) => item.id.isNotEmpty)
         .toList(growable: false);
   }
 
   SearchPlaceItem _fromRecommended(RecommendedPlace place, int index) {
-    final rating =
-    place.rating > 0 ? place.rating : place.score.clamp(0, 5).toDouble();
+    final rating = place.rating > 0
+        ? place.rating
+        : place.score.clamp(0, 5).toDouble();
 
     // Tags demo chỉ phục vụ UI filter trước khi endpoint search/filter hoàn thiện.
     // Khi backend có filter thật, map category/tag thật vào đây.
@@ -278,10 +278,7 @@ class SearchRepository {
       place.address,
       place.district,
       place.province,
-    ]
-        .whereType<String>()
-        .where((part) => part.trim().isNotEmpty)
-        .join(', ');
+    ].whereType<String>().where((part) => part.trim().isNotEmpty).join(', ');
 
     return SearchPlaceItem(
       id: place.placeId,
@@ -296,6 +293,61 @@ class SearchRepository {
       category: place.displayCategory,
       filterTags: tags,
     );
+  }
+
+  SearchUserItem _userFromJson(Object? value) {
+    final json = value is Map ? value : const <String, dynamic>{};
+    final nickname = _text(json['nickname']);
+    final displayName = _text(json['displayName'], fallback: nickname);
+    final city = _text(json['city']);
+    final bio = _text(json['bio']);
+    final subtitle = city.isNotEmpty
+        ? city
+        : (bio.isNotEmpty
+              ? bio
+              : (nickname.isEmpty ? 'Người dùng GoMate' : '@$nickname'));
+
+    return SearchUserItem(
+      id: _text(json['userId']),
+      name: displayName.isEmpty ? nickname : displayName,
+      subtitle: subtitle,
+      avatarUrl: _nullableText(json['avatarUrl']),
+      relation: _relationFromJson(json),
+    );
+  }
+
+  SearchUserProfile _profileFromJson(Object? value) {
+    final json = value is Map ? value : const <String, dynamic>{};
+    final nickname = _text(json['nickname']);
+    final displayName = _text(json['displayName'], fallback: nickname);
+    final stats = json['relationshipStats'] is Map
+        ? json['relationshipStats'] as Map
+        : const {};
+    return SearchUserProfile(
+      userId: _text(json['userId'], fallback: _text(json['id'])),
+      nickname: nickname,
+      displayName: displayName.isEmpty ? nickname : displayName,
+      avatarUrl: _nullableText(json['avatarUrl']),
+      city: _nullableText(json['city']),
+      bio: _nullableText(json['bio']),
+      followingCount: _int(stats['followingCount']),
+      followersCount: _int(stats['followersCount']),
+      mutualFriendCount: _int(stats['mutualFriendCount']),
+      relation: _relationFromJson(json),
+    );
+  }
+
+  SearchUserRelation _relationFromJson(Object? value) {
+    final json = value is Map ? value : const <String, dynamic>{};
+    final followingByMe = _bool(json['followingByMe']);
+    final followsMe = _bool(json['followsMe']);
+    final mutualFriend = _bool(json['mutualFriend']);
+    if (mutualFriend || (followingByMe && followsMe)) {
+      return SearchUserRelation.friend;
+    }
+    if (followingByMe) return SearchUserRelation.following;
+    if (followsMe) return SearchUserRelation.followsYou;
+    return SearchUserRelation.none;
   }
 
   Set<String> _selectedContextCodes() {
@@ -324,6 +376,29 @@ class SearchRepository {
           value == 'UU_TIEN_KHAC';
     }).toSet();
   }
+
+  List<Object?> _asList(Object? value) {
+    if (value is List) return value;
+    return const <Object?>[];
+  }
+
+  String _text(Object? value, {String fallback = ''}) {
+    if (value is! String) return fallback;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? fallback : trimmed;
+  }
+
+  String? _nullableText(Object? value) {
+    final text = _text(value);
+    return text.isEmpty ? null : text;
+  }
+
+  int _int(Object? value) {
+    if (value is num) return value.toInt();
+    return 0;
+  }
+
+  bool _bool(Object? value) => value == true;
 
   String _normalize(String value) {
     const source =

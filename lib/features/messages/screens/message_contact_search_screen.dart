@@ -93,6 +93,11 @@ class _MessageContactSearchScreenState
   }
 
   void _search(String value) {
+    final repository = widget.repository;
+    if (repository is RealDirectMessageRepository) {
+      repository.searchContactsFromApi(value);
+    }
+
     setState(() {
       _results = _buildResults(value);
     });

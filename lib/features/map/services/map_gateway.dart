@@ -17,6 +17,13 @@ abstract class GoMateMapGateway {
     required String destinationPlaceId,
   });
 
+  Future<GoMateMapRoute> loadTripRouteFromCurrentLocation({
+    required double originLatitude,
+    required double originLongitude,
+    required List<String> placeIds,
+  });
+
   Future<GoMateMapRoute> loadTripRoute(String tripId);
+
   Future<List<GoMateMapMember>> loadTripMembers(String tripId);
 }

@@ -1,5 +1,6 @@
 package vn.gomate.map.routing.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -42,6 +43,46 @@ public class RouteService {
             result.distanceMeters(),
             result.durationSeconds(),
             placeIds,
+            result.geometry()
+        );
+    }
+
+    public RouteComputeResponse calculateFromRuntimeOrigin(
+        Double originLatitude,
+        Double originLongitude,
+        List<String> placeIds
+    ) {
+        if (placeIds == null || placeIds.isEmpty()) {
+            throw ApiException.bad(
+                "Cần ít nhất 1 điểm đến trong lịch trình."
+            );
+        }
+
+        Coordinate origin = resolveDirectionsOrigin(
+            null,
+            originLatitude,
+            originLongitude
+        );
+
+        List<Coordinate> waypoints = new ArrayList<>();
+        waypoints.add(origin);
+        waypoints.addAll(
+            placeIds.stream()
+                .map(id -> coordinateResolver.resolve(id, "placeIds"))
+                .toList()
+        );
+
+        RouteResult result = calculateWithProvider(waypoints);
+
+        List<String> orderedPlaceIds = new ArrayList<>();
+        orderedPlaceIds.add("current-location");
+        orderedPlaceIds.addAll(placeIds);
+
+        return new RouteComputeResponse(
+            UUID.randomUUID().toString(),
+            result.distanceMeters(),
+            result.durationSeconds(),
+            orderedPlaceIds,
             result.geometry()
         );
     }

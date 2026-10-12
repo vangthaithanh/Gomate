@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 
@@ -253,14 +255,7 @@ class _MomentMessageContentState extends State<MomentMessageContent> {
                 border: Border.all(color: AppColors.grayBorder),
               ),
               clipBehavior: Clip.antiAlias,
-              child: Image.asset(
-                widget.receiverAvatarAsset,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const Icon(
-                  LucideIcons.user,
-                  color: AppColors.grayText,
-                ),
-              ),
+              child: _SourceAvatar(source: widget.receiverAvatarAsset),
             ),
             SizedBox(width: (width * 0.025).clamp(8.0, 10.0).toDouble()),
             Expanded(
@@ -345,6 +340,29 @@ class _MomentMessageContentState extends State<MomentMessageContent> {
     final value = raw.trim();
     if (value.isEmpty) return;
     Navigator.of(context).pop(value);
+  }
+}
+
+class _SourceAvatar extends StatelessWidget {
+  final String source;
+
+  const _SourceAvatar({required this.source});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget fallback() {
+      return const Icon(LucideIcons.user, color: AppColors.grayText);
+    }
+
+    final value = source.trim();
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return Image.network(value, fit: BoxFit.cover, errorBuilder: (_, __, ___) => fallback());
+    }
+    if (value.contains(':\\') || value.startsWith('/')) {
+      return Image.file(File(value), fit: BoxFit.cover, errorBuilder: (_, __, ___) => fallback());
+    }
+    if (value.isEmpty) return fallback();
+    return Image.asset(value, fit: BoxFit.cover, errorBuilder: (_, __, ___) => fallback());
   }
 }
 

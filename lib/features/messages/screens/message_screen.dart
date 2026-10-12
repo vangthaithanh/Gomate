@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_colors.dart';
 import '../data/message_repository.dart';
 import '../widgets/message_widgets.dart';
 import '../../../core/widgets/gomate_main_tab_header.dart';
@@ -11,10 +10,7 @@ import 'pending_messages_screen.dart';
 class MessageScreen extends StatefulWidget {
   final MessageRepository? repository;
 
-  const MessageScreen({
-    super.key,
-    this.repository,
-  });
+  const MessageScreen({super.key, this.repository});
 
   @override
   State<MessageScreen> createState() => _MessageScreenState();
@@ -26,7 +22,7 @@ class _MessageScreenState extends State<MessageScreen> {
   @override
   void initState() {
     super.initState();
-    _repository = widget.repository ?? DemoMessageRepository.instance;
+    _repository = widget.repository ?? RealDirectMessageRepository.instance;
     _repository.addListener(_refresh);
   }
 
@@ -45,10 +41,8 @@ class _MessageScreenState extends State<MessageScreen> {
 
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => MessageChatScreen(
-          conversationId: id,
-          repository: _repository,
-        ),
+        builder: (_) =>
+            MessageChatScreen(conversationId: id, repository: _repository),
       ),
     );
   }
@@ -56,9 +50,7 @@ class _MessageScreenState extends State<MessageScreen> {
   Future<void> _openSearch() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => MessageContactSearchScreen(
-          repository: _repository,
-        ),
+        builder: (_) => MessageContactSearchScreen(repository: _repository),
       ),
     );
   }
@@ -66,9 +58,7 @@ class _MessageScreenState extends State<MessageScreen> {
   Future<void> _openPending() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) => PendingMessagesScreen(
-          repository: _repository,
-        ),
+        builder: (_) => PendingMessagesScreen(repository: _repository),
       ),
     );
   }
@@ -78,23 +68,11 @@ class _MessageScreenState extends State<MessageScreen> {
     final width = MediaQuery.sizeOf(context).width;
     final conversations = _repository.mainConversations;
 
-    final mainHeaderUi =
-    GoMateMainTabHeaderMetrics.fromWidth(width);
+    final mainHeaderUi = GoMateMainTabHeaderMetrics.fromWidth(width);
 
-    final headerTopGap =
-        messageClamp(width * 0.018, 6, 8);
+    final searchHorizontalPadding = messageClamp(width * 0.075, 24, 30);
 
-    final headerTitleSize =
-        messageClamp(width * 0.055, 20, 23);
-
-    final headerToSearchGap =
-        messageClamp(width * 0.030, 10, 13);
-
-    final searchHorizontalPadding =
-        messageClamp(width * 0.075, 24, 30);
-
-    final searchToPendingGap =
-        messageClamp(width * 0.040, 14, 17);
+    final searchToPendingGap = messageClamp(width * 0.040, 14, 17);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -102,13 +80,9 @@ class _MessageScreenState extends State<MessageScreen> {
         bottom: false,
         child: Column(
           children: [
-            GoMateMainTabHeader(
-              title: _repository.currentUserName,
-            ),
+            GoMateMainTabHeader(title: _repository.currentUserName),
 
-            SizedBox(
-              height: mainHeaderUi.contentGap,
-            ),
+            SizedBox(height: mainHeaderUi.contentGap),
 
             Padding(
               padding: EdgeInsets.symmetric(
@@ -125,11 +99,7 @@ class _MessageScreenState extends State<MessageScreen> {
 
             Padding(
               padding: EdgeInsets.symmetric(
-                horizontal: messageClamp(
-                  width * 0.075,
-                  24,
-                  30,
-                ),
+                horizontal: messageClamp(width * 0.075, 24, 30),
               ),
               child: Align(
                 alignment: Alignment.centerRight,
@@ -157,11 +127,7 @@ class _MessageScreenState extends State<MessageScreen> {
             Expanded(
               child: ListView.builder(
                 padding: EdgeInsets.only(
-                  top: messageClamp(
-                    width * 0.014,
-                    5,
-                    7,
-                  ),
+                  top: messageClamp(width * 0.014, 5, 7),
                   bottom: 110,
                 ),
                 physics: const BouncingScrollPhysics(),
@@ -173,9 +139,7 @@ class _MessageScreenState extends State<MessageScreen> {
                     conversation: conversation,
                     currentUserId: _repository.currentUserId,
                     activeRing: conversation.id == 'direct_chi',
-                    onTap: () => _openConversation(
-                      conversation.id,
-                    ),
+                    onTap: () => _openConversation(conversation.id),
                   );
                 },
               ),

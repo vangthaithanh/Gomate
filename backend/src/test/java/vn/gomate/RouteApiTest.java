@@ -109,6 +109,40 @@ class RouteApiTest {
     }
 
     @Test
+    void computeCanUseRuntimeOriginAndOrderedTripStops() throws Exception {
+        mvc.perform(post("/api/v1/routes/compute")
+                .contentType("application/json")
+                .content(json.writeValueAsBytes(Map.of(
+                    "originLatitude", 11.9500,
+                    "originLongitude", 108.4500,
+                    "placeIds", List.of(
+                        Long.toString(destinationId),
+                        Long.toString(originId)
+                    )
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.distanceMeters").value(9460.5))
+            .andExpect(jsonPath("$.durationSeconds").value(1234.0))
+            .andExpect(jsonPath("$.orderedPlaceIds[0]").value("current-location"))
+            .andExpect(jsonPath("$.orderedPlaceIds[1]").value(Long.toString(destinationId)))
+            .andExpect(jsonPath("$.orderedPlaceIds[2]").value(Long.toString(originId)))
+            .andExpect(jsonPath("$.geometry.length()").value(2));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Coordinate>> captor =
+            ArgumentCaptor.forClass(List.class);
+        verify(routingProvider).calculateRoute(captor.capture());
+        List<Coordinate> coordinates = captor.getValue();
+        assertEquals(3, coordinates.size());
+        assertEquals(108.4500, coordinates.get(0).longitude(), 0.00001);
+        assertEquals(11.9500, coordinates.get(0).latitude(), 0.00001);
+        assertEquals(108.4369, coordinates.get(1).longitude(), 0.00001);
+        assertEquals(11.9037, coordinates.get(1).latitude(), 0.00001);
+        assertEquals(108.4483, coordinates.get(2).longitude(), 0.00001);
+        assertEquals(11.9419, coordinates.get(2).latitude(), 0.00001);
+    }
+
+    @Test
     void directionsCanUseTwoPostgresPlaceIds() throws Exception {
         mvc.perform(post("/api/v1/routes/directions")
                 .contentType("application/json")

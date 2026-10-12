@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
@@ -53,19 +54,11 @@ class MomentImageFrame extends StatelessWidget {
     final content = child ??
         (imageAsset == null
             ? ColoredBox(color: backgroundColor)
-            : Image.asset(
-                imageAsset!,
+            : _MomentSourceImage(
+                source: imageAsset!,
                 fit: fit,
-                errorBuilder: (_, __, ___) => ColoredBox(
-                  color: backgroundColor,
-                  child: Center(
-                    child: Icon(
-                      LucideIcons.image,
-                      size: fallbackIconSize,
-                      color: AppColors.grayText,
-                    ),
-                  ),
-                ),
+                backgroundColor: backgroundColor,
+                fallbackIconSize: fallbackIconSize,
               ));
 
     return Opacity(
@@ -81,6 +74,67 @@ class MomentImageFrame extends StatelessWidget {
           child: content,
         ),
       ),
+    );
+  }
+}
+
+class _MomentSourceImage extends StatelessWidget {
+  final String source;
+  final BoxFit fit;
+  final Color backgroundColor;
+  final double fallbackIconSize;
+
+  const _MomentSourceImage({
+    required this.source,
+    required this.fit,
+    required this.backgroundColor,
+    required this.fallbackIconSize,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Widget fallback() {
+      return ColoredBox(
+        color: backgroundColor,
+        child: Center(
+          child: Icon(
+            LucideIcons.image,
+            size: fallbackIconSize,
+            color: AppColors.grayText,
+          ),
+        ),
+      );
+    }
+
+    final value = source.trim();
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return Image.network(
+        value,
+        fit: fit,
+        errorBuilder: (_, __, ___) => fallback(),
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              fallback(),
+              const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            ],
+          );
+        },
+      );
+    }
+    if (value.contains(':\\') || value.startsWith('/')) {
+      return Image.file(
+        File(value),
+        fit: fit,
+        errorBuilder: (_, __, ___) => fallback(),
+      );
+    }
+    return Image.asset(
+      value,
+      fit: fit,
+      errorBuilder: (_, __, ___) => fallback(),
     );
   }
 }

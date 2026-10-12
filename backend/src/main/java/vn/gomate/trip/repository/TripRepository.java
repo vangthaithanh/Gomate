@@ -1,9 +1,11 @@
 package vn.gomate.trip.repository;
 
 import java.time.*;
+import java.math.BigDecimal;
 import java.util.*;
 import org.springframework.stereotype.Repository;
 import vn.gomate.common.Db;
+import vn.gomate.trip.model.TripStopSequenceItem;
 import static vn.gomate.common.Db.args;
 
 @Repository
@@ -11,41 +13,103 @@ public class TripRepository {
  private final Db db;
  public TripRepository(Db db) { this.db=db; }
 
- public void insertTrip(UUID id,UUID ownerId,String title,String description,LocalDate startDate,LocalDate endDate,String timezone) {
+ public record StopRow(
+  UUID id,
+  long placeId,
+  int dayNo,
+  int orderNo,
+  OffsetDateTime plannedStartAt,
+  Integer plannedDurationMin,
+  String note,
+  int checkinRadiusM,
+  String status,
+  BigDecimal latitude,
+  BigDecimal longitude
+ ) implements TripStopSequenceItem {}
+
+ public void insertTrip(UUID id,UUID ownerId,String title,String description,String tripType,LocalDate startDate,LocalDate endDate,String timezone) {
   db.update("""
    INSERT INTO trips(id,owner_id,title,description,trip_type,status,start_date,end_date,timezone)
-   VALUES(:id,:ownerId,:title,:description,'PERSONAL','DRAFT',:startDate,:endDate,:timezone)
-   """,args("id",id,"ownerId",ownerId,"title",title,"description",description,"startDate",startDate,"endDate",endDate,"timezone",timezone));
+   VALUES(:id,:ownerId,:title,:description,:tripType,'DRAFT',:startDate,:endDate,:timezone)
+   """,args("id",id,"ownerId",ownerId,"title",title,"description",description,"tripType",tripType,"startDate",startDate,"endDate",endDate,"timezone",timezone));
  }
 
  public void insertLeader(UUID tripId,UUID userId) {
+  insertMember(tripId,userId,"LEADER",null);
+ }
+
+ public void insertMember(UUID tripId,UUID userId,String role,UUID invitedBy) {
   db.update("""
-   INSERT INTO trip_members(trip_id,user_id,role,status)
-   VALUES(:tripId,:userId,'LEADER','ACTIVE')
-   """,args("tripId",tripId,"userId",userId));
+   INSERT INTO trip_members(trip_id,user_id,role,status,invited_by)
+   VALUES(:tripId,:userId,:role,'ACTIVE',:invitedBy)
+   """,args("tripId",tripId,"userId",userId,"role",role,"invitedBy",invitedBy));
+ }
+
+ public List<UUID> activeUserIds(Collection<UUID> userIds) {
+  if(userIds==null || userIds.isEmpty()) return List.of();
+  return db.list("""
+   SELECT id FROM users
+   WHERE status='ACTIVE' AND id IN (:userIds)
+   ORDER BY id
+   """,args("userIds",userIds)).stream().map(row -> (UUID)row.get("id")).toList();
  }
 
  public List<Map<String,Object>> listForUser(UUID userId) {
   return db.list("""
    SELECT t.id,t.title,t.description,t.trip_type,t.status,t.start_date,t.end_date,t.timezone,
-          t.created_at,t.updated_at,COUNT(s.id) AS stop_count
+          gc.id AS linked_conversation_id,
+          CASE WHEN tp.user_id IS NULL THEN FALSE ELSE TRUE END AS pinned,
+          COUNT(DISTINCT m_all.user_id) AS member_count,
+          t.created_at,t.updated_at,COUNT(DISTINCT s.id) AS stop_count
    FROM trips t
    JOIN trip_members m ON m.trip_id=t.id
+   LEFT JOIN trip_members m_all ON m_all.trip_id=t.id AND m_all.status='ACTIVE'
    LEFT JOIN trip_stops s ON s.trip_id=t.id
+   LEFT JOIN conversations gc ON gc.linked_trip_id=t.id AND gc.type='GROUP'
+   LEFT JOIN trip_pins tp ON tp.trip_id=t.id AND tp.user_id=:userId
    WHERE m.user_id=:userId AND m.status='ACTIVE'
-   GROUP BY t.id,t.title,t.description,t.trip_type,t.status,t.start_date,t.end_date,t.timezone,t.created_at,t.updated_at
-   ORDER BY t.created_at DESC,t.id
+   GROUP BY t.id,t.title,t.description,t.trip_type,t.status,t.start_date,t.end_date,t.timezone,gc.id,tp.user_id,t.created_at,t.updated_at
+   ORDER BY pinned DESC,t.created_at DESC,t.id
    """,args("userId",userId));
  }
 
  public Optional<Map<String,Object>> detailForUser(UUID tripId,UUID userId) {
   return db.list("""
    SELECT t.id,t.owner_id,t.title,t.description,t.trip_type,t.status,t.start_date,t.end_date,t.timezone,
+          gc.id AS linked_conversation_id,
+          CASE WHEN tp.user_id IS NULL THEN FALSE ELSE TRUE END AS pinned,
+          (SELECT COUNT(*) FROM trip_members tm WHERE tm.trip_id=t.id AND tm.status='ACTIVE') AS member_count,
           t.started_at,t.completed_at,t.created_at,t.updated_at
    FROM trips t
    JOIN trip_members m ON m.trip_id=t.id
+   LEFT JOIN conversations gc ON gc.linked_trip_id=t.id AND gc.type='GROUP'
+   LEFT JOIN trip_pins tp ON tp.trip_id=t.id AND tp.user_id=:userId
    WHERE t.id=:tripId AND m.user_id=:userId AND m.status='ACTIVE'
    """,args("tripId",tripId,"userId",userId)).stream().findFirst();
+ }
+
+ public Optional<UUID> pinnedTripId(UUID userId) {
+  return db.list("""
+   SELECT tp.trip_id
+   FROM trip_pins tp
+   JOIN trip_members tm ON tm.trip_id=tp.trip_id AND tm.user_id=tp.user_id AND tm.status='ACTIVE'
+   WHERE tp.user_id=:userId
+   """,args("userId",userId)).stream().findFirst().map(row -> (UUID)row.get("tripId"));
+ }
+
+ public void pinTrip(UUID userId,UUID tripId) {
+  db.update("DELETE FROM trip_pins WHERE user_id=:userId",args("userId",userId));
+  db.update("""
+   INSERT INTO trip_pins(user_id,trip_id)
+   VALUES(:userId,:tripId)
+   """,args("userId",userId,"tripId",tripId));
+ }
+
+ public void unpinTrip(UUID userId,UUID tripId) {
+  db.update("""
+   DELETE FROM trip_pins
+   WHERE user_id=:userId AND trip_id=:tripId
+   """,args("userId",userId,"tripId",tripId));
  }
 
  public Optional<Map<String,Object>> tripForUpdate(UUID tripId) {
@@ -57,6 +121,29 @@ public class TripRepository {
    SELECT COUNT(*) FROM trip_members
    WHERE trip_id=:tripId AND user_id=:userId AND role='LEADER' AND status='ACTIVE'
    """,args("tripId",tripId,"userId",userId))==1;
+ }
+
+ public boolean isActiveMember(UUID tripId,UUID userId) {
+  return db.count("""
+   SELECT COUNT(*) FROM trip_members
+   WHERE trip_id=:tripId AND user_id=:userId AND status='ACTIVE'
+   """,args("tripId",tripId,"userId",userId))==1;
+ }
+
+ public List<UUID> activeTripUserIds(UUID tripId) {
+  return db.list("""
+   SELECT user_id FROM trip_members
+   WHERE trip_id=:tripId AND status='ACTIVE'
+   ORDER BY joined_at,user_id
+   """,args("tripId",tripId)).stream().map(row -> (UUID)row.get("userId")).toList();
+ }
+
+ public void updateTripType(UUID tripId,String tripType) {
+  db.update("""
+   UPDATE trips
+   SET trip_type=:tripType,updated_at=CURRENT_TIMESTAMP
+   WHERE id=:tripId
+   """,args("tripId",tripId,"tripType",tripType));
  }
 
  public void updateTrip(UUID tripId,String title,String description,LocalDate startDate,LocalDate endDate,String status,String timezone) {
@@ -79,6 +166,13 @@ public class TripRepository {
   db.update("DELETE FROM trips WHERE id=:tripId",args("tripId",tripId));
  }
 
+ public Optional<UUID> groupConversationId(UUID tripId) {
+  return db.list("""
+   SELECT id FROM conversations
+   WHERE type='GROUP' AND linked_trip_id=:tripId
+   """,args("tripId",tripId)).stream().findFirst().map(row -> (UUID)row.get("id"));
+ }
+
  public boolean activePlaceExists(long placeId) {
   return db.count("SELECT COUNT(*) FROM places WHERE id=:placeId AND status='ACTIVE'",args("placeId",placeId))==1;
  }
@@ -90,11 +184,15 @@ public class TripRepository {
 
  public UUID insertStop(UUID tripId,long placeId,int dayNo,int orderNo,OffsetDateTime plannedStartAt,Integer plannedDurationMin,String note,int checkinRadiusM) {
   UUID id=UUID.randomUUID();
+  insertStop(id,tripId,placeId,dayNo,orderNo,plannedStartAt,plannedDurationMin,note,checkinRadiusM);
+  return id;
+ }
+
+ public void insertStop(UUID id,UUID tripId,long placeId,int dayNo,int orderNo,OffsetDateTime plannedStartAt,Integer plannedDurationMin,String note,int checkinRadiusM) {
   db.update("""
    INSERT INTO trip_stops(id,trip_id,place_id,day_no,order_no,planned_start_at,planned_duration_min,note,checkin_radius_m,status)
    VALUES(:id,:tripId,:placeId,:dayNo,:orderNo,:plannedStartAt,:plannedDurationMin,:note,:checkinRadiusM,'PLANNED')
    """,args("id",id,"tripId",tripId,"placeId",placeId,"dayNo",dayNo,"orderNo",orderNo,"plannedStartAt",plannedStartAt,"plannedDurationMin",plannedDurationMin,"note",note,"checkinRadiusM",checkinRadiusM));
-  return id;
  }
 
  public Optional<UUID> stopTripId(UUID stopId) {
@@ -109,6 +207,29 @@ public class TripRepository {
  public List<UUID> stopIds(UUID tripId) {
   return db.list("SELECT id FROM trip_stops WHERE trip_id=:tripId ORDER BY day_no,order_no,id",args("tripId",tripId))
    .stream().map(row -> (UUID)row.get("id")).toList();
+ }
+
+ public List<StopRow> stopRows(UUID tripId) {
+  return db.list("""
+   SELECT s.id,s.place_id,s.day_no,s.order_no,s.planned_start_at,s.planned_duration_min,
+          s.note,s.checkin_radius_m,s.status,p.latitude,p.longitude
+   FROM trip_stops s
+   JOIN places p ON p.id=s.place_id
+   WHERE s.trip_id=:tripId
+   ORDER BY s.day_no,s.order_no,s.id
+   """,args("tripId",tripId)).stream().map(row -> new StopRow(
+   (UUID)row.get("id"),
+   ((Number)row.get("placeId")).longValue(),
+   ((Number)row.get("dayNo")).intValue(),
+   ((Number)row.get("orderNo")).intValue(),
+   asOffsetDateTime(row.get("plannedStartAt")),
+   asInt(row.get("plannedDurationMin")),
+   (String)row.get("note"),
+   ((Number)row.get("checkinRadiusM")).intValue(),
+   (String)row.get("status"),
+   (BigDecimal)row.get("latitude"),
+   (BigDecimal)row.get("longitude")
+  )).toList();
  }
 
  public void moveStopsToTemporaryOrders(UUID tripId) {
@@ -127,13 +248,71 @@ public class TripRepository {
    """,args("stopId",stopId,"dayNo",dayNo,"orderNo",orderNo));
  }
 
+ public void updateStop(UUID stopId,long placeId,int dayNo,int orderNo,OffsetDateTime plannedStartAt,Integer plannedDurationMin,String note,int checkinRadiusM) {
+  db.update("""
+   UPDATE trip_stops
+   SET place_id=:placeId,
+       day_no=:dayNo,
+       order_no=:orderNo,
+       planned_start_at=:plannedStartAt,
+       planned_duration_min=:plannedDurationMin,
+       note=:note,
+       checkin_radius_m=:checkinRadiusM,
+       updated_at=CURRENT_TIMESTAMP
+   WHERE id=:stopId
+   """,args(
+   "stopId",stopId,
+   "placeId",placeId,
+   "dayNo",dayNo,
+   "orderNo",orderNo,
+   "plannedStartAt",plannedStartAt,
+   "plannedDurationMin",plannedDurationMin,
+   "note",note,
+   "checkinRadiusM",checkinRadiusM
+  ));
+ }
+
  public List<Map<String,Object>> members(UUID tripId) {
   return db.list("""
-   SELECT user_id,role,status,joined_at,location_sharing_enabled
-   FROM trip_members
-   WHERE trip_id=:tripId
-   ORDER BY CASE role WHEN 'LEADER' THEN 0 ELSE 1 END,joined_at,user_id
+   SELECT tm.user_id,
+          CASE WHEN up.full_name IS NULL OR up.full_name='' THEN up.nickname ELSE up.full_name END AS display_name,
+          up.avatar_url,
+          tm.role,tm.status,tm.joined_at,tm.location_sharing_enabled
+   FROM trip_members tm
+   JOIN users u ON u.id=tm.user_id
+   JOIN user_profiles up ON up.user_id=u.id
+   WHERE tm.trip_id=:tripId AND u.status='ACTIVE'
+   ORDER BY CASE tm.role WHEN 'LEADER' THEN 0 ELSE 1 END,tm.joined_at,tm.user_id
    """,args("tripId",tripId));
+ }
+
+ public List<Map<String,Object>> activeMemberProfiles(UUID tripId) {
+  return db.list("""
+   SELECT tm.user_id,
+          CASE WHEN up.full_name IS NULL OR up.full_name='' THEN up.nickname ELSE up.full_name END AS display_name,
+          up.avatar_url,
+          tm.role,tm.location_sharing_enabled
+   FROM trip_members tm
+   JOIN users u ON u.id=tm.user_id
+   JOIN user_profiles up ON up.user_id=u.id
+   WHERE tm.trip_id=:tripId AND tm.status='ACTIVE' AND u.status='ACTIVE'
+   ORDER BY CASE tm.role WHEN 'LEADER' THEN 0 ELSE 1 END,tm.joined_at,tm.user_id
+   """,args("tripId",tripId));
+ }
+
+ public Set<UUID> locationSharingEnabledUserIds(UUID tripId) {
+  return new HashSet<>(db.list("""
+   SELECT user_id FROM trip_members
+   WHERE trip_id=:tripId AND status='ACTIVE' AND location_sharing_enabled=TRUE
+   """,args("tripId",tripId)).stream().map(row -> (UUID)row.get("userId")).toList());
+ }
+
+ public void updateLocationSharing(UUID tripId,UUID userId,boolean enabled) {
+  db.update("""
+   UPDATE trip_members
+   SET location_sharing_enabled=:enabled
+   WHERE trip_id=:tripId AND user_id=:userId AND status='ACTIVE'
+   """,args("tripId",tripId,"userId",userId,"enabled",enabled));
  }
 
  public List<Map<String,Object>> stops(UUID tripId) {
@@ -160,5 +339,19 @@ public class TripRepository {
    WHERE trip_id=:tripId
    ORDER BY remind_at,id
    """,args("tripId",tripId));
+ }
+
+ private static Integer asInt(Object value) {
+  if(value==null) return null;
+  if(value instanceof Number number) return number.intValue();
+  return Integer.valueOf(value.toString());
+ }
+
+ private static OffsetDateTime asOffsetDateTime(Object value) {
+  if(value==null) return null;
+  if(value instanceof OffsetDateTime dateTime) return dateTime;
+  if(value instanceof LocalDateTime dateTime) return dateTime.atOffset(ZoneOffset.UTC);
+  if(value instanceof Instant instant) return instant.atOffset(ZoneOffset.UTC);
+  throw new IllegalArgumentException("Unsupported date-time value: "+value.getClass().getName());
  }
 }

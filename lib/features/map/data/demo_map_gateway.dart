@@ -45,6 +45,19 @@ class DemoGoMateMapGateway implements GoMateMapGateway {
   }
 
   @override
+  Future<GoMateMapRoute> loadTripRouteFromCurrentLocation({
+    required double originLatitude,
+    required double originLongitude,
+    required List<String> placeIds,
+  }) {
+    return _routes.calculateTripFromCurrentLocation(
+      originLatitude: originLatitude,
+      originLongitude: originLongitude,
+      placeIds: placeIds,
+    );
+  }
+
+  @override
   Future<GoMateMapRoute> loadTripRoute(String tripId) async {
     try {
       return await _routes.calculate(placeIds: demoTripStopIds);

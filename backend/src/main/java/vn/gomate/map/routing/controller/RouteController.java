@@ -21,6 +21,16 @@ public class RouteController {
     public ResponseEntity<RouteComputeResponse> compute(
         @RequestBody RouteComputeRequest request
     ) {
+        if (request.originLatitude() != null || request.originLongitude() != null) {
+            return ResponseEntity.ok(
+                routeService.calculateFromRuntimeOrigin(
+                    request.originLatitude(),
+                    request.originLongitude(),
+                    request.placeIds()
+                )
+            );
+        }
+
         return ResponseEntity.ok(
             routeService.calculate(request.placeIds())
         );

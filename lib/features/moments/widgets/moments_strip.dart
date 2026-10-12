@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 
@@ -225,20 +227,39 @@ class _AvatarCore extends StatelessWidget {
         border: Border.all(color: AppColors.grayBorder, width: 1),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Image.asset(
-        imagePath,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Container(
-          color: const Color(0xFFE7EBF3),
-          alignment: Alignment.center,
-          child: Icon(
-            LucideIcons.user,
-            size: 24,
-            color: AppColors.grayText,
-          ),
-        ),
-      ),
+      child: _AvatarImage(source: imagePath),
     );
+  }
+}
+
+class _AvatarImage extends StatelessWidget {
+  final String source;
+
+  const _AvatarImage({required this.source});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget fallback() {
+      return Container(
+        color: const Color(0xFFE7EBF3),
+        alignment: Alignment.center,
+        child: Icon(
+          LucideIcons.user,
+          size: 24,
+          color: AppColors.grayText,
+        ),
+      );
+    }
+
+    final value = source.trim();
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return Image.network(value, fit: BoxFit.cover, errorBuilder: (_, __, ___) => fallback());
+    }
+    if (value.contains(':\\') || value.startsWith('/')) {
+      return Image.file(File(value), fit: BoxFit.cover, errorBuilder: (_, __, ___) => fallback());
+    }
+    if (value.isEmpty) return fallback();
+    return Image.asset(value, fit: BoxFit.cover, errorBuilder: (_, __, ___) => fallback());
   }
 }
 

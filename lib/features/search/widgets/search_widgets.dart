@@ -154,35 +154,37 @@ class SearchTabs extends StatelessWidget {
     final width = MediaQuery.sizeOf(context).width;
 
     return Row(
-      children: SearchTab.values.map((tab) {
-        final selectedTab = selected == tab;
-        final label = switch (tab) {
-          SearchTab.places => 'Địa điểm',
-          SearchTab.users => 'Người dùng',
-          SearchTab.posts => 'Bài viết',
-        };
+      children: SearchTab.values
+          .map((tab) {
+            final selectedTab = selected == tab;
+            final label = switch (tab) {
+              SearchTab.places => 'Địa điểm',
+              SearchTab.users => 'Người dùng',
+              SearchTab.posts => 'Bài viết',
+            };
 
-        return Expanded(
-          child: InkWell(
-            onTap: () => onChanged(tab),
-            borderRadius: BorderRadius.circular(10),
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: width * 0.020),
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: searchFont(width, 13),
-                  fontWeight: FontWeight.w600,
-                  color: selectedTab
-                      ? AppColors.primaryText
-                      : AppColors.grayText,
+            return Expanded(
+              child: InkWell(
+                onTap: () => onChanged(tab),
+                borderRadius: BorderRadius.circular(10),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: width * 0.020),
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: searchFont(width, 13),
+                      fontWeight: FontWeight.w600,
+                      color: selectedTab
+                          ? AppColors.primaryText
+                          : AppColors.grayText,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-        );
-      }).toList(growable: false),
+            );
+          })
+          .toList(growable: false),
     );
   }
 }
@@ -190,10 +192,7 @@ class SearchTabs extends StatelessWidget {
 class SearchSectionTitle extends StatelessWidget {
   final String title;
 
-  const SearchSectionTitle({
-    super.key,
-    required this.title,
-  });
+  const SearchSectionTitle({super.key, required this.title});
 
   @override
   Widget build(BuildContext context) {
@@ -237,10 +236,10 @@ class SearchFilterBar extends StatelessWidget {
             children: chips
                 .map(
                   (chip) => SearchFilterChip(
-                label: chip,
-                onRemove: () => onRemoveChip(chip),
-              ),
-            )
+                    label: chip,
+                    onRemove: () => onRemoveChip(chip),
+                  ),
+                )
                 .toList(growable: false),
           ),
         ),
@@ -299,11 +298,7 @@ class SearchFilterChip extends StatelessWidget {
               color: AppColors.primaryIcon,
             ),
             alignment: Alignment.center,
-            child: Icon(
-              LucideIcons.x,
-              size: closeSize,
-              color: Colors.white,
-            ),
+            child: Icon(LucideIcons.x, size: closeSize, color: Colors.white),
           ),
         ),
       ],
@@ -362,10 +357,7 @@ class SearchPlaceCard extends StatelessWidget {
               Positioned(
                 top: width * 0.055,
                 right: width * 0.055,
-                child: _SearchRatingBadge(
-                  rating: item.rating,
-                  width: width,
-                ),
+                child: _SearchRatingBadge(rating: item.rating, width: width),
               ),
               Positioned(
                 left: width * 0.075,
@@ -431,10 +423,7 @@ class SearchUserTile extends StatelessWidget {
         padding: EdgeInsets.symmetric(vertical: width * 0.020),
         child: Row(
           children: [
-            SearchUserAvatar(
-              item: item,
-              size: avatarSize,
-            ),
+            SearchUserAvatar(item: item, size: avatarSize),
             SizedBox(width: width * 0.030),
             Expanded(
               child: Column(
@@ -478,8 +467,9 @@ class SearchUserTile extends StatelessWidget {
                     style: TextStyle(
                       fontSize: searchFont(width, 10),
                       fontWeight: FontWeight.w500,
-                      color: (item.relation == SearchUserRelation.friend ||
-                          item.relation == SearchUserRelation.following)
+                      color:
+                          (item.relation == SearchUserRelation.friend ||
+                              item.relation == SearchUserRelation.following)
                           ? AppColors.grayText
                           : AppColors.primaryText,
                     ),
@@ -495,52 +485,54 @@ class SearchUserTile extends StatelessWidget {
 
 class SearchUserPreviewItem extends StatelessWidget {
   final SearchUserItem item;
+  final VoidCallback? onTap;
 
-  const SearchUserPreviewItem({
-    super.key,
-    required this.item,
-  });
+  const SearchUserPreviewItem({super.key, required this.item, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final avatar = (width * 0.090).clamp(32.0, 38.0);
 
-    return SizedBox(
-      width: (width * 0.38).clamp(132.0, 158.0),
-      child: Row(
-        children: [
-          SearchUserAvatar(item: item, size: avatar),
-          SizedBox(width: width * 0.018),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: searchFont(width, 12.5),
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.black,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: (width * 0.38).clamp(132.0, 158.0),
+        child: Row(
+          children: [
+            SearchUserAvatar(item: item, size: avatar),
+            SizedBox(width: width * 0.018),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: searchFont(width, 12.5),
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.black,
+                    ),
                   ),
-                ),
-                SizedBox(height: width * 0.005),
-                Text(
-                  item.subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: searchFont(width, 10.5),
-                    color: AppColors.grayText,
+                  SizedBox(height: width * 0.005),
+                  Text(
+                    item.subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: searchFont(width, 10.5),
+                      color: AppColors.grayText,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -550,11 +542,7 @@ class SearchUserAvatar extends StatelessWidget {
   final SearchUserItem item;
   final double size;
 
-  const SearchUserAvatar({
-    super.key,
-    required this.item,
-    required this.size,
-  });
+  const SearchUserAvatar({super.key, required this.item, required this.size});
 
   @override
   Widget build(BuildContext context) {
@@ -591,11 +579,7 @@ class SearchUserAvatar extends StatelessWidget {
 
   Widget _avatarFallback() {
     return Center(
-      child: Icon(
-        LucideIcons.user,
-        size: size * 0.60,
-        color: Colors.white,
-      ),
+      child: Icon(LucideIcons.user, size: size * 0.60, color: Colors.white),
     );
   }
 }
@@ -604,11 +588,7 @@ class SearchPostGrid extends StatelessWidget {
   final List<SearchPostItem> items;
   final int maxItems;
 
-  const SearchPostGrid({
-    super.key,
-    required this.items,
-    this.maxItems = 999,
-  });
+  const SearchPostGrid({super.key, required this.items, this.maxItems = 999});
 
   @override
   Widget build(BuildContext context) {
@@ -635,10 +615,7 @@ class SearchPostGrid extends StatelessWidget {
             return Container(
               color: const Color(0xFFE7EBF3),
               alignment: Alignment.center,
-              child: const Icon(
-                LucideIcons.image,
-                color: AppColors.grayText,
-              ),
+              child: const Icon(LucideIcons.image, color: AppColors.grayText),
             );
           },
         );
@@ -707,10 +684,7 @@ class SearchRecentRow extends StatelessWidget {
 class SearchEmptyState extends StatelessWidget {
   final String text;
 
-  const SearchEmptyState({
-    super.key,
-    required this.text,
-  });
+  const SearchEmptyState({super.key, required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -736,10 +710,7 @@ class _SearchRatingBadge extends StatelessWidget {
   final double rating;
   final double width;
 
-  const _SearchRatingBadge({
-    required this.rating,
-    required this.width,
-  });
+  const _SearchRatingBadge({required this.rating, required this.width});
 
   @override
   Widget build(BuildContext context) {
@@ -778,9 +749,7 @@ class _SearchRatingBadge extends StatelessWidget {
 class _SearchNetworkImage extends StatelessWidget {
   final String? url;
 
-  const _SearchNetworkImage({
-    required this.url,
-  });
+  const _SearchNetworkImage({required this.url});
 
   @override
   Widget build(BuildContext context) {
@@ -817,10 +786,7 @@ class _SearchNetworkImage extends StatelessWidget {
     return Container(
       color: const Color(0xFFE7EBF3),
       alignment: Alignment.center,
-      child: const Icon(
-        LucideIcons.image,
-        color: AppColors.grayText,
-      ),
+      child: const Icon(LucideIcons.image, color: AppColors.grayText),
     );
   }
 }

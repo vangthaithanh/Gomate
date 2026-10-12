@@ -11,6 +11,8 @@ import '../../../core/widgets/snackbar.dart';
 import '../../messages/data/message_repository.dart';
 import '../../messages/widgets/message_widgets.dart';
 import '../../map/state/map_ui_session.dart';
+import '../../map/services/location_service.dart';
+import '../data/trip_repository.dart';
 import '../models/trip_ui_models.dart';
 import 'create_trip_screen.dart';
 import 'trip_detail_screen.dart';
@@ -19,28 +21,27 @@ class TripScreen extends StatefulWidget {
   const TripScreen({super.key});
 
   @override
-  State<TripScreen> createState() =>
-      _TripScreenState();
+  State<TripScreen> createState() => _TripScreenState();
 }
 
 class _TripScreenState extends State<TripScreen> {
-  final TextEditingController _searchController =
-  TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
 
   final MessageRepository _messageRepository =
-      DemoMessageRepository.instance;
+      RealDirectMessageRepository.instance;
+  final RealTripRepository _tripRepository = RealTripRepository.instance;
+  final GoMateLocationService _locationService = GoMateLocationService();
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
 
-    // Trip là nguồn dữ liệu UI demo hiện tại.
-    // Map dùng cùng danh sách này thay vì tạo một bộ demo khác.
     GoMateMapUiSession.registerTrips(_trips);
 
-    GoMateMapUiSession.revision.addListener(
-      _pullTripChangesFromMap,
-    );
+    GoMateMapUiSession.revision.addListener(_pullTripChangesFromMap);
+    unawaited(_loadTrips());
   }
 
   void _pullTripChangesFromMap() {
@@ -59,120 +60,42 @@ class _TripScreenState extends State<TripScreen> {
     GoMateMapUiSession.registerTrips(_trips);
   }
 
-  late final List<TripUi> _trips = <TripUi>[
-    TripUi(
-      id: 'trip-personal-v2',
-      title: 'Đà lạt cá nhân',
-      days: 4,
-      destination: 'Đà Lạt',
-      coverAsset: 'assets/images/home_dalat.jpg',
-      currentUserRole: TripAccessRole.personal,
-      startDate: DateTime(2026, 10, 12),
-      endDate: DateTime(2026, 10, 15),
-      members: const [
-        TripMemberUi(
-          id: 'me',
-          name: 'Thune',
-          role: TripAccessRole.personal,
-        ),
-      ],
-    ),
-    TripUi(
-      id: 'trip_da_lat_leader',
-      title: 'Đà lạt ơi',
-      days: 4,
-      destination: 'Đà Lạt',
-      coverAsset: 'assets/images/checkin.jpg',
-      isGroup: true,
-      currentUserRole: TripAccessRole.leader,
-      conversationId: 'group_cover_read',
-      startDate: DateTime(2026, 10, 12),
-      endDate: DateTime(2026, 10, 15),
-      members: const [
-        TripMemberUi(
-          id: 'me',
-          name: 'Thune',
-          role: TripAccessRole.leader,
-        ),
-        TripMemberUi(
-          id: 'chi',
-          name: 'ChiThanh',
-          role: TripAccessRole.deputy,
-        ),
-        TripMemberUi(
-          id: 'thune_a',
-          name: 'Thune',
-        ),
-        TripMemberUi(
-          id: 'thanh',
-          name: 'Thanh',
-        ),
-      ],
-    ),
-    TripUi(
-      id: 'trip_da_lat_deputy',
-      title: 'Đà lạt ơi',
-      days: 4,
-      destination: 'Đà Lạt',
-      coverAsset: 'assets/images/survey_city.jpg',
-      isGroup: true,
-      currentUserRole: TripAccessRole.deputy,
-      conversationId: 'group_deputy_demo',
-      startDate: DateTime(2026, 10, 12),
-      endDate: DateTime(2026, 10, 15),
-      members: const [
-        TripMemberUi(
-          id: 'me',
-          name: 'Thune',
-          role: TripAccessRole.deputy,
-        ),
-        TripMemberUi(
-          id: 'chi',
-          name: 'ChiThanh',
-          role: TripAccessRole.leader,
-        ),
-        TripMemberUi(
-          id: 'thune_a',
-          name: 'Thune',
-        ),
-      ],
-    ),
-    TripUi(
-      id: 'trip_da_lat_member',
-      title: 'Đà lạt ơi',
-      days: 4,
-      destination: 'Đà Lạt',
-      coverAsset: 'assets/images/thiennhien.jpg',
-      isGroup: true,
-      currentUserRole: TripAccessRole.member,
-      conversationId: 'group_unread',
-      startDate: DateTime(2026, 10, 12),
-      endDate: DateTime(2026, 10, 15),
-      members: const [
-        TripMemberUi(
-          id: 'me',
-          name: 'Thune',
-        ),
-        TripMemberUi(
-          id: 'chi',
-          name: 'ChiThanh',
-          role: TripAccessRole.leader,
-        ),
-        TripMemberUi(
-          id: 'thune_a',
-          name: 'Thune',
-          role: TripAccessRole.deputy,
-        ),
-      ],
-    ),
-  ];
+  final List<TripUi> _trips = <TripUi>[];
 
-  bool get _isSearching =>
-      _searchController.text.trim().isNotEmpty;
+  Future<void> _loadTrips() async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final trips = await _tripRepository.list();
+      if (!mounted) return;
+      setState(() {
+        _trips
+          ..clear()
+          ..addAll(trips);
+      });
+      _syncMapTripSession();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.toString();
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  bool get _isSearching => _searchController.text.trim().isNotEmpty;
 
   List<TripUi> get _visibleTrips {
-    final query =
-    _searchController.text.trim().toLowerCase();
+    final query = _searchController.text.trim().toLowerCase();
 
     if (query.isEmpty) {
       return List<TripUi>.unmodifiable(_trips);
@@ -181,9 +104,9 @@ class _TripScreenState extends State<TripScreen> {
     return _trips
         .where(
           (trip) =>
-      trip.title.toLowerCase().contains(query) ||
-          trip.destination.toLowerCase().contains(query),
-    )
+              trip.title.toLowerCase().contains(query) ||
+              trip.destination.toLowerCase().contains(query),
+        )
         .toList(growable: false);
   }
 
@@ -199,20 +122,18 @@ class _TripScreenState extends State<TripScreen> {
 
   @override
   void dispose() {
-    GoMateMapUiSession.revision.removeListener(
-      _pullTripChangesFromMap,
-    );
+    GoMateMapUiSession.revision.removeListener(_pullTripChangesFromMap);
 
     _searchController.dispose();
     super.dispose();
   }
 
   Future<void> _createTrip() async {
-    final created =
-    await Navigator.of(context).push<TripUi>(
+    final created = await Navigator.of(context).push<TripUi>(
       MaterialPageRoute(
         builder: (_) => CreateTripScreen(
           messageRepository: _messageRepository,
+          tripRepository: _tripRepository,
         ),
       ),
     );
@@ -221,27 +142,40 @@ class _TripScreenState extends State<TripScreen> {
       return;
     }
 
-    final normalized =
-    created.copyWith(isActive: false);
+    final normalized = created.copyWith(isActive: false);
 
     setState(() {
       _trips.insert(0, normalized);
     });
 
     _syncMapTripSession();
+    await _messageRepository.refresh();
 
     await _openTrip(normalized);
   }
 
-  Future<void> _openTrip(
-      TripUi trip,
-      ) async {
-    final result =
-    await Navigator.of(context).push<TripDetailResult>(
+  Future<void> _openTrip(TripUi trip) async {
+    TripUi detail = trip;
+    try {
+      detail = await _tripRepository.detail(trip.id);
+    } catch (error) {
+      if (!mounted) return;
+      GoMateSnackBar.show(
+        context,
+        message: error.toString(),
+        bottomOffset: 92,
+        icon: Icons.error_outline,
+      );
+      return;
+    }
+    if (!mounted) return;
+
+    final result = await Navigator.of(context).push<TripDetailResult>(
       MaterialPageRoute(
         builder: (_) => TripDetailScreen(
-          trip: trip,
+          trip: detail,
           messageRepository: _messageRepository,
+          tripRepository: _tripRepository,
         ),
       ),
     );
@@ -250,9 +184,7 @@ class _TripScreenState extends State<TripScreen> {
       return;
     }
 
-    final index = _trips.indexWhere(
-          (item) => item.id == result.trip.id,
-    );
+    final index = _trips.indexWhere((item) => item.id == result.trip.id);
 
     if (result.removeFromList) {
       if (index >= 0) {
@@ -275,16 +207,11 @@ class _TripScreenState extends State<TripScreen> {
     }
   }
 
-  Future<void> _openActions(
-      TripUi trip,
-      ) async {
-    final result =
-    await GoMateBottomSheet.show<_ListAction>(
+  Future<void> _openActions(TripUi trip) async {
+    final result = await GoMateBottomSheet.show<_ListAction>(
       context: context,
       contentPadding: EdgeInsets.zero,
-      child: _ListActionContent(
-        trip: trip,
-      ),
+      child: _ListActionContent(trip: trip),
     );
 
     if (!mounted || result == null) {
@@ -293,11 +220,11 @@ class _TripScreenState extends State<TripScreen> {
 
     switch (result) {
       case _ListAction.pin:
-        _pin(trip);
+        await _pin(trip);
         break;
 
       case _ListAction.unpin:
-        _unpin(trip);
+        await _unpin(trip);
         break;
 
       case _ListAction.delete:
@@ -310,38 +237,77 @@ class _TripScreenState extends State<TripScreen> {
     }
   }
 
-  void _pin(
-      TripUi target,
-      ) {
-    setState(() {
-      for (var i = 0; i < _trips.length; i++) {
-        _trips[i] = _trips[i].copyWith(
-          isActive: _trips[i].id == target.id,
-        );
+  Future<void> _pin(TripUi target) async {
+    final permission = await _locationService.ensureAlwaysForPinnedTrip();
+    if (!mounted) return;
+
+    if (permission.state != GoMateLocationState.ready) {
+      await _handlePinPermissionBlock(permission.state);
+      return;
+    }
+
+    try {
+      final pinned = await _tripRepository.pin(target.id);
+      final current = await _locationService.getCurrentLocation();
+      if (current.state == GoMateLocationState.ready) {
+        final p = current.position!;
+        try {
+          await _tripRepository.publishLocation(
+            target.id,
+            latitude: p.latitude,
+            longitude: p.longitude,
+            accuracyM: p.accuracy,
+          );
+        } catch (_) {
+          // Pin đã được backend xác nhận; snapshot vị trí sẽ được thử lại khi user mở Map.
+        }
       }
-    });
-
-    _syncMapTripSession();
-
-    GoMateSnackBar.show(
-      context,
-      message: 'Đã ghim lịch trình',
-      bottomOffset: 92,
-    );
+      if (!mounted) return;
+      setState(() {
+        for (var i = 0; i < _trips.length; i++) {
+          _trips[i] = _trips[i].copyWith(isActive: _trips[i].id == target.id);
+        }
+        final index = _trips.indexWhere((item) => item.id == pinned.id);
+        if (index >= 0) _trips[index] = pinned;
+      });
+      _syncMapTripSession();
+      GoMateSnackBar.show(
+        context,
+        message: 'Đã ghim lịch trình',
+        bottomOffset: 92,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      GoMateSnackBar.show(
+        context,
+        message: error.toString(),
+        bottomOffset: 92,
+        icon: Icons.error_outline,
+      );
+    }
   }
 
-  void _unpin(
-      TripUi target,
-      ) {
-    final index = _trips.indexWhere(
-          (item) => item.id == target.id,
-    );
+  Future<void> _unpin(TripUi target) async {
+    try {
+      await _tripRepository.unpin(target.id);
+    } catch (error) {
+      if (!mounted) return;
+      GoMateSnackBar.show(
+        context,
+        message: error.toString(),
+        bottomOffset: 92,
+        icon: Icons.error_outline,
+      );
+      return;
+    }
+    if (!mounted) return;
+
+    final index = _trips.indexWhere((item) => item.id == target.id);
 
     if (index < 0) return;
 
     setState(() {
-      _trips[index] =
-          _trips[index].copyWith(isActive: false);
+      _trips[index] = _trips[index].copyWith(isActive: false);
     });
 
     _syncMapTripSession();
@@ -353,21 +319,60 @@ class _TripScreenState extends State<TripScreen> {
     );
   }
 
-  Future<void> _deleteTrip(
-      TripUi trip,
-      ) async {
-    final confirmed =
-    await GoMateBottomSheet.show<bool>(
+  Future<void> _handlePinPermissionBlock(GoMateLocationState state) async {
+    switch (state) {
+      case GoMateLocationState.serviceOff:
+        GoMateSnackBar.show(
+          context,
+          message: 'Hãy bật dịch vụ vị trí trước khi ghim lịch trình.',
+          bottomOffset: 92,
+          icon: Icons.location_off_outlined,
+        );
+        await _locationService.openLocationSettings();
+        break;
+      case GoMateLocationState.whileInUseOnly:
+        GoMateSnackBar.show(
+          context,
+          message: 'Ghim lịch trình cần quyền vị trí Luôn cho phép.',
+          bottomOffset: 92,
+          icon: Icons.location_on_outlined,
+        );
+        await _locationService.openAppSettings();
+        break;
+      case GoMateLocationState.permissionDeniedForever:
+        GoMateSnackBar.show(
+          context,
+          message:
+              'Quyền vị trí đã bị chặn. Hãy bật Luôn cho phép trong Settings.',
+          bottomOffset: 92,
+          icon: Icons.location_off_outlined,
+        );
+        await _locationService.openAppSettings();
+        break;
+      case GoMateLocationState.permissionDenied:
+        GoMateSnackBar.show(
+          context,
+          message: 'GoMate cần quyền vị trí Luôn cho phép để ghim lịch trình.',
+          bottomOffset: 92,
+          icon: Icons.location_off_outlined,
+        );
+        break;
+      case GoMateLocationState.ready:
+        break;
+    }
+  }
+
+  Future<void> _deleteTrip(TripUi trip) async {
+    final confirmed = await GoMateBottomSheet.show<bool>(
       context: context,
       child: MessageConfirmContent(
         title: 'Xoá lịch trình?',
         description: trip.isGroup
             ? 'Xoá lịch trình nhóm đồng nghĩa với việc xoá đoạn chat nhóm. '
-            'Hành động này không thể hoàn tác.'
+                  'Hành động này không thể hoàn tác.'
             : 'Lịch trình này sẽ bị xoá vĩnh viễn. '
-            'Hành động này không thể hoàn tác.',
-        onConfirm: () =>
-            Navigator.of(context).pop(true),
+                  'Hành động này không thể hoàn tác.',
+        onConfirm: () => Navigator.of(context).pop(true),
       ),
     );
 
@@ -377,39 +382,44 @@ class _TripScreenState extends State<TripScreen> {
 
     final conversationId = trip.conversationId;
 
-    if (trip.isGroup && conversationId != null) {
-      _messageRepository.deleteGroupAndItinerary(
-        conversationId,
+    try {
+      await _tripRepository.delete(trip.id);
+      if (trip.isGroup && conversationId != null) {
+        _messageRepository.deleteGroupAndItinerary(conversationId);
+      }
+
+      setState(() {
+        _trips.removeWhere((item) => item.id == trip.id);
+      });
+
+      _syncMapTripSession();
+      await _messageRepository.refresh();
+      if (!mounted) return;
+
+      GoMateSnackBar.show(
+        context,
+        message: 'Đã xoá lịch trình',
+        bottomOffset: 92,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      GoMateSnackBar.show(
+        context,
+        message: error.toString(),
+        bottomOffset: 92,
+        icon: Icons.error_outline,
       );
     }
-
-    setState(() {
-      _trips.removeWhere(
-            (item) => item.id == trip.id,
-      );
-    });
-
-    _syncMapTripSession();
-
-    GoMateSnackBar.show(
-      context,
-      message: 'Đã xoá lịch trình',
-      bottomOffset: 92,
-    );
   }
 
-  Future<void> _leaveTrip(
-      TripUi trip,
-      ) async {
-    final confirmed =
-    await GoMateBottomSheet.show<bool>(
+  Future<void> _leaveTrip(TripUi trip) async {
+    final confirmed = await GoMateBottomSheet.show<bool>(
       context: context,
       child: MessageConfirmContent(
         title: 'Rời lịch trình?',
         description:
-        'Rời lịch trình đồng nghĩa với việc bạn rời đoạn chat nhóm.',
-        onConfirm: () =>
-            Navigator.of(context).pop(true),
+            'Rời lịch trình đồng nghĩa với việc bạn rời đoạn chat nhóm.',
+        onConfirm: () => Navigator.of(context).pop(true),
       ),
     );
 
@@ -420,15 +430,11 @@ class _TripScreenState extends State<TripScreen> {
     final conversationId = trip.conversationId;
 
     if (conversationId != null) {
-      _messageRepository.leaveGroup(
-        conversationId,
-      );
+      _messageRepository.leaveGroup(conversationId);
     }
 
     setState(() {
-      _trips.removeWhere(
-            (item) => item.id == trip.id,
-      );
+      _trips.removeWhere((item) => item.id == trip.id);
     });
 
     _syncMapTripSession();
@@ -444,14 +450,12 @@ class _TripScreenState extends State<TripScreen> {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
 
-    final headerUi =
-    GoMateMainTabHeaderMetrics.fromWidth(width);
+    final headerUi = GoMateMainTabHeaderMetrics.fromWidth(width);
 
     final visible = _visibleTrips;
     final pinned = _pinnedTrip;
 
-    final horizontal =
-    (width * 0.065).clamp(22.0, 28.0).toDouble();
+    final horizontal = (width * 0.065).clamp(22.0, 28.0).toDouble();
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -469,8 +473,7 @@ class _TripScreenState extends State<TripScreen> {
 
             Padding(
               padding: EdgeInsets.symmetric(
-                horizontal:
-                (width * 0.075).clamp(24.0, 30.0).toDouble(),
+                horizontal: (width * 0.075).clamp(24.0, 30.0).toDouble(),
               ),
               child: GoMateSearchField(
                 controller: _searchController,
@@ -485,92 +488,88 @@ class _TripScreenState extends State<TripScreen> {
               ),
             ),
 
-            SizedBox(
-              height:
-              (width * 0.050).clamp(17.0, 21.0).toDouble(),
-            ),
+            SizedBox(height: (width * 0.050).clamp(17.0, 21.0).toDouble()),
 
             Expanded(
-              child: ListView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.only(
-                  bottom: 110,
-                ),
-                children: [
-                  if (!_isSearching && pinned != null) ...[
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: horizontal,
-                      ),
-                      child: Text(
-                        'Đang diễn ra',
-                        style: TextStyle(
-                          fontSize:
-                          (width * 0.032).clamp(11.5, 13.0).toDouble(),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-
-                    SizedBox(
-                      height:
-                      (width * 0.030).clamp(10.0, 13.0).toDouble(),
-                    ),
-
-                    // Khôi phục hero pinned kiểu cũ:
-                    // ảnh full-width, không bị bó hẹp trong card nhỏ.
-                    _PinnedTripCard(
-                      trip: pinned,
-                      onTap: () => _openTrip(pinned),
-                    ),
-
-                    SizedBox(
-                      height:
-                      (width * 0.060).clamp(20.0, 25.0).toDouble(),
-                    ),
-                  ],
-
-                  if (visible.isEmpty)
-                    Padding(
-                      padding: EdgeInsets.only(
-                        top: width * 0.28,
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'Không tìm thấy lịch trình',
-                          style: TextStyle(
-                            color: AppColors.grayText,
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: horizontal,
-                      ),
-                      child: Column(
-                        children: [
-                          for (var i = 0; i < visible.length; i++) ...[
-                            _TripCard(
-                              trip: visible[i],
-                              onTap: () =>
-                                  _openTrip(visible[i]),
-                              onMoreTap: () =>
-                                  _openActions(visible[i]),
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                  ? _TripErrorState(message: _error!, onRetry: _loadTrips)
+                  : ListView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.only(bottom: 110),
+                      children: [
+                        if (!_isSearching && pinned != null) ...[
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: horizontal,
                             ),
-                            if (i != visible.length - 1)
-                              SizedBox(
-                                height: (width * 0.050)
-                                    .clamp(17.0, 21.0)
+                            child: Text(
+                              'Đang diễn ra',
+                              style: TextStyle(
+                                fontSize: (width * 0.032)
+                                    .clamp(11.5, 13.0)
                                     .toDouble(),
+                                fontWeight: FontWeight.w700,
                               ),
-                          ],
+                            ),
+                          ),
+
+                          SizedBox(
+                            height: (width * 0.030)
+                                .clamp(10.0, 13.0)
+                                .toDouble(),
+                          ),
+
+                          // Khôi phục hero pinned kiểu cũ:
+                          // ảnh full-width, không bị bó hẹp trong card nhỏ.
+                          _PinnedTripCard(
+                            trip: pinned,
+                            onTap: () => _openTrip(pinned),
+                          ),
+
+                          SizedBox(
+                            height: (width * 0.060)
+                                .clamp(20.0, 25.0)
+                                .toDouble(),
+                          ),
                         ],
-                      ),
+
+                        if (visible.isEmpty)
+                          Padding(
+                            padding: EdgeInsets.only(top: width * 0.28),
+                            child: const Center(
+                              child: Text(
+                                'Không tìm thấy lịch trình',
+                                style: TextStyle(color: AppColors.grayText),
+                              ),
+                            ),
+                          )
+                        else
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: horizontal,
+                            ),
+                            child: Column(
+                              children: [
+                                for (var i = 0; i < visible.length; i++) ...[
+                                  _TripCard(
+                                    trip: visible[i],
+                                    onTap: () => _openTrip(visible[i]),
+                                    onMoreTap: () => _openActions(visible[i]),
+                                  ),
+                                  if (i != visible.length - 1)
+                                    SizedBox(
+                                      height: (width * 0.050)
+                                          .clamp(17.0, 21.0)
+                                          .toDouble(),
+                                    ),
+                                ],
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
-                ],
-              ),
             ),
           ],
         ),
@@ -579,19 +578,44 @@ class _TripScreenState extends State<TripScreen> {
   }
 }
 
-enum _ListAction {
-  pin,
-  unpin,
-  delete,
-  leave,
+class _TripErrorState extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _TripErrorState({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: (width * 0.075).clamp(24.0, 30.0).toDouble(),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, color: AppColors.grayText, size: 34),
+          const SizedBox(height: 10),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: AppColors.grayText),
+          ),
+          const SizedBox(height: 14),
+          TextButton(onPressed: onRetry, child: const Text('Thử lại')),
+        ],
+      ),
+    );
+  }
 }
+
+enum _ListAction { pin, unpin, delete, leave }
 
 class _ListActionContent extends StatelessWidget {
   final TripUi trip;
 
-  const _ListActionContent({
-    required this.trip,
-  });
+  const _ListActionContent({required this.trip});
 
   @override
   Widget build(BuildContext context) {
@@ -608,40 +632,28 @@ class _ListActionContent extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _ListActionRow(
-            icon: trip.isActive
-                ? LucideIcons.pin_off
-                : LucideIcons.pin,
-            label: trip.isActive
-                ? 'Bỏ ghim lịch trình'
-                : 'Ghim lịch trình',
-            onTap: () => Navigator.of(context).pop(
-              trip.isActive
-                  ? _ListAction.unpin
-                  : _ListAction.pin,
-            ),
+            icon: trip.isActive ? LucideIcons.pin_off : LucideIcons.pin,
+            label: trip.isActive ? 'Bỏ ghim lịch trình' : 'Ghim lịch trình',
+            onTap: () => Navigator.of(
+              context,
+            ).pop(trip.isActive ? _ListAction.unpin : _ListAction.pin),
           ),
 
-          const Divider(
-            color: AppColors.grayBorder,
-          ),
+          const Divider(color: AppColors.grayBorder),
 
           if (trip.canDeleteTrip)
             _ListActionRow(
               icon: LucideIcons.trash,
               label: 'Xoá lịch trình',
               color: AppColors.primaryText,
-              onTap: () => Navigator.of(context).pop(
-                _ListAction.delete,
-              ),
+              onTap: () => Navigator.of(context).pop(_ListAction.delete),
             )
           else
             _ListActionRow(
               icon: LucideIcons.log_out,
               label: 'Rời lịch trình',
               color: AppColors.primaryText,
-              onTap: () => Navigator.of(context).pop(
-                _ListAction.leave,
-              ),
+              onTap: () => Navigator.of(context).pop(_ListAction.leave),
             ),
         ],
       ),
@@ -677,14 +689,11 @@ class _ListActionRow extends StatelessWidget {
               size: (width * 0.060).clamp(21.0, 24.0).toDouble(),
               color: color,
             ),
-            SizedBox(
-              width: (width * 0.045).clamp(15.0, 18.0).toDouble(),
-            ),
+            SizedBox(width: (width * 0.045).clamp(15.0, 18.0).toDouble()),
             Text(
               label,
               style: TextStyle(
-                fontSize:
-                (width * 0.032).clamp(11.5, 12.5).toDouble(),
+                fontSize: (width * 0.032).clamp(11.5, 12.5).toDouble(),
                 fontWeight: FontWeight.w600,
                 color: color,
               ),
@@ -720,14 +729,11 @@ class _TripCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
 
-    final cardHeight =
-    (width * 0.225).clamp(84.0, 94.0).toDouble();
+    final cardHeight = (width * 0.225).clamp(84.0, 94.0).toDouble();
 
-    final imageWidth =
-    (width * 0.21).clamp(78.0, 88.0).toDouble();
+    final imageWidth = (width * 0.21).clamp(78.0, 88.0).toDouble();
 
-    final radius =
-    (width * 0.038).clamp(13.0, 16.0).toDouble();
+    final radius = (width * 0.038).clamp(13.0, 16.0).toDouble();
 
     return Container(
       height: cardHeight,
@@ -757,16 +763,12 @@ class _TripCard extends StatelessWidget {
                 height: cardHeight,
               ),
 
-              SizedBox(
-                width:
-                (width * 0.030).clamp(10.0, 13.0).toDouble(),
-              ),
+              SizedBox(width: (width * 0.030).clamp(10.0, 13.0).toDouble()),
 
               Expanded(
                 child: Padding(
                   padding: EdgeInsets.symmetric(
-                    vertical:
-                    (width * 0.020).clamp(7.0, 9.0).toDouble(),
+                    vertical: (width * 0.020).clamp(7.0, 9.0).toDouble(),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -774,13 +776,12 @@ class _TripCard extends StatelessWidget {
                     children: [
                       _TripTitleWithRole(
                         trip: trip,
-                        iconSize:
-                        (width * 0.036).clamp(13.0, 15.0).toDouble(),
-                        iconGap:
-                        (width * 0.012).clamp(4.0, 5.0).toDouble(),
+                        iconSize: (width * 0.036).clamp(13.0, 15.0).toDouble(),
+                        iconGap: (width * 0.012).clamp(4.0, 5.0).toDouble(),
                         style: TextStyle(
-                          fontSize:
-                          (width * 0.032).clamp(11.5, 13.0).toDouble(),
+                          fontSize: (width * 0.032)
+                              .clamp(11.5, 13.0)
+                              .toDouble(),
                           height: 1.05,
                           fontWeight: FontWeight.w800,
                           color: AppColors.primaryText,
@@ -788,8 +789,7 @@ class _TripCard extends StatelessWidget {
                       ),
 
                       SizedBox(
-                        height:
-                        (width * 0.010).clamp(3.0, 4.0).toDouble(),
+                        height: (width * 0.010).clamp(3.0, 4.0).toDouble(),
                       ),
 
                       Text(
@@ -797,8 +797,7 @@ class _TripCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize:
-                          (width * 0.025).clamp(9.0, 10.5).toDouble(),
+                          fontSize: (width * 0.025).clamp(9.0, 10.5).toDouble(),
                           height: 1.1,
                           color: AppColors.grayText,
                         ),
@@ -806,8 +805,7 @@ class _TripCard extends StatelessWidget {
 
                       if (trip.isGroup) ...[
                         SizedBox(
-                          height:
-                          (width * 0.006).clamp(2.0, 3.0).toDouble(),
+                          height: (width * 0.006).clamp(2.0, 3.0).toDouble(),
                         ),
 
                         Text(
@@ -815,8 +813,9 @@ class _TripCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize:
-                            (width * 0.025).clamp(9.0, 10.5).toDouble(),
+                            fontSize: (width * 0.025)
+                                .clamp(9.0, 10.5)
+                                .toDouble(),
                             height: 1.1,
                             color: AppColors.grayText,
                           ),
@@ -824,8 +823,7 @@ class _TripCard extends StatelessWidget {
                       ],
 
                       SizedBox(
-                        height:
-                        (width * 0.006).clamp(2.0, 3.0).toDouble(),
+                        height: (width * 0.006).clamp(2.0, 3.0).toDouble(),
                       ),
 
                       Text(
@@ -833,8 +831,7 @@ class _TripCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize:
-                          (width * 0.025).clamp(9.0, 10.5).toDouble(),
+                          fontSize: (width * 0.025).clamp(9.0, 10.5).toDouble(),
                           height: 1.1,
                           color: AppColors.grayText,
                         ),
@@ -848,13 +845,11 @@ class _TripCard extends StatelessWidget {
                 onTap: onMoreTap,
                 borderRadius: BorderRadius.circular(20),
                 child: SizedBox(
-                  width:
-                  (width * 0.13).clamp(44.0, 52.0).toDouble(),
+                  width: (width * 0.13).clamp(44.0, 52.0).toDouble(),
                   child: Center(
                     child: Icon(
                       LucideIcons.ellipsis_vertical,
-                      size:
-                      (width * 0.050).clamp(18.0, 21.0).toDouble(),
+                      size: (width * 0.050).clamp(18.0, 21.0).toDouble(),
                       color: AppColors.grayText,
                     ),
                   ),
@@ -886,8 +881,7 @@ List<String> _pinnedTripPlaceImages(TripUi trip) {
     ];
   }
 
-  final count =
-  trip.places.length.clamp(1, demoPlaceImages.length);
+  final count = trip.places.length.clamp(1, demoPlaceImages.length);
 
   return demoPlaceImages.take(count).toList(growable: false);
 }
@@ -896,22 +890,17 @@ class _PinnedTripCard extends StatefulWidget {
   final TripUi trip;
   final VoidCallback onTap;
 
-  const _PinnedTripCard({
-    required this.trip,
-    required this.onTap,
-  });
+  const _PinnedTripCard({required this.trip, required this.onTap});
 
   @override
-  State<_PinnedTripCard> createState() =>
-      _PinnedTripCardState();
+  State<_PinnedTripCard> createState() => _PinnedTripCardState();
 }
 
 class _PinnedTripCardState extends State<_PinnedTripCard> {
   Timer? _timer;
   int _imageIndex = 0;
 
-  List<String> get _images =>
-      _pinnedTripPlaceImages(widget.trip);
+  List<String> get _images => _pinnedTripPlaceImages(widget.trip);
 
   @override
   void initState() {
@@ -920,9 +909,7 @@ class _PinnedTripCardState extends State<_PinnedTripCard> {
   }
 
   @override
-  void didUpdateWidget(
-      covariant _PinnedTripCard oldWidget,
-      ) {
+  void didUpdateWidget(covariant _PinnedTripCard oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.trip.id != widget.trip.id ||
@@ -937,17 +924,13 @@ class _PinnedTripCardState extends State<_PinnedTripCard> {
 
     if (_images.length <= 1) return;
 
-    _timer = Timer.periodic(
-      const Duration(seconds: 5),
-          (_) {
-        if (!mounted) return;
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted) return;
 
-        setState(() {
-          _imageIndex =
-              (_imageIndex + 1) % _images.length;
-        });
-      },
-    );
+      setState(() {
+        _imageIndex = (_imageIndex + 1) % _images.length;
+      });
+    });
   }
 
   @override
@@ -969,18 +952,14 @@ class _PinnedTripCardState extends State<_PinnedTripCard> {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
 
-    final height =
-    (width * 0.34).clamp(122.0, 140.0).toDouble();
+    final height = (width * 0.34).clamp(122.0, 140.0).toDouble();
 
-    final horizontal =
-    (width * 0.052).clamp(18.0, 22.0).toDouble();
+    final horizontal = (width * 0.052).clamp(18.0, 22.0).toDouble();
 
-    final bottom =
-    (width * 0.050).clamp(17.0, 21.0).toDouble();
+    final bottom = (width * 0.050).clamp(17.0, 21.0).toDouble();
 
     final images = _images;
-    final safeIndex =
-    _imageIndex.clamp(0, images.length - 1);
+    final safeIndex = _imageIndex.clamp(0, images.length - 1);
     final image = images[safeIndex];
 
     return Material(
@@ -1012,10 +991,7 @@ class _PinnedTripCardState extends State<_PinnedTripCard> {
                   gradient: LinearGradient(
                     begin: Alignment.centerRight,
                     end: Alignment.centerLeft,
-                    colors: [
-                      Color(0x14000000),
-                      Color(0x82000000),
-                    ],
+                    colors: [Color(0x14000000), Color(0x82000000)],
                   ),
                 ),
               ),
@@ -1034,13 +1010,10 @@ class _PinnedTripCardState extends State<_PinnedTripCard> {
 
                     _TripTitleWithRole(
                       trip: widget.trip,
-                      iconSize:
-                      (width * 0.040).clamp(14.0, 16.0).toDouble(),
-                      iconGap:
-                      (width * 0.014).clamp(5.0, 6.0).toDouble(),
+                      iconSize: (width * 0.040).clamp(14.0, 16.0).toDouble(),
+                      iconGap: (width * 0.014).clamp(5.0, 6.0).toDouble(),
                       style: TextStyle(
-                        fontSize:
-                        (width * 0.044).clamp(16.0, 18.0).toDouble(),
+                        fontSize: (width * 0.044).clamp(16.0, 18.0).toDouble(),
                         height: 1,
                         fontWeight: FontWeight.w800,
                         color: Colors.white,
@@ -1048,8 +1021,7 @@ class _PinnedTripCardState extends State<_PinnedTripCard> {
                     ),
 
                     SizedBox(
-                      height:
-                      (width * 0.022).clamp(7.0, 9.0).toDouble(),
+                      height: (width * 0.022).clamp(7.0, 9.0).toDouble(),
                     ),
 
                     _PinnedMetaRow(
@@ -1059,8 +1031,7 @@ class _PinnedTripCardState extends State<_PinnedTripCard> {
 
                     if (widget.trip.isGroup) ...[
                       SizedBox(
-                        height:
-                        (width * 0.016).clamp(5.0, 7.0).toDouble(),
+                        height: (width * 0.016).clamp(5.0, 7.0).toDouble(),
                       ),
 
                       _PinnedMetaRow(
@@ -1070,16 +1041,14 @@ class _PinnedTripCardState extends State<_PinnedTripCard> {
                     ],
 
                     SizedBox(
-                      height:
-                      (width * 0.016).clamp(5.0, 7.0).toDouble(),
+                      height: (width * 0.016).clamp(5.0, 7.0).toDouble(),
                     ),
 
                     Text(
                       '${widget.trip.days} ngày - '
-                          '${widget.trip.places.length} địa điểm',
+                      '${widget.trip.places.length} địa điểm',
                       style: TextStyle(
-                        fontSize:
-                        (width * 0.027).clamp(10.0, 11.5).toDouble(),
+                        fontSize: (width * 0.027).clamp(10.0, 11.5).toDouble(),
                         height: 1.1,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
@@ -1095,29 +1064,22 @@ class _PinnedTripCardState extends State<_PinnedTripCard> {
                   bottom: bottom,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: List.generate(
-                      images.length,
-                          (index) {
-                        final active =
-                            index == _imageIndex;
+                    children: List.generate(images.length, (index) {
+                      final active = index == _imageIndex;
 
-                        return AnimatedContainer(
-                          duration:
-                          const Duration(milliseconds: 220),
-                          margin:
-                          const EdgeInsets.only(left: 4),
-                          width: active ? 12 : 5,
-                          height: 5,
-                          decoration: BoxDecoration(
-                            color: active
-                                ? Colors.white
-                                : Colors.white.withOpacity(0.55),
-                            borderRadius:
-                            BorderRadius.circular(99),
-                          ),
-                        );
-                      },
-                    ),
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 220),
+                        margin: const EdgeInsets.only(left: 4),
+                        width: active ? 12 : 5,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: active
+                              ? Colors.white
+                              : Colors.white.withOpacity(0.55),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      );
+                    }),
                   ),
                 ),
             ],
@@ -1132,10 +1094,7 @@ class _PinnedMetaRow extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const _PinnedMetaRow({
-    required this.icon,
-    required this.text,
-  });
+  const _PinnedMetaRow({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -1145,22 +1104,17 @@ class _PinnedMetaRow extends StatelessWidget {
       children: [
         Icon(
           icon,
-          size:
-          (width * 0.037).clamp(13.0, 15.0).toDouble(),
+          size: (width * 0.037).clamp(13.0, 15.0).toDouble(),
           color: Colors.white,
         ),
-        SizedBox(
-          width:
-          (width * 0.014).clamp(5.0, 6.0).toDouble(),
-        ),
+        SizedBox(width: (width * 0.014).clamp(5.0, 6.0).toDouble()),
         Expanded(
           child: Text(
             text,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize:
-              (width * 0.027).clamp(10.0, 11.5).toDouble(),
+              fontSize: (width * 0.027).clamp(10.0, 11.5).toDouble(),
               height: 1.1,
               fontWeight: FontWeight.w600,
               color: Colors.white,
@@ -1186,16 +1140,11 @@ class _TripTitleWithRole extends StatelessWidget {
   });
 
   bool get _showLeader =>
-      trip.isGroup &&
-          trip.currentUserRole == TripAccessRole.leader;
-
-  bool get _showDeputy =>
-      trip.isGroup &&
-          trip.currentUserRole == TripAccessRole.deputy;
+      trip.isGroup && trip.currentUserRole == TripAccessRole.leader;
 
   @override
   Widget build(BuildContext context) {
-    final showRoleIcon = _showLeader || _showDeputy;
+    final showRoleIcon = _showLeader;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -1210,13 +1159,7 @@ class _TripTitleWithRole extends StatelessWidget {
         ),
         if (showRoleIcon) ...[
           SizedBox(width: iconGap),
-          Icon(
-            Icons.key,
-            size: iconSize,
-            color: _showLeader
-                ? AppColors.primaryIcon
-                : AppColors.grayText,
-          ),
+          Icon(Icons.key, size: iconSize, color: AppColors.primaryIcon),
         ],
       ],
     );
@@ -1251,10 +1194,7 @@ class _TripImage extends StatelessWidget {
           height: height,
           color: AppColors.blue50,
           alignment: Alignment.center,
-          child: const Icon(
-            LucideIcons.image,
-            color: AppColors.primaryIcon,
-          ),
+          child: const Icon(LucideIcons.image, color: AppColors.primaryIcon),
         );
       },
     );
@@ -1268,17 +1208,13 @@ class _TripCreateIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
 
-    final boxSize =
-    (width * (31 / 375)).clamp(29.0, 32.0).toDouble();
+    final boxSize = (width * (31 / 375)).clamp(29.0, 32.0).toDouble();
 
-    final calendarSize =
-    (width * (27.27 / 375)).clamp(25.0, 28.0).toDouble();
+    final calendarSize = (width * (27.27 / 375)).clamp(25.0, 28.0).toDouble();
 
-    final badgeSize =
-    (width * (20.45 / 375)).clamp(18.0, 20.5).toDouble();
+    final badgeSize = (width * (20.45 / 375)).clamp(18.0, 20.5).toDouble();
 
-    final plusSize =
-    (width * (13.64 / 375)).clamp(11.5, 13.5).toDouble();
+    final plusSize = (width * (13.64 / 375)).clamp(11.5, 13.5).toDouble();
 
     return SizedBox.square(
       dimension: boxSize,
@@ -1302,10 +1238,7 @@ class _TripCreateIcon extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.black,
-                border: Border.all(
-                  color: Colors.white,
-                  width: 1.6,
-                ),
+                border: Border.all(color: Colors.white, width: 1.6),
               ),
               alignment: Alignment.center,
               child: Icon(

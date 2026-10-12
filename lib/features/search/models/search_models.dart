@@ -1,16 +1,6 @@
-enum SearchTab {
-  places,
-  users,
-  posts,
-}
+enum SearchTab { places, users, posts }
 
-enum SearchUserRelation {
-  friend,
-  following,
-  followsYou,
-  none,
-  pending,
-}
+enum SearchUserRelation { friend, following, followsYou, none, pending }
 
 enum SearchPlaceFilter {
   nature('nature', 'Thiên nhiên'),
@@ -53,7 +43,7 @@ class SearchPlaceItem {
 }
 
 class SearchUserItem {
-  final int id;
+  final String id;
   final String name;
   final String subtitle;
   final String? avatarUrl;
@@ -85,6 +75,52 @@ class SearchUserItem {
   }
 }
 
+class SearchUserProfile {
+  final String userId;
+  final String nickname;
+  final String displayName;
+  final String? avatarUrl;
+  final String? city;
+  final String? bio;
+  final int followingCount;
+  final int followersCount;
+  final int mutualFriendCount;
+  final SearchUserRelation relation;
+
+  const SearchUserProfile({
+    required this.userId,
+    required this.nickname,
+    required this.displayName,
+    this.avatarUrl,
+    this.city,
+    this.bio,
+    this.followingCount = 0,
+    this.followersCount = 0,
+    this.mutualFriendCount = 0,
+    this.relation = SearchUserRelation.none,
+  });
+
+  SearchUserProfile copyWith({
+    SearchUserRelation? relation,
+    int? followingCount,
+    int? followersCount,
+    int? mutualFriendCount,
+  }) {
+    return SearchUserProfile(
+      userId: userId,
+      nickname: nickname,
+      displayName: displayName,
+      avatarUrl: avatarUrl,
+      city: city,
+      bio: bio,
+      followingCount: followingCount ?? this.followingCount,
+      followersCount: followersCount ?? this.followersCount,
+      mutualFriendCount: mutualFriendCount ?? this.mutualFriendCount,
+      relation: relation ?? this.relation,
+    );
+  }
+}
+
 class SearchPostItem {
   final int id;
   final String imageAsset;
@@ -103,10 +139,7 @@ class SearchHashtagItem {
   final String tag;
   final int postCount;
 
-  const SearchHashtagItem({
-    required this.tag,
-    required this.postCount,
-  });
+  const SearchHashtagItem({required this.tag, required this.postCount});
 }
 
 class SearchBundle {

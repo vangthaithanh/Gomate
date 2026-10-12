@@ -372,7 +372,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
     final width = MediaQuery.sizeOf(context).width;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
     final horizontal = (width * 0.055).clamp(18.0, 24.0).toDouble();
-    final headerHeight = (width * 0.19).clamp(68.0, 78.0).toDouble();
+    final headerHeight = (width * 0.36).clamp(132.0, 150.0).toDouble();
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -430,12 +430,11 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                     opacity: _detailHeaderVisible ? 1 : 0,
                     child: SizedBox(
                       height: headerHeight,
-                      child:_PlaceFloatingHeader(
+                      child: _PlaceFloatingHeader(
+                        place: place,
                         isFavorite: _isFavorite,
                         onBack: () => Navigator.of(context).pop(),
                         onFavorite: _toggleFavorite,
-
-                        // Giữ nguyên toàn bộ SharePlace flow hiện tại.
                         onShare: _openSharePlace,
                       ),
                     ),
@@ -720,7 +719,9 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
   }
 }
 
+
 class _PlaceFloatingHeader extends StatelessWidget {
+  final MapPlaceUi place;
   final bool isFavorite;
 
   final VoidCallback onBack;
@@ -728,6 +729,7 @@ class _PlaceFloatingHeader extends StatelessWidget {
   final VoidCallback onShare;
 
   const _PlaceFloatingHeader({
+    required this.place,
     required this.isFavorite,
     required this.onBack,
     required this.onFavorite,
@@ -737,58 +739,122 @@ class _PlaceFloatingHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-
     final horizontal =
     (width * 0.055).clamp(18.0, 24.0).toDouble();
 
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: horizontal,
+      padding: EdgeInsets.fromLTRB(
+        horizontal,
+        width * 0.015,
+        horizontal,
+        width * 0.024,
       ),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.055),
+            color: Colors.black.withOpacity(0.035),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _HeaderIconButton(
-            icon: LucideIcons.chevron_left,
-            onTap: onBack,
+          // Hàng icon: giữ nguyên luồng hiện tại.
+          Row(
+            children: [
+              _HeaderIconButton(
+                icon: LucideIcons.chevron_left,
+                onTap: onBack,
+              ),
+              const Spacer(),
+              _HeaderIconButton(
+                icon: isFavorite
+                    ? Icons.favorite_rounded
+                    : LucideIcons.heart,
+                color: isFavorite
+                    ? AppColors.primaryIcon
+                    : Colors.black,
+                onTap: onFavorite,
+              ),
+              SizedBox(width: width * 0.020),
+              _HeaderIconButton(
+                icon: LucideIcons.send,
+                onTap: onShare,
+              ),
+            ],
           ),
 
-          const Spacer(),
+          SizedBox(height: width * 0.012),
 
-          _HeaderIconButton(
-            icon: isFavorite
-                ? Icons.favorite_rounded
-                : LucideIcons.heart,
-            color: isFavorite
-                ? AppColors.primaryIcon
-                : Colors.black,
-            onTap: onFavorite,
+          // Tên địa điểm.
+          Text(
+            place.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: (width * 0.050)
+                  .clamp(18.0, 22.0)
+                  .toDouble(),
+              fontWeight: FontWeight.w800,
+              color: AppColors.primaryText,
+              height: 1.05,
+            ),
           ),
 
-          SizedBox(
-            width: (width * 0.020)
-                .clamp(7.0, 9.0)
-                .toDouble(),
+          SizedBox(height: width * 0.010),
+
+          // Đánh giá và phân loại địa điểm.
+          Row(
+            children: [
+              Icon(
+                Icons.star_rounded,
+                size: (width * 0.040)
+                    .clamp(15.0, 17.0)
+                    .toDouble(),
+                color: AppColors.primaryIcon,
+              ),
+              SizedBox(width: width * 0.008),
+              Expanded(
+                child: Text(
+                  '${place.rating.toStringAsFixed(1)} '
+                      '(${place.reviewCount})   '
+                      '${place.tags.isNotEmpty ? place.tags.first : 'Khu du lịch'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: (width * 0.028)
+                        .clamp(10.5, 12.0)
+                        .toDouble(),
+                    color: AppColors.grayText,
+                  ),
+                ),
+              ),
+            ],
           ),
 
-          _HeaderIconButton(
-            icon: LucideIcons.send,
-            onTap: onShare,
+          SizedBox(height: width * 0.010),
+
+          // Địa chỉ.
+          Text(
+            place.address,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: (width * 0.027)
+                  .clamp(10.0, 11.5)
+                  .toDouble(),
+              color: AppColors.grayText,
+            ),
           ),
         ],
       ),
     );
   }
 }
+
 
 class _HeaderIconButton extends StatelessWidget {
   final IconData icon;

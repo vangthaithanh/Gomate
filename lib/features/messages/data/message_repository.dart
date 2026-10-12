@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
+import '../../../core/services/auth_service.dart';
 import '../models/message_models.dart';
 
 abstract class MessageRepository extends ChangeNotifier {
@@ -14,11 +17,17 @@ abstract class MessageRepository extends ChangeNotifier {
   /// Chỉ các lịch trình current user có quyền mời thêm thành viên.
   List<MessageItinerary> get inviteableItineraries;
 
+  Future<void> refresh();
   MessageConversation? conversation(String id);
   MessageItinerary? linkedGroupItinerary(String conversationId);
   MessageGroupRole groupRole(String conversationId);
+  List<MessageContact> groupInviteCandidates(
+    String conversationId,
+    String query,
+  );
   List<MessageGroupInvite> pendingGroupInvites(String conversationId);
   List<MessageContact> searchContacts(String query);
+  Future<List<MessageContact>> fetchContactSuggestions(String query);
   List<MessageSearchResult> searchMessages(String conversationId, String query);
   String openOrCreateDirectConversation(String contactId);
 
@@ -32,23 +41,661 @@ abstract class MessageRepository extends ChangeNotifier {
   void renameGroup(String conversationId, String name);
   void inviteGroupMembers(String conversationId, Iterable<String> contactIds);
   void cancelGroupInvite(String conversationId, String contactId);
-  void removeGroupMembers(String conversationId, Iterable<String> participantIds);
-  void promoteGroupMembers(String conversationId, Iterable<String> participantIds);
-  void revokeGroupDeputy(String conversationId, String participantId);
+  void removeGroupMembers(
+    String conversationId,
+    Iterable<String> participantIds,
+  );
   void toggleMute(String conversationId);
   void setNickname({
     required String conversationId,
     required String participantId,
     String? nickname,
   });
-  void sendText({
-    required String conversationId,
-    required String text,
-  });
+  void sendText({required String conversationId, required String text});
   void invitePeerToItinerary({
     required String conversationId,
     required String itineraryId,
   });
+}
+
+class RealDirectMessageRepository extends MessageRepository {
+  RealDirectMessageRepository._() {
+    AuthService.instance.addListener(_handleAuthChanged);
+    refresh();
+  }
+
+  static final RealDirectMessageRepository instance =
+      RealDirectMessageRepository._();
+
+  final List<MessageConversation> _items = <MessageConversation>[];
+  final List<MessageContact> _contacts = <MessageContact>[];
+  final Map<String, String> _aliases = <String, String>{};
+  String? _error;
+  bool _loading = false;
+
+  bool get loading => _loading;
+  String? get error => _error;
+
+  @override
+  String get currentUserId {
+    final user = AuthService.instance.user;
+    final id = _text(user?['id']);
+    return id.isEmpty ? _text(user?['userId']) : id;
+  }
+
+  @override
+  String get currentUserName {
+    final user = AuthService.instance.user;
+    final displayName = _text(user?['displayName']);
+    if (displayName.isNotEmpty) return displayName;
+    final fullName = _text(user?['fullName']);
+    if (fullName.isNotEmpty) return fullName;
+    final nickname = _text(user?['nickname']);
+    return nickname.isEmpty ? 'GoMate' : nickname;
+  }
+
+  @override
+  List<MessageConversation> get mainConversations =>
+      List.unmodifiable(_items.where((item) => !item.isPending));
+
+  @override
+  List<MessageConversation> get pendingConversations =>
+      List.unmodifiable(_items.where((item) => item.isPending));
+
+  @override
+  List<MessageContact> get contacts => List.unmodifiable(_contacts);
+
+  @override
+  List<MessageItinerary> get itineraries => const <MessageItinerary>[];
+
+  @override
+  List<MessageItinerary> get inviteableItineraries =>
+      const <MessageItinerary>[];
+
+  @override
+  Future<void> refresh() async {
+    if (!AuthService.instance.signedIn) return;
+    _loading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final conversations = await AuthService.instance.requestJson(
+        'GET',
+        '/conversations',
+      );
+      final pending = await AuthService.instance.requestJson(
+        'GET',
+        '/message-requests',
+      );
+      _items
+        ..clear()
+        ..addAll([
+          ..._asList(conversations).map(_conversationFromSummary),
+          ..._asList(pending).map(_conversationFromSummary),
+        ]);
+    } catch (error) {
+      _error = error.toString();
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> searchContactsFromApi(String query) async {
+    await fetchContactSuggestions(query);
+  }
+
+  @override
+  Future<List<MessageContact>> fetchContactSuggestions(String query) async {
+    final q = query.trim();
+    try {
+      final uri = Uri(
+        path: '/users/search',
+        queryParameters: <String, String>{'q': q, 'page': '0', 'size': '20'},
+      );
+      final response = await AuthService.instance.request(
+        'GET',
+        uri.toString(),
+      );
+      final contacts = _asList(response['items'])
+          .map(_contactFromJson)
+          .where((item) => item.id.isNotEmpty)
+          .toList(growable: false);
+      _contacts
+        ..clear()
+        ..addAll(contacts);
+      notifyListeners();
+      return contacts;
+    } catch (error) {
+      _error = error.toString();
+      notifyListeners();
+      return const <MessageContact>[];
+    }
+  }
+
+  @override
+  MessageConversation? conversation(String id) {
+    final resolvedId = _resolve(id);
+    final index = _indexOf(resolvedId);
+    if (index < 0) return null;
+    final item = _items[index];
+    if (item.messages.isEmpty) unawaited(_loadDetail(resolvedId));
+    return item;
+  }
+
+  @override
+  MessageItinerary? linkedGroupItinerary(String conversationId) {
+    final conversation = this.conversation(conversationId);
+    if (conversation == null || !conversation.isGroup) return null;
+    final tripId = conversation.linkedItineraryId;
+    if (tripId == null || tripId.trim().isEmpty) return null;
+    return MessageItinerary(
+      id: tripId,
+      title: conversation.title,
+      dateRange: '',
+      summary: '${conversation.participants.length} thành viên',
+      imageAsset: conversation.coverAsset ?? 'assets/images/home_dalat.jpg',
+      memberCount: conversation.participants.length,
+    );
+  }
+
+  @override
+  MessageGroupRole groupRole(String conversationId) =>
+      conversation(conversationId)?.roleOf(currentUserId) ??
+      MessageGroupRole.member;
+
+  @override
+  List<MessageContact> groupInviteCandidates(
+    String conversationId,
+    String query,
+  ) => const <MessageContact>[];
+
+  @override
+  List<MessageGroupInvite> pendingGroupInvites(String conversationId) =>
+      const <MessageGroupInvite>[];
+
+  @override
+  List<MessageContact> searchContacts(String query) {
+    final normalized = query.trim().toLowerCase();
+    if (normalized.isEmpty) return contacts;
+    return _contacts
+        .where(
+          (contact) =>
+              contact.name.toLowerCase().contains(normalized) ||
+              contact.subtitle.toLowerCase().contains(normalized),
+        )
+        .toList(growable: false);
+  }
+
+  @override
+  List<MessageSearchResult> searchMessages(
+    String conversationId,
+    String query,
+  ) {
+    final target = conversation(conversationId);
+    if (target == null) return const <MessageSearchResult>[];
+    final normalized = query.trim().toLowerCase();
+    if (normalized.isEmpty) return const <MessageSearchResult>[];
+    return target.messages
+        .where((message) => message.text.toLowerCase().contains(normalized))
+        .map(
+          (message) => MessageSearchResult(
+            messageId: message.id,
+            senderName: message.senderId == currentUserId
+                ? currentUserName
+                : target.title,
+            text: message.text,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  @override
+  String openOrCreateDirectConversation(String contactId) {
+    return openOrCreateDirectConversationWithPeer(contactId: contactId);
+  }
+
+  String openOrCreateDirectConversationWithPeer({
+    required String contactId,
+    String? name,
+    String? subtitle,
+    String? avatarUrl,
+  }) {
+    final existing = _items.where((item) {
+      if (item.type != MessageConversationType.direct) return false;
+      return item.participants.any((p) => p.id == contactId);
+    });
+    if (existing.isNotEmpty) return existing.first.id;
+
+    MessageContact? contact;
+    for (final item in _contacts) {
+      if (item.id == contactId) {
+        contact = item;
+        break;
+      }
+    }
+    contact ??= MessageContact(
+      id: contactId,
+      name: name?.trim().isNotEmpty == true ? name!.trim() : 'Người dùng',
+      subtitle: subtitle?.trim().isNotEmpty == true ? subtitle!.trim() : '',
+      avatarAsset: avatarUrl?.trim().isNotEmpty == true
+          ? avatarUrl!.trim()
+          : null,
+    );
+    final temporaryId = 'opening_$contactId';
+    _items.insert(
+      0,
+      MessageConversation(
+        id: temporaryId,
+        type: MessageConversationType.direct,
+        title: contact.name,
+        participants: [
+          _me(),
+          MessageParticipant(
+            id: contact.id,
+            name: contact.name,
+            avatarAsset: contact.avatarAsset,
+          ),
+        ],
+        messages: const [],
+        lastSenderId: '',
+        lastMessageText: '',
+        lastMessageTime: '',
+        isPending: true,
+      ),
+    );
+    notifyListeners();
+    unawaited(_openDirect(contactId, temporaryId));
+    return temporaryId;
+  }
+
+  @override
+  void markRead(String conversationId) {
+    final resolvedId = _resolve(conversationId);
+    if (resolvedId.startsWith('opening_')) return;
+    final index = _indexOf(resolvedId);
+    if (index >= 0 && _items[index].unreadCount > 0) {
+      _items[index] = _items[index].copyWith(unreadCount: 0);
+      notifyListeners();
+    }
+    unawaited(
+      AuthService.instance
+          .request('POST', '/conversations/$resolvedId/read')
+          .catchError((_) => <String, dynamic>{}),
+    );
+    unawaited(_loadDetail(resolvedId));
+  }
+
+  @override
+  void acceptPending(Iterable<String> conversationIds) {
+    for (final id in conversationIds.toSet()) {
+      unawaited(_acceptPending(id));
+    }
+  }
+
+  @override
+  void deletePending(Iterable<String> conversationIds) {
+    for (final id in conversationIds.toSet()) {
+      unawaited(_deletePending(id));
+    }
+  }
+
+  @override
+  void blockConversation(String conversationId) {
+    unawaited(_toggleBlock(conversationId, true));
+  }
+
+  @override
+  void unblockConversation(String conversationId) {
+    unawaited(_toggleBlock(conversationId, false));
+  }
+
+  @override
+  void leaveGroup(String conversationId) {}
+
+  @override
+  void deleteGroupAndItinerary(String conversationId) {}
+
+  @override
+  void renameGroup(String conversationId, String name) {
+    final value = name.trim();
+    if (value.isEmpty) return;
+    final resolvedId = _resolve(conversationId);
+    unawaited(
+      AuthService.instance
+          .request(
+            'PATCH',
+            '/conversations/$resolvedId/name',
+            body: {'name': value},
+          )
+          .then((response) {
+            final index = _indexOf(resolvedId);
+            if (index >= 0) _items[index] = _conversationFromSummary(response);
+            notifyListeners();
+          })
+          .catchError((error) {
+            _setError(error);
+            return null;
+          }),
+    );
+  }
+
+  @override
+  void inviteGroupMembers(String conversationId, Iterable<String> contactIds) {
+    final resolvedId = _resolve(conversationId);
+    final conversation = this.conversation(resolvedId);
+    final tripId = conversation?.linkedItineraryId;
+    final ids = contactIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+    if (tripId == null || tripId.trim().isEmpty || ids.isEmpty) return;
+    unawaited(
+      AuthService.instance
+          .request(
+            'POST',
+            '/trips/$tripId/members',
+            body: {'selectedMemberIds': ids},
+          )
+          .then((_) => refresh())
+          .catchError((error) {
+            _setError(error);
+            return null;
+          }),
+    );
+  }
+
+  @override
+  void cancelGroupInvite(String conversationId, String contactId) {}
+
+  @override
+  void removeGroupMembers(
+    String conversationId,
+    Iterable<String> participantIds,
+  ) {}
+
+  @override
+  void toggleMute(String conversationId) {
+    final item = conversation(conversationId);
+    if (item == null) return;
+    final next = !item.isMuted;
+    final resolvedId = _resolve(conversationId);
+    unawaited(
+      AuthService.instance
+          .request(next ? 'POST' : 'DELETE', '/conversations/$resolvedId/mute')
+          .then((_) {
+            final index = _indexOf(resolvedId);
+            if (index >= 0) {
+              _items[index] = _items[index].copyWith(isMuted: next);
+              notifyListeners();
+            }
+          })
+          .catchError((error) {
+            _setError(error);
+            return null;
+          }),
+    );
+  }
+
+  @override
+  void setNickname({
+    required String conversationId,
+    required String participantId,
+    String? nickname,
+  }) {}
+
+  @override
+  void sendText({required String conversationId, required String text}) {
+    final value = text.trim();
+    final resolvedId = _resolve(conversationId);
+    if (value.isEmpty || resolvedId.startsWith('opening_')) return;
+    unawaited(
+      AuthService.instance
+          .request(
+            'POST',
+            '/conversations/$resolvedId/messages',
+            body: {'text': value},
+          )
+          .then((response) {
+            final index = _indexOf(resolvedId);
+            if (index < 0) return;
+            final item = _items[index];
+            final message = _messageFromJson(response);
+            _items[index] = item.copyWith(
+              messages: [...item.messages, message],
+              lastSenderId: message.senderId,
+              lastMessageText: message.text,
+              lastMessageTime: 'Bây giờ',
+              unreadCount: 0,
+            );
+            notifyListeners();
+          })
+          .catchError((error) {
+            _setError(error);
+            return null;
+          }),
+    );
+  }
+
+  @override
+  void invitePeerToItinerary({
+    required String conversationId,
+    required String itineraryId,
+  }) {}
+
+  Future<void> _openDirect(String contactId, String temporaryId) async {
+    try {
+      final response = await AuthService.instance.request(
+        'POST',
+        '/conversations/direct',
+        body: {'targetUserId': contactId},
+      );
+      final conversation = _conversationFromSummary(response);
+      _aliases[temporaryId] = conversation.id;
+      final index = _indexOf(temporaryId);
+      if (index >= 0) {
+        _items[index] = conversation;
+      } else {
+        _items.insert(0, conversation);
+      }
+      notifyListeners();
+    } catch (error) {
+      _items.removeWhere((item) => item.id == temporaryId);
+      _setError(error);
+    }
+  }
+
+  Future<void> _loadDetail(String conversationId) async {
+    try {
+      final response = await AuthService.instance.request(
+        'GET',
+        '/conversations/$conversationId?limit=50',
+      );
+      final summary = _conversationFromSummary(response['conversation']);
+      final messages = _asList(
+        response['messages'],
+      ).map(_messageFromJson).toList();
+      final index = _indexOf(conversationId);
+      if (index >= 0) {
+        _items[index] = summary.copyWith(messages: messages);
+        notifyListeners();
+      }
+    } catch (error) {
+      _setError(error);
+    }
+  }
+
+  Future<void> _acceptPending(String conversationId) async {
+    final resolvedId = _resolve(conversationId);
+    try {
+      final response = await AuthService.instance.request(
+        'POST',
+        '/message-requests/$resolvedId/accept',
+      );
+      final index = _indexOf(resolvedId);
+      if (index >= 0) _items[index] = _conversationFromSummary(response);
+      notifyListeners();
+    } catch (error) {
+      _setError(error);
+    }
+  }
+
+  Future<void> _deletePending(String conversationId) async {
+    final resolvedId = _resolve(conversationId);
+    try {
+      await AuthService.instance.request(
+        'DELETE',
+        '/message-requests/$resolvedId',
+      );
+      _items.removeWhere((item) => item.id == resolvedId);
+      notifyListeners();
+    } catch (error) {
+      _setError(error);
+    }
+  }
+
+  Future<void> _toggleBlock(String conversationId, bool blocked) async {
+    final resolvedId = _resolve(conversationId);
+    try {
+      final response = await AuthService.instance.request(
+        blocked ? 'POST' : 'DELETE',
+        '/conversations/$resolvedId/block',
+      );
+      final index = _indexOf(resolvedId);
+      if (index >= 0) _items[index] = _conversationFromSummary(response);
+      notifyListeners();
+    } catch (error) {
+      _setError(error);
+    }
+  }
+
+  MessageConversation _conversationFromSummary(Object? value) {
+    final json = value is Map ? value : const <String, dynamic>{};
+    final peer = json['peer'] is Map ? json['peer'] as Map : const {};
+    final isGroup = _text(json['type']) == 'GROUP';
+    final latest = json['latestMessage'] is Map
+        ? json['latestMessage'] as Map
+        : null;
+    final peerParticipant = MessageParticipant(
+      id: _text(peer['userId']),
+      name: _text(peer['displayName'], fallback: _text(peer['nickname'])),
+      nickname: _text(peer['nickname']),
+      avatarAsset: _nullableText(peer['avatarUrl']),
+    );
+    final latestMessage = latest == null ? null : _messageFromJson(latest);
+    final status = _text(json['status']);
+    final members = isGroup
+        ? _asList(json['members']).map(_participantFromJson).toList()
+        : [_me(), peerParticipant];
+    return MessageConversation(
+      id: _text(json['conversationId']),
+      type: isGroup
+          ? MessageConversationType.group
+          : MessageConversationType.direct,
+      title: isGroup
+          ? _text(json['displayName'], fallback: 'Nhóm')
+          : peerParticipant.displayName,
+      participants: members,
+      messages: latestMessage == null ? const [] : [latestMessage],
+      lastSenderId: latestMessage?.senderId ?? '',
+      lastMessageText: latestMessage?.text ?? '',
+      lastMessageTime: _timeLabel(latest?['createdAt'] ?? json['updatedAt']),
+      unreadCount: _int(json['unreadCount']),
+      isPending: status == 'PENDING',
+      isMuted: json['muted'] == true,
+      isBlocked: json['blockedByMe'] == true || json['blockedByPeer'] == true,
+      linkedItineraryId: isGroup ? _nullableText(json['linkedTripId']) : null,
+    );
+  }
+
+  MessageParticipant _participantFromJson(Object? value) {
+    final json = value is Map ? value : const <String, dynamic>{};
+    return MessageParticipant(
+      id: _text(json['userId']),
+      name: _text(json['displayName'], fallback: 'Thành viên'),
+      avatarAsset: _nullableText(json['avatarUrl']),
+      role: _text(json['role']) == 'LEADER'
+          ? MessageGroupRole.leader
+          : MessageGroupRole.member,
+    );
+  }
+
+  MessageContact _contactFromJson(Object? value) {
+    final json = value is Map ? value : const <String, dynamic>{};
+    return MessageContact(
+      id: _text(json['userId']),
+      name: _text(json['displayName'], fallback: _text(json['nickname'])),
+      subtitle: _text(json['bio'], fallback: '@${_text(json['nickname'])}'),
+      avatarAsset: _nullableText(json['avatarUrl']),
+    );
+  }
+
+  MessageItem _messageFromJson(Object? value) {
+    final json = value is Map ? value : const <String, dynamic>{};
+    return MessageItem(
+      id: _text(json['messageId']),
+      senderId: _text(json['senderUserId']),
+      text: _text(json['text']),
+      sentAtLabel: _timeLabel(json['createdAt']),
+    );
+  }
+
+  MessageParticipant _me() {
+    return MessageParticipant(id: currentUserId, name: currentUserName);
+  }
+
+  List<Object?> _asList(Object? value) {
+    if (value is List) return value;
+    return const <Object?>[];
+  }
+
+  int _indexOf(String id) => _items.indexWhere((item) => item.id == id);
+
+  String _resolve(String id) => _aliases[id] ?? id;
+
+  int _int(Object? value) {
+    if (value is num) return value.toInt();
+    return 0;
+  }
+
+  String _text(Object? value, {String fallback = ''}) {
+    if (value is! String) return fallback;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? fallback : trimmed;
+  }
+
+  String? _nullableText(Object? value) {
+    final text = _text(value);
+    return text.isEmpty ? null : text;
+  }
+
+  String _timeLabel(Object? value) {
+    final raw = _text(value);
+    if (raw.isEmpty) return '';
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return '';
+    final delta = DateTime.now().difference(parsed.toLocal());
+    if (delta.inMinutes < 1) return 'Bây giờ';
+    if (delta.inHours < 1) return '${delta.inMinutes} phút';
+    if (delta.inDays < 1) return '${delta.inHours} giờ';
+    return '${delta.inDays} ngày';
+  }
+
+  void _handleAuthChanged() {
+    if (!AuthService.instance.signedIn) {
+      _items.clear();
+      _contacts.clear();
+      notifyListeners();
+      return;
+    }
+    if (_items.isEmpty && !_loading) unawaited(refresh());
+  }
+
+  void _setError(Object error) {
+    _error = error.toString();
+    notifyListeners();
+  }
 }
 
 class DemoMessageRepository extends MessageRepository {
@@ -67,7 +714,7 @@ class DemoMessageRepository extends MessageRepository {
   final List<MessageConversation> _items = <MessageConversation>[];
 
   /// Mock state cho lời mời từ direct chat vào lịch trình.
-  /// Key = "<itineraryId>:<inviteeUserId>".
+  /// Key = `itineraryId:inviteeUserId`.
   final Set<String> _pendingDirectItineraryInvites = <String>{};
 
   final List<MessageContact> _contacts = const <MessageContact>[
@@ -145,7 +792,7 @@ class DemoMessageRepository extends MessageRepository {
       memberCount: 4,
     ),
     const MessageItinerary(
-      id: 'trip_da_lat_deputy',
+      id: 'trip_da_lat_member_view',
       title: 'Đà Lạt ơi',
       dateRange: '12-15 tháng 10, 2026',
       summary: '4 ngày - 12 địa điểm',
@@ -180,77 +827,62 @@ class DemoMessageRepository extends MessageRepository {
     ),
   ];
 
-
-  MessageParticipant get _me => const MessageParticipant(
-        id: 'me',
-        name: 'Thune',
-      );
+  MessageParticipant get _me =>
+      const MessageParticipant(id: 'me', name: 'Thune');
 
   MessageParticipant get _meLeader => const MessageParticipant(
-        id: 'me',
-        name: 'Thune',
-        role: MessageGroupRole.leader,
-      );
+    id: 'me',
+    name: 'Thune',
+    role: MessageGroupRole.leader,
+  );
 
-  MessageParticipant get _meDeputy => const MessageParticipant(
-        id: 'me',
-        name: 'Thune',
-        role: MessageGroupRole.deputy,
-      );
-
-  MessageParticipant get _chiDeputy => const MessageParticipant(
-        id: 'chi',
-        name: 'ChiThanh',
-        avatarAsset: 'assets/images/thiennhien.jpg',
-        role: MessageGroupRole.deputy,
-        distanceLabel: '12.5km',
-      );
+  MessageParticipant get _meMember =>
+      const MessageParticipant(id: 'me', name: 'Thune');
 
   MessageParticipant get _chiMember => const MessageParticipant(
-        id: 'chi',
-        name: 'ChiThanh',
-        avatarAsset: 'assets/images/thiennhien.jpg',
-        distanceLabel: '12.5km',
-      );
+    id: 'chi',
+    name: 'ChiThanh',
+    avatarAsset: 'assets/images/thiennhien.jpg',
+    distanceLabel: '12.5km',
+  );
 
   MessageParticipant get _thuneAMember => const MessageParticipant(
-        id: 'thune_a',
-        name: 'Thune',
-        avatarAsset: 'assets/images/nghiduong.jpg',
-        distanceLabel: 'Chưa xác định km',
-      );
+    id: 'thune_a',
+    name: 'Thune',
+    avatarAsset: 'assets/images/nghiduong.jpg',
+    distanceLabel: 'Chưa xác định km',
+  );
 
   MessageParticipant get _trongBui => const MessageParticipant(
-        id: 'trong_bui',
-        name: 'Trọng Bùi',
-        avatarAsset: 'assets/images/survey_country.jpg',
-        nickname: 'Buiji',
-        distanceLabel: 'Chưa xác định km',
-      );
+    id: 'trong_bui',
+    name: 'Trọng Bùi',
+    avatarAsset: 'assets/images/survey_country.jpg',
+    nickname: 'Buiji',
+    distanceLabel: 'Chưa xác định km',
+  );
 
   MessageParticipant get _chi => const MessageParticipant(
-        id: 'chi',
-        name: 'ChiThanh',
-        avatarAsset: 'assets/images/thiennhien.jpg',
-        role: MessageGroupRole.leader,
-        distanceLabel: '12.5km',
-      );
+    id: 'chi',
+    name: 'ChiThanh',
+    avatarAsset: 'assets/images/thiennhien.jpg',
+    role: MessageGroupRole.leader,
+    distanceLabel: '12.5km',
+  );
 
   MessageParticipant get _thuneA => const MessageParticipant(
-        id: 'thune_a',
-        name: 'Thune',
-        avatarAsset: 'assets/images/nghiduong.jpg',
-        role: MessageGroupRole.deputy,
-        distanceLabel: 'Chưa xác định km',
-      );
+    id: 'thune_a',
+    name: 'Thune',
+    avatarAsset: 'assets/images/nghiduong.jpg',
+    distanceLabel: 'Chưa xác định km',
+  );
 
   MessageParticipant get _thanh => const MessageParticipant(
-        id: 'thanh',
-        name: 'Thanh',
-        avatarAsset: 'assets/images/checkin.jpg',
-        nickname: 'ChiThanh',
-        distanceLabel: '12.5km',
-      );
+    id: 'thanh',
+    name: 'Thanh',
+    avatarAsset: 'assets/images/checkin.jpg',
+    nickname: 'ChiThanh',
+    distanceLabel: '12.5km',
+  );
 
   void _seed() {
     _items
@@ -467,7 +1099,13 @@ class DemoMessageRepository extends MessageRepository {
           title: 'Đà Lạt ơi',
           coverAsset: 'assets/images/checkin.jpg',
           linkedItineraryId: 'trip_da_lat_leader',
-          participants: [_meLeader, _chiDeputy, _thuneAMember, _thanh, _trongBui],
+          participants: [
+            _meLeader,
+            _chiMember,
+            _thuneAMember,
+            _thanh,
+            _trongBui,
+          ],
           pendingInvites: const [
             MessageGroupInvite(
               contactId: 'dada_1',
@@ -490,11 +1128,11 @@ class DemoMessageRepository extends MessageRepository {
           lastMessageTime: '3 ngày',
         ),
         MessageConversation(
-          id: 'group_deputy_demo',
+          id: 'group_member_demo',
           type: MessageConversationType.group,
           title: 'Đà Lạt ơi',
-          linkedItineraryId: 'trip_da_lat_deputy',
-          participants: [_meDeputy, _chi, _thuneAMember, _thanh, _trongBui],
+          linkedItineraryId: 'trip_da_lat_member_view',
+          participants: [_meMember, _chi, _thuneAMember, _thanh, _trongBui],
           messages: const [
             MessageItem(
               id: 'gd_1',
@@ -641,6 +1279,9 @@ class DemoMessageRepository extends MessageRepository {
   }
 
   @override
+  Future<void> refresh() async {}
+
+  @override
   List<MessageConversation> get mainConversations =>
       List.unmodifiable(_items.where((item) => !item.isPending));
 
@@ -655,9 +1296,8 @@ class DemoMessageRepository extends MessageRepository {
   List<MessageItinerary> get itineraries => List.unmodifiable(_itineraries);
 
   @override
-  List<MessageItinerary> get inviteableItineraries => List.unmodifiable(
-        _itineraries.where((item) => item.canInviteMembers),
-      );
+  List<MessageItinerary> get inviteableItineraries =>
+      List.unmodifiable(_itineraries.where((item) => item.canInviteMembers));
 
   @override
   MessageConversation? conversation(String id) {
@@ -694,6 +1334,37 @@ class DemoMessageRepository extends MessageRepository {
   }
 
   @override
+  List<MessageContact> groupInviteCandidates(
+    String conversationId,
+    String query,
+  ) {
+    final item = conversation(conversationId);
+    if (item == null || !item.isGroup) return const [];
+
+    final memberIds = item.participants.map((e) => e.id).toSet();
+    final pendingIds = item.pendingInvites.map((e) => e.contactId).toSet();
+    final normalized = query.trim().toLowerCase();
+
+    final result = _contacts
+        .where((contact) {
+          if (memberIds.contains(contact.id)) return false;
+          if (normalized.isEmpty) return true;
+          return contact.name.toLowerCase().contains(normalized) ||
+              contact.subtitle.toLowerCase().contains(normalized);
+        })
+        .toList(growable: false);
+
+    result.sort((a, b) {
+      final ap = pendingIds.contains(a.id);
+      final bp = pendingIds.contains(b.id);
+      if (ap == bp) return 0;
+      return ap ? -1 : 1;
+    });
+
+    return result;
+  }
+
+  @override
   List<MessageContact> searchContacts(String query) {
     final normalized = query.trim().toLowerCase();
     if (normalized.isEmpty) return contacts;
@@ -708,6 +1379,11 @@ class DemoMessageRepository extends MessageRepository {
   }
 
   @override
+  Future<List<MessageContact>> fetchContactSuggestions(String query) async {
+    return searchContacts(query);
+  }
+
+  @override
   List<MessageSearchResult> searchMessages(
     String conversationId,
     String query,
@@ -719,7 +1395,8 @@ class DemoMessageRepository extends MessageRepository {
     if (normalized.isEmpty) return const [];
 
     final participantById = <String, MessageParticipant>{
-      for (final participant in target.participants) participant.id: participant,
+      for (final participant in target.participants)
+        participant.id: participant,
     };
 
     return target.messages
@@ -802,10 +1479,7 @@ class DemoMessageRepository extends MessageRepository {
       if (!ids.contains(item.id)) continue;
       if (!item.isPending || item.isBlocked) continue;
 
-      _items[i] = item.copyWith(
-        isPending: false,
-        unreadCount: 0,
-      );
+      _items[i] = item.copyWith(isPending: false, unreadCount: 0);
     }
 
     notifyListeners();
@@ -814,9 +1488,7 @@ class DemoMessageRepository extends MessageRepository {
   @override
   void deletePending(Iterable<String> conversationIds) {
     final ids = conversationIds.toSet();
-    _items.removeWhere(
-      (item) => item.isPending && ids.contains(item.id),
-    );
+    _items.removeWhere((item) => item.isPending && ids.contains(item.id));
     notifyListeners();
   }
 
@@ -833,10 +1505,7 @@ class DemoMessageRepository extends MessageRepository {
     // Cả direct chat đã chấp nhận và Tin nhắn đang chờ đều được GIỮ LẠI.
     // Block chỉ đổi trạng thái, không xoá conversation/lịch sử/request.
     // Vì vậy request chưa chấp nhận vẫn có thể mở lại và "Bỏ chặn".
-    _items[index] = item.copyWith(
-      isBlocked: true,
-      unreadCount: 0,
-    );
+    _items[index] = item.copyWith(isBlocked: true, unreadCount: 0);
     notifyListeners();
   }
 
@@ -849,9 +1518,7 @@ class DemoMessageRepository extends MessageRepository {
     if (item.isGroup || !item.isBlocked) return;
 
     // Cho phép unblock cả direct chat bình thường lẫn message request.
-    _items[index] = item.copyWith(
-      isBlocked: false,
-    );
+    _items[index] = item.copyWith(isBlocked: false);
     notifyListeners();
   }
 
@@ -900,8 +1567,7 @@ class DemoMessageRepository extends MessageRepository {
     if (!item.isGroup) return;
 
     final role = item.roleOf(currentUserId);
-    if (role != MessageGroupRole.leader &&
-        role != MessageGroupRole.deputy) {
+    if (role != MessageGroupRole.leader) {
       return;
     }
 
@@ -910,18 +1576,14 @@ class DemoMessageRepository extends MessageRepository {
   }
 
   @override
-  void inviteGroupMembers(
-    String conversationId,
-    Iterable<String> contactIds,
-  ) {
+  void inviteGroupMembers(String conversationId, Iterable<String> contactIds) {
     final index = _indexOf(conversationId);
     if (index < 0) return;
     final item = _items[index];
     if (!item.isGroup) return;
 
     final role = item.roleOf(currentUserId);
-    if (role != MessageGroupRole.leader &&
-        role != MessageGroupRole.deputy) {
+    if (role != MessageGroupRole.leader) {
       return;
     }
 
@@ -952,10 +1614,7 @@ class DemoMessageRepository extends MessageRepository {
   }
 
   @override
-  void cancelGroupInvite(
-      String conversationId,
-      String contactId,
-      ) {
+  void cancelGroupInvite(String conversationId, String contactId) {
     final index = _indexOf(conversationId);
     if (index < 0) return;
 
@@ -964,16 +1623,13 @@ class DemoMessageRepository extends MessageRepository {
 
     final role = item.roleOf(currentUserId);
 
-    if (role != MessageGroupRole.leader &&
-        role != MessageGroupRole.deputy) {
+    if (role != MessageGroupRole.leader) {
       return;
     }
 
     _items[index] = item.copyWith(
       pendingInvites: item.pendingInvites
-          .where(
-            (invite) => invite.contactId != contactId,
-      )
+          .where((invite) => invite.contactId != contactId)
           .toList(growable: false),
     );
 
@@ -991,70 +1647,18 @@ class DemoMessageRepository extends MessageRepository {
     if (!item.isGroup) return;
 
     final actorRole = item.roleOf(currentUserId);
-    if (actorRole == MessageGroupRole.member) return;
+    if (actorRole != MessageGroupRole.leader) return;
 
     final ids = participantIds.toSet();
-    final participants = item.participants.where((participant) {
-      if (!ids.contains(participant.id)) return true;
-      if (participant.id == currentUserId) return true;
-      if (participant.role == MessageGroupRole.leader) return true;
+    final participants = item.participants
+        .where((participant) {
+          if (!ids.contains(participant.id)) return true;
+          if (participant.id == currentUserId) return true;
+          if (participant.role == MessageGroupRole.leader) return true;
 
-      if (actorRole == MessageGroupRole.deputy) {
-        return participant.role != MessageGroupRole.member;
-      }
-
-      return false;
-    }).toList(growable: false);
-
-    _items[index] = item.copyWith(participants: participants);
-    notifyListeners();
-  }
-
-  @override
-  void promoteGroupMembers(
-    String conversationId,
-    Iterable<String> participantIds,
-  ) {
-    final index = _indexOf(conversationId);
-    if (index < 0) return;
-    final item = _items[index];
-    if (!item.isGroup ||
-        item.roleOf(currentUserId) != MessageGroupRole.leader) {
-      return;
-    }
-
-    final ids = participantIds.toSet();
-    final participants = item.participants.map((participant) {
-      if (ids.contains(participant.id) &&
-          participant.id != currentUserId &&
-          participant.role == MessageGroupRole.member) {
-        return participant.copyWith(role: MessageGroupRole.deputy);
-      }
-      return participant;
-    }).toList(growable: false);
-
-    _items[index] = item.copyWith(participants: participants);
-    notifyListeners();
-  }
-
-  @override
-  void revokeGroupDeputy(String conversationId, String participantId) {
-    final index = _indexOf(conversationId);
-    if (index < 0) return;
-    final item = _items[index];
-    if (!item.isGroup ||
-        item.roleOf(currentUserId) != MessageGroupRole.leader) {
-      return;
-    }
-
-    final participants = item.participants.map((participant) {
-      if (participant.id == participantId &&
-          participant.id != currentUserId &&
-          participant.role == MessageGroupRole.deputy) {
-        return participant.copyWith(role: MessageGroupRole.member);
-      }
-      return participant;
-    }).toList(growable: false);
+          return false;
+        })
+        .toList(growable: false);
 
     _items[index] = item.copyWith(participants: participants);
     notifyListeners();
@@ -1098,10 +1702,7 @@ class DemoMessageRepository extends MessageRepository {
   }
 
   @override
-  void sendText({
-    required String conversationId,
-    required String text,
-  }) {
+  void sendText({required String conversationId, required String text}) {
     final value = text.trim();
     if (value.isEmpty) return;
 

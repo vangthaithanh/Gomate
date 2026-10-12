@@ -1,13 +1,6 @@
-enum MessageConversationType {
-  direct,
-  group,
-}
+enum MessageConversationType { direct, group }
 
-enum MessageGroupRole {
-  member,
-  deputy,
-  leader,
-}
+enum MessageGroupRole { member, leader }
 
 class MessageParticipant {
   final String id;
@@ -138,9 +131,9 @@ class MessageConversation {
     this.linkedItineraryId,
     this.pendingInvites = const <MessageGroupInvite>[],
   }) : assert(
-          type != MessageConversationType.group || linkedItineraryId != null,
-          'Group message phải gắn với một lịch trình nhóm.',
-        );
+         type != MessageConversationType.group || linkedItineraryId != null,
+         'Group message phải gắn với một lịch trình nhóm.',
+       );
 
   bool get isGroup => type == MessageConversationType.group;
 

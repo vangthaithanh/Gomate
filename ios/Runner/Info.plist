@@ -45,5 +45,19 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>GoMate cần camera để bạn chụp và đăng ảnh khoảnh khắc.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>GoMate cần truy cập thư viện ảnh để bạn chọn ảnh khoảnh khắc.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>GoMate cần vị trí của bạn để hiển thị bản đồ và chỉ đường.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>GoMate cần quyền vị trí Luôn cho phép để ghim lịch trình và cập nhật vị trí trong chuyến đi.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>GoMate cần quyền vị trí Luôn cho phép để ghim lịch trình và cập nhật vị trí trong chuyến đi.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 </dict>
 </plist>

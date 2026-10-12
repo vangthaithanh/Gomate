@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -302,6 +303,7 @@ class _MomentViewerScreenState extends State<MomentViewerScreen> {
     await widget.repository.sendMessage(
       receiverUserId: receiver.ownerId,
       message: message,
+      momentId: receiver.id,
     );
 
     if (!mounted) return;
@@ -394,8 +396,8 @@ class _ViewerHeader extends StatelessWidget {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(locationThumb * 0.26),
-                        child: Image.asset(
-                          moment.imageAsset,
+                        child: _SourceImage(
+                          source: moment.imageAsset,
                           width: locationThumb,
                           height: locationThumb,
                           fit: BoxFit.cover,
@@ -566,7 +568,7 @@ class _AuthorRow extends StatelessWidget {
             border: Border.all(color: AppColors.grayBorder),
           ),
           clipBehavior: Clip.antiAlias,
-          child: Image.asset(moment.ownerAvatarAsset, fit: BoxFit.cover),
+          child: _SourceImage(source: moment.ownerAvatarAsset, fit: BoxFit.cover),
         ),
         SizedBox(width: c(width * 0.025, 8, 10)),
         Column(
@@ -607,6 +609,61 @@ class _AuthorRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SourceImage extends StatelessWidget {
+  final String source;
+  final BoxFit fit;
+  final double? width;
+  final double? height;
+
+  const _SourceImage({
+    required this.source,
+    this.fit = BoxFit.cover,
+    this.width,
+    this.height,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Widget fallback() {
+      return Container(
+        width: width,
+        height: height,
+        color: AppColors.blue50,
+        alignment: Alignment.center,
+        child: Icon(LucideIcons.image, color: AppColors.grayText),
+      );
+    }
+
+    final value = source.trim();
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return Image.network(
+        value,
+        width: width,
+        height: height,
+        fit: fit,
+        errorBuilder: (_, __, ___) => fallback(),
+      );
+    }
+    if (value.contains(':\\') || value.startsWith('/')) {
+      return Image.file(
+        File(value),
+        width: width,
+        height: height,
+        fit: fit,
+        errorBuilder: (_, __, ___) => fallback(),
+      );
+    }
+    if (value.isEmpty) return fallback();
+    return Image.asset(
+      value,
+      width: width,
+      height: height,
+      fit: fit,
+      errorBuilder: (_, __, ___) => fallback(),
     );
   }
 }

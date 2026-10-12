@@ -4,6 +4,7 @@ import 'package:flutter_lucide/flutter_lucide.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../messages/screens/message_screen.dart';
 import '../../home/screens/home_screen.dart';
+import '../../map/models/map_focus_target.dart';
 import '../../map/screens/map_screen.dart';
 import '../../map/state/map_ui_session.dart';
 import '../../profile/screens/profile_screen.dart';
@@ -18,6 +19,7 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
+  MapFocusTarget? _mapFocusTarget;
 
   @override
   void initState() {
@@ -100,11 +102,24 @@ class _MainShellState extends State<MainShell> {
         GoMateMapUiSession.hideMapBottomNav;
 
     final pages = <Widget>[
-      const HomeScreen(),
+      HomeScreen(
+        onOpenPostLocation: (target) {
+          setState(() {
+            _mapFocusTarget = MapFocusTarget(
+              label: target.label,
+              placeId: target.placeId,
+              latitude: target.latitude,
+              longitude: target.longitude,
+            );
+            _currentIndex = 2;
+          });
+        },
+      ),
       const MessageScreen(),
       GoMateMapScreen(
         bottomNavigationInset:
             hideBottomNav ? 0 : metrics.totalHeight + 8,
+        focusTarget: _mapFocusTarget,
       ),
       const TripScreen(),
       const ProfileScreen(),

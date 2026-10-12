@@ -28,6 +28,26 @@ class SpringRouteService {
     );
   }
 
+  Future<GoMateMapRoute> calculateTripFromCurrentLocation({
+    required double originLatitude,
+    required double originLongitude,
+    required List<String> placeIds,
+  }) async {
+    if (placeIds.isEmpty) {
+      throw ArgumentError('Lịch trình cần ít nhất 1 điểm đến.');
+    }
+
+    return _postRoute(
+      path: '/routes/compute',
+      body: {
+        'originLatitude': originLatitude,
+        'originLongitude': originLongitude,
+        'placeIds': placeIds,
+      },
+      fallbackOrderedPlaceIds: ['current-location', ...placeIds],
+    );
+  }
+
   /// Route business contract:
   /// Default: Flutter gửi GPS runtime coordinate + destination places.id.
   /// Option đổi điểm đầu: Flutter gửi origin places.id + destination places.id.

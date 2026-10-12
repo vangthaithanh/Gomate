@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import vn.gomate.auth.AuthRepository;
 import vn.gomate.common.ApiException;
+import vn.gomate.event.service.InteractionEventService;
 import vn.gomate.recommendation.client.AiRecommendationClient;
 import vn.gomate.recommendation.dto.RecommendationDtos;
 import vn.gomate.recommendation.repository.RecommendationPlaceRepository;
@@ -17,6 +18,7 @@ public class RecommendationService {
     private final AiRecommendationClient ai;
     private final RecommendationPlaceRepository places;
     private final ContextualRecommendationReranker reranker;
+    private final InteractionEventService interactionEvents;
     private final ObjectMapper mapper;
     private final int candidateK;
     private final int homeLimit;
@@ -26,6 +28,7 @@ public class RecommendationService {
         AiRecommendationClient ai,
         RecommendationPlaceRepository places,
         ContextualRecommendationReranker reranker,
+        InteractionEventService interactionEvents,
         ObjectMapper mapper,
         @Value("${app.ai.recommendation-candidate-k:50}") int candidateK,
         @Value("${app.ai.recommendation-home-limit:10}") int homeLimit
@@ -34,6 +37,7 @@ public class RecommendationService {
         this.ai = ai;
         this.places = places;
         this.reranker = reranker;
+        this.interactionEvents = interactionEvents;
         this.mapper = mapper;
         this.candidateK = Math.max(1, Math.min(candidateK, 100));
         this.homeLimit = Math.max(1, Math.min(homeLimit, 50));
@@ -61,7 +65,7 @@ public class RecommendationService {
         List<String> contextCodes = places.filterContextCodes(allOptionCodes);
 
         if (semanticInterestCodes.isEmpty()) {
-            return fallbackOnly(
+            Map<String, Object> result = fallbackOnly(
                 effectiveDestination,
                 semanticInterestCodes,
                 contextCodes,
@@ -70,6 +74,8 @@ public class RecommendationService {
                 longitude,
                 "Người dùng chưa có lựa chọn semantic từ khảo sát; dùng fallback PostgreSQL."
             );
+            interactionEvents.recordHomeRecommendationServed(userId, result);
+            return result;
         }
 
         RecommendationDtos.AiResponse response;
@@ -81,7 +87,7 @@ public class RecommendationService {
                 Math.max(candidateK, limit)
             );
         } catch (ApiException error) {
-            return fallbackOnly(
+            Map<String, Object> result = fallbackOnly(
                 effectiveDestination,
                 semanticInterestCodes,
                 contextCodes,
@@ -90,6 +96,8 @@ public class RecommendationService {
                 longitude,
                 error.getMessage()
             );
+            interactionEvents.recordHomeRecommendationServed(userId, result);
+            return result;
         }
 
         List<RecommendationDtos.AiRecommendation> aiItems = response.items() == null
@@ -149,6 +157,7 @@ public class RecommendationService {
         result.put("totalCandidates", response.totalCandidates());
         result.put("items", items.stream().limit(limit).toList());
         result.put("warnings", warnings);
+        interactionEvents.recordHomeRecommendationServed(userId, result);
         return result;
     }
 

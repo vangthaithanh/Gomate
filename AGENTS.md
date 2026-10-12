@@ -1,7 +1,7 @@
 # AGENTS.md — GoMate Codex Rules
 
 > Root instructions for Codex/AI coding agents working in the GoMate repository.
-> Updated: 2026-09-11.
+> Updated: 2026-10-10.
 >
 > Goal: keep the team consistent, protect working code, and avoid spending tokens rereading the full DOCX specifications for ordinary coding tasks.
 
@@ -272,7 +272,7 @@ Other rules:
 
 Do not change these without explicit approval:
 
-- No Moments/Story domain in the new system.
+- Moment is now product scope as short-lived social media and is implemented through MongoDB + Cloudinary. Do not reintroduce legacy Story as a separate domain.
 - Post is the social sharing content type.
 - PUBLIC account follows immediately; PRIVATE account creates follow request.
 - Friendship = mutual active follow; no mandatory `friends` source table.
@@ -281,6 +281,9 @@ Do not change these without explicit approval:
 - Official Place comes from Admin, controlled external import, or approved user submission.
 - One Trip domain handles PERSONAL and GROUP.
 - Exactly one active LEADER per Trip.
+- Group roles are only LEADER and MEMBER. Deputy/co-leader/vice-leader roles are deprecated and must not be added to new contracts.
+- Trip Stop is a Place occurrence in an ordered itinerary, not the Place itself. A -> B -> A is valid; adjacent duplicate Place stops such as A -> A are invalid.
+- Trip Stop time belongs to the stop occurrence. A missing start time clears/ignores end time; start without end is not a complete scheduled interval.
 - Only LEADER edits/reorders stops, starts/completes/cancels Trip, kicks members, approves member-originated invites.
 - Member invite flow: invitee accepts first, then Leader approves.
 - Leader-originated invite: invitee acceptance is enough to join.
@@ -316,6 +319,8 @@ Business-rule change:
 
 Scope change such as adding Moments/OAuth as a core requirement:
 - requires explicit approval.
+
+Note: Moment scope has already been explicitly approved and implemented. Do not use older "No Moments" text from historical docs to remove it.
 
 Definition of Done is end-to-end:
 - API + DB + UI + test data + error state + related event/audit/notification where applicable.

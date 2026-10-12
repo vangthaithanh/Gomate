@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -43,7 +44,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _homeHeaderVisible = true;
 
   bool _handleHomeScroll(UserScrollNotification notification) {
@@ -65,8 +66,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return false;
   }
 
-  final DemoMomentsRepository _momentsRepository =
-      DemoMomentsRepository.instance;
+  final ApiMomentsRepository _momentsRepository =
+      ApiMomentsRepository.instance;
+  Timer? _momentRefreshTimer;
 
   final List<_HomePost> _posts = const [
     _HomePost(
@@ -153,7 +155,13 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
 
+    WidgetsBinding.instance.addObserver(this);
     _momentsRepository.addListener(_onMomentsChanged);
+    unawaited(_momentsRepository.refresh());
+    _momentRefreshTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => unawaited(_momentsRepository.refresh()),
+    );
 
     _postInteractionRepository =
         widget.interactionRepository ?? DemoPostInteractionRepository();
@@ -168,8 +176,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _momentRefreshTimer?.cancel();
     _momentsRepository.removeListener(_onMomentsChanged);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_momentsRepository.refresh());
+    }
   }
 
   void _retryRecommendations() {

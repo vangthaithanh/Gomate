@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/widgets/snackbar.dart';
 import '../../auth/screens/login_screen.dart';
+import '../widgets/profile_account_sheets.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -19,9 +21,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _query = '';
 
   @override
+  void initState() {
+    super.initState();
+    AuthService.instance.addListener(_refresh);
+    AuthService.instance.loadProfile().catchError((_) {});
+  }
+
+  @override
   void dispose() {
+    AuthService.instance.removeListener(_refresh);
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _refresh() {
+    if (mounted) setState(() {});
+  }
+
+  Map<String, dynamic> get _user => AuthService.instance.user ?? const {};
+
+  String get _nickname => _text(_user['nickname'], fallback: 'gomate');
+
+  String get _displayName {
+    final displayName = _text(_user['displayName']);
+    if (displayName.isNotEmpty) return displayName;
+    final fullName = _text(_user['fullName']);
+    return fullName.isNotEmpty ? fullName : _nickname;
+  }
+
+  String get _email => _text(_user['email']);
+
+  String? get _avatarUrl {
+    final value = _text(_user['avatarUrl']);
+    return value.isEmpty ? null : value;
+  }
+
+  Future<void> _editProfile() async {
+    final saved = await showProfileEditSheet(context, user: _user);
+    if (!mounted || saved != true) return;
+    GoMateSnackBar.show(context, message: 'Đã cập nhật hồ sơ');
+  }
+
+  Future<void> _changePassword() async {
+    final changed = await showChangePasswordSheet(context);
+    if (!mounted || changed != true) return;
+
+    GoMateSnackBar.show(
+      context,
+      message: 'Đã đổi mật khẩu. Vui lòng đăng nhập lại.',
+    );
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
   }
 
   @override
@@ -37,12 +89,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(
-                  20,
-                  10,
-                  20,
-                  28,
-                ),
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -104,9 +151,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
 
-          const SizedBox(
-            width: 54,
-          ),
+          const SizedBox(width: 54),
         ],
       ),
     );
@@ -141,19 +186,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
         suffixIcon: _query.isEmpty
             ? null
             : IconButton(
-          onPressed: () {
-            _searchController.clear();
+                onPressed: () {
+                  _searchController.clear();
 
-            setState(() {
-              _query = '';
-            });
-          },
-          icon: const Icon(
-            Icons.close_rounded,
-            size: 19,
-            color: AppColors.textSecondary,
-          ),
-        ),
+                  setState(() {
+                    _query = '';
+                  });
+                },
+                icon: const Icon(
+                  Icons.close_rounded,
+                  size: 19,
+                  color: AppColors.textSecondary,
+                ),
+              ),
 
         filled: true,
         fillColor: AppColors.blue50.withOpacity(0.38),
@@ -177,8 +222,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildAccountCard() {
     if (!_matchesAny([
-      'xuân thu',
-      'xuthu',
+      _displayName,
+      _nickname,
+      _email,
       'tài khoản',
       'hồ sơ',
       'email',
@@ -206,39 +252,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
               color: AppColors.blue100,
             ),
 
-            child: const Icon(
-              Icons.person_rounded,
-              size: 30,
-              color: AppColors.blue500,
-            ),
+            child: _avatarUrl == null
+                ? const Icon(
+                    Icons.person_rounded,
+                    size: 30,
+                    color: AppColors.blue500,
+                  )
+                : ClipOval(
+                    child: Image.network(
+                      _avatarUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.person_rounded,
+                        size: 30,
+                        color: AppColors.blue500,
+                      ),
+                    ),
+                  ),
           ),
 
           const SizedBox(width: 13),
 
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Xuân Thu',
+                  _displayName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
 
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 16.5,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
                   ),
                 ),
 
-                SizedBox(height: 3),
+                const SizedBox(height: 3),
 
                 Text(
-                  '@xuthu',
+                  _email.isEmpty ? '@$_nickname' : _email,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
 
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 12.5,
                     color: AppColors.textSecondary,
                   ),
@@ -248,9 +306,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
 
           InkWell(
-            onTap: () {
-              // UI only - bước sau có thể nối màn chỉnh sửa hồ sơ.
-            },
+            onTap: _editProfile,
             borderRadius: BorderRadius.circular(14),
 
             child: Container(
@@ -297,7 +353,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               iconColor: AppColors.blue500,
               title: 'Chỉnh sửa hồ sơ',
               subtitle: 'Tên, ảnh đại diện, tiểu sử',
-              onTap: () {},
+              onTap: _editProfile,
             ),
 
             _SettingsTile(
@@ -321,9 +377,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       );
 
-      widgets.add(
-        const SizedBox(height: 16),
-      );
+      widgets.add(const SizedBox(height: 16));
     }
 
     if (_sectionVisible([
@@ -385,9 +439,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       );
 
-      widgets.add(
-        const SizedBox(height: 16),
-      );
+      widgets.add(const SizedBox(height: 16));
     }
 
     if (_sectionVisible([
@@ -415,15 +467,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               iconColor: AppColors.blue500,
               title: 'Đổi mật khẩu',
               subtitle: 'Cập nhật mật khẩu tài khoản',
-              onTap: () {},
+              onTap: _changePassword,
             ),
           ],
         ),
       );
 
-      widgets.add(
-        const SizedBox(height: 16),
-      );
+      widgets.add(const SizedBox(height: 16));
     }
 
     if (_sectionVisible([
@@ -469,9 +519,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     if (widgets.isEmpty) {
-      widgets.add(
-        const _NoSettingFound(),
-      );
+      widgets.add(const _NoSettingFound());
     }
 
     return widgets;
@@ -482,11 +530,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // ============================================================
 
   Widget _buildLogoutCard() {
-    if (!_matchesAny([
-      'đăng xuất',
-      'logout',
-      'tài khoản',
-    ])) {
+    if (!_matchesAny(['đăng xuất', 'logout', 'tài khoản'])) {
       return const SizedBox.shrink();
     }
 
@@ -494,8 +538,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       onTap: _isLoggingOut
           ? null
           : () {
-        _showLogoutDialog();
-      },
+              _showLogoutDialog();
+            },
       borderRadius: BorderRadius.circular(22),
 
       child: Container(
@@ -515,9 +559,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: Color(0xFFFFE2E2),
-                  borderRadius: BorderRadius.all(
-                    Radius.circular(13),
-                  ),
+                  borderRadius: BorderRadius.all(Radius.circular(13)),
                 ),
                 child: Icon(
                   Icons.logout_rounded,
@@ -531,9 +573,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             Expanded(
               child: Text(
-                _isLoggingOut
-                    ? 'Đang đăng xuất...'
-                    : 'Đăng xuất',
+                _isLoggingOut ? 'Đang đăng xuất...' : 'Đăng xuất',
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
@@ -552,10 +592,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               )
             else
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: Color(0xFFE45858),
-              ),
+              const Icon(Icons.chevron_right_rounded, color: Color(0xFFE45858)),
           ],
         ),
       ),
@@ -584,10 +621,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           content: const Text(
             'Bạn có chắc muốn đăng xuất khỏi GoMate không?',
-            style: TextStyle(
-              height: 1.4,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(height: 1.4, color: AppColors.textSecondary),
           ),
 
           actions: [
@@ -597,9 +631,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
               child: const Text(
                 'Huỷ',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                ),
+                style: TextStyle(color: AppColors.textSecondary),
               ),
             ),
 
@@ -639,10 +671,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // Xoá toàn bộ stack của MainShell/Profile/Settings
       // để người dùng không thể back về màn đã đăng nhập.
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (_) => const LoginScreen(),
-        ),
-            (route) => false,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
       );
     } catch (error) {
       if (!mounted) return;
@@ -671,15 +701,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return true;
     }
 
-    return keywords.any(
-          (keyword) => keyword
-          .toLowerCase()
-          .contains(_query),
-    );
+    return keywords.any((keyword) => keyword.toLowerCase().contains(_query));
   }
 
   bool _sectionVisible(List<String> keywords) {
     return _matchesAny(keywords);
+  }
+
+  String _text(Object? value, {String fallback = ''}) {
+    if (value is! String) return fallback;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? fallback : trimmed;
   }
 }
 
@@ -691,10 +723,7 @@ class _SettingsSection extends StatelessWidget {
   final String title;
   final List<Widget> children;
 
-  const _SettingsSection({
-    required this.title,
-    required this.children,
-  });
+  const _SettingsSection({required this.title, required this.children});
 
   @override
   Widget build(BuildContext context) {
@@ -703,10 +732,7 @@ class _SettingsSection extends StatelessWidget {
 
       children: [
         Padding(
-          padding: const EdgeInsets.only(
-            left: 4,
-            bottom: 9,
-          ),
+          padding: const EdgeInsets.only(left: 4, bottom: 9),
 
           child: Text(
             title,
@@ -726,9 +752,7 @@ class _SettingsSection extends StatelessWidget {
             color: Colors.white,
             borderRadius: BorderRadius.circular(24),
 
-            border: Border.all(
-              color: AppColors.blue100.withOpacity(0.45),
-            ),
+            border: Border.all(color: AppColors.blue100.withOpacity(0.45)),
           ),
 
           child: Column(
@@ -738,9 +762,7 @@ class _SettingsSection extends StatelessWidget {
 
                 if (i != children.length - 1)
                   Padding(
-                    padding: const EdgeInsets.only(
-                      left: 68,
-                    ),
+                    padding: const EdgeInsets.only(left: 68),
                     child: Divider(
                       height: 1,
                       thickness: 1,
@@ -786,10 +808,7 @@ class _SettingsTile extends StatelessWidget {
       borderRadius: BorderRadius.circular(22),
 
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 12,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
 
         child: Row(
           children: [
@@ -802,11 +821,7 @@ class _SettingsTile extends StatelessWidget {
                 borderRadius: BorderRadius.circular(13),
               ),
 
-              child: Icon(
-                icon,
-                size: 21,
-                color: iconColor,
-              ),
+              child: Icon(icon, size: 21, color: iconColor),
             ),
 
             const SizedBox(width: 12),
@@ -872,10 +887,7 @@ class _NoSettingFound extends StatelessWidget {
     return Container(
       width: double.infinity,
 
-      padding: const EdgeInsets.symmetric(
-        horizontal: 24,
-        vertical: 36,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
 
       decoration: BoxDecoration(
         color: AppColors.blue50.withOpacity(0.30),
@@ -884,11 +896,7 @@ class _NoSettingFound extends StatelessWidget {
 
       child: const Column(
         children: [
-          Icon(
-            Icons.search_off_rounded,
-            size: 32,
-            color: AppColors.blue300,
-          ),
+          Icon(Icons.search_off_rounded, size: 32, color: AppColors.blue300),
 
           SizedBox(height: 10),
 
@@ -906,10 +914,7 @@ class _NoSettingFound extends StatelessWidget {
           Text(
             'Thử tìm kiếm bằng từ khóa khác.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12.5,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
           ),
         ],
       ),

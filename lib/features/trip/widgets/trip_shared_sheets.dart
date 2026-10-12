@@ -6,11 +6,7 @@ import '../../../core/widgets/gomate_member_invite_content.dart';
 import '../../messages/models/message_models.dart';
 import '../models/trip_ui_models.dart';
 
-double _tripClamp(
-  double value,
-  double min,
-  double max,
-) {
+double _tripClamp(double value, double min, double max) {
   return value.clamp(min, max).toDouble();
 }
 // ============================================================================
@@ -32,6 +28,7 @@ class TripInviteMembersContent extends StatefulWidget {
   final Set<String> initialPendingInviteIds;
   final Set<String> acceptedMemberIds;
   final ValueChanged<Set<String>>? onPendingChanged;
+  final Future<List<MessageContact>> Function(String query)? searchContacts;
 
   const TripInviteMembersContent({
     super.key,
@@ -39,6 +36,7 @@ class TripInviteMembersContent extends StatefulWidget {
     this.initialPendingInviteIds = const <String>{},
     this.acceptedMemberIds = const <String>{},
     this.onPendingChanged,
+    this.searchContacts,
   });
 
   @override
@@ -46,8 +44,7 @@ class TripInviteMembersContent extends StatefulWidget {
       _TripInviteMembersContentState();
 }
 
-class _TripInviteMembersContentState
-    extends State<TripInviteMembersContent> {
+class _TripInviteMembersContentState extends State<TripInviteMembersContent> {
   late final Set<String> _pending;
 
   @override
@@ -57,9 +54,7 @@ class _TripInviteMembersContentState
   }
 
   void _emit() {
-    widget.onPendingChanged?.call(
-      Set<String>.unmodifiable(_pending),
-    );
+    widget.onPendingChanged?.call(Set<String>.unmodifiable(_pending));
   }
 
   @override
@@ -93,6 +88,21 @@ class _TripInviteMembersContentState
 
         _emit();
       },
+      onSearchContacts: widget.searchContacts == null
+          ? null
+          : (query) async {
+              final results = await widget.searchContacts!(query);
+              return results
+                  .map(
+                    (contact) => GoMateInviteContact(
+                      id: contact.id,
+                      name: contact.name,
+                      subtitle: contact.subtitle,
+                      avatarAsset: contact.avatarAsset,
+                    ),
+                  )
+                  .toList(growable: false);
+            },
     );
   }
 }
@@ -105,19 +115,13 @@ class TripDateRangeContent extends StatefulWidget {
   final DateTime? initialStart;
   final DateTime? initialEnd;
 
-  const TripDateRangeContent({
-    super.key,
-    this.initialStart,
-    this.initialEnd,
-  });
+  const TripDateRangeContent({super.key, this.initialStart, this.initialEnd});
 
   @override
-  State<TripDateRangeContent> createState() =>
-      _TripDateRangeContentState();
+  State<TripDateRangeContent> createState() => _TripDateRangeContentState();
 }
 
-class _TripDateRangeContentState
-    extends State<TripDateRangeContent> {
+class _TripDateRangeContentState extends State<TripDateRangeContent> {
   late DateTime _calendarMonth;
 
   DateTime? _start;
@@ -263,20 +267,13 @@ class _TripDateRangeContentState
                 );
                 currentMonth = false;
               } else if (dayOffset > daysInMonth) {
-                date = DateTime(
-                  year,
-                  month + 1,
-                  dayOffset - daysInMonth,
-                );
+                date = DateTime(year, month + 1, dayOffset - daysInMonth);
                 currentMonth = false;
               } else {
                 date = DateTime(year, month, dayOffset);
               }
 
-              return _dayCell(
-                date,
-                currentMonth: currentMonth,
-              );
+              return _dayCell(date, currentMonth: currentMonth);
             },
           ),
 
@@ -333,16 +330,14 @@ class _TripDateRangeContentState
     );
   }
 
-  Widget _dayCell(
-    DateTime date, {
-    required bool currentMonth,
-  }) {
+  Widget _dayCell(DateTime date, {required bool currentMonth}) {
     final clean = DateTime(date.year, date.month, date.day);
 
     final isStart = _start != null && _same(clean, _start!);
     final isEnd = _end != null && _same(clean, _end!);
 
-    final inRange = _start != null &&
+    final inRange =
+        _start != null &&
         _end != null &&
         clean.isAfter(_start!) &&
         clean.isBefore(_end!);
@@ -359,8 +354,8 @@ class _TripDateRangeContentState
           color: selected
               ? AppColors.primaryIcon
               : inRange
-                  ? AppColors.blue100
-                  : Colors.transparent,
+              ? AppColors.blue100
+              : Colors.transparent,
           borderRadius: BorderRadius.horizontal(
             left: Radius.circular(isStart ? 20 : 0),
             right: Radius.circular(isEnd ? 20 : 0),
@@ -374,21 +369,16 @@ class _TripDateRangeContentState
             color: selected
                 ? Colors.white
                 : currentMonth
-                    ? Colors.black
-                    : AppColors.grayText.withOpacity(0.35),
+                ? Colors.black
+                : AppColors.grayText.withOpacity(0.35),
           ),
         ),
       ),
     );
   }
 
-  static bool _same(
-    DateTime a,
-    DateTime b,
-  ) {
-    return a.year == b.year &&
-        a.month == b.month &&
-        a.day == b.day;
+  static bool _same(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
   static String _format(DateTime date) {

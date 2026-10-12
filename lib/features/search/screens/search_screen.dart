@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_colors.dart';
+import '../../../core/services/auth_service.dart';
 import '../../../core/widgets/bottom_sheet.dart';
+import '../../../core/widgets/snackbar.dart';
 import '../../map/screens/place_detail_screen.dart';
+import '../../profile/screens/public_profile_screen.dart';
 import '../data/search_repository.dart';
 import '../models/search_models.dart';
 import '../widgets/search_filter_content.dart';
@@ -57,8 +61,10 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _submitted = false;
   bool _loadingSuggestions = true;
   bool _loadingSearch = false;
+  String? _searchError;
 
   int _searchToken = 0;
+  Timer? _liveSearchDebounce;
 
   @override
   void initState() {
@@ -115,17 +121,29 @@ class _SearchScreenState extends State<SearchScreen> {
       _loadingSearch = true;
     });
 
-    final bundle = await _repository.search(
-      query: query,
-      placeFilters: _placeFilters,
-      hashtags: _postHashtags,
-    );
+    SearchBundle bundle;
+    try {
+      bundle = await _repository.search(
+        query: query,
+        placeFilters: _placeFilters,
+        hashtags: _postHashtags,
+      );
+    } catch (_) {
+      if (!mounted || token != _searchToken) return;
+      setState(() {
+        _submittedBundle = const SearchBundle();
+        _loadingSearch = false;
+        _searchError = 'Không tải được kết quả. Kiểm tra kết nối máy chủ.';
+      });
+      return;
+    }
 
     if (!mounted || token != _searchToken) return;
 
     setState(() {
       _submittedBundle = bundle;
       _loadingSearch = false;
+      _searchError = null;
     });
   }
 
@@ -191,11 +209,16 @@ class _SearchScreenState extends State<SearchScreen> {
       setState(() {
         _liveBundle = const SearchBundle();
         _loadingSearch = false;
+        _searchError = null;
       });
       return;
     }
 
-    _runLiveSearch(query);
+    _liveSearchDebounce?.cancel();
+    _liveSearchDebounce = Timer(
+      const Duration(milliseconds: 320),
+      () => _runLiveSearch(query),
+    );
   }
 
   Future<void> _runLiveSearch(String query) async {
@@ -203,19 +226,32 @@ class _SearchScreenState extends State<SearchScreen> {
 
     setState(() {
       _loadingSearch = true;
+      _searchError = null;
     });
 
-    final bundle = await _repository.search(
-      query: query,
-      placeFilters: _placeFilters,
-      hashtags: _postHashtags,
-    );
+    SearchBundle bundle;
+    try {
+      bundle = await _repository.search(
+        query: query,
+        placeFilters: _placeFilters,
+        hashtags: _postHashtags,
+      );
+    } catch (_) {
+      if (!mounted || token != _searchToken) return;
+      setState(() {
+        _liveBundle = const SearchBundle();
+        _loadingSearch = false;
+        _searchError = 'Không tải được kết quả. Kiểm tra kết nối máy chủ.';
+      });
+      return;
+    }
 
     if (!mounted || token != _searchToken) return;
 
     setState(() {
       _liveBundle = bundle;
       _loadingSearch = false;
+      _searchError = null;
     });
   }
 
@@ -236,13 +272,25 @@ class _SearchScreenState extends State<SearchScreen> {
           ? widget.initialTab
           : SearchTab.places;
       _loadingSearch = true;
+      _searchError = null;
     });
 
-    final bundle = await _repository.search(
-      query: query,
-      placeFilters: _placeFilters,
-      hashtags: _postHashtags,
-    );
+    SearchBundle bundle;
+    try {
+      bundle = await _repository.search(
+        query: query,
+        placeFilters: _placeFilters,
+        hashtags: _postHashtags,
+      );
+    } catch (_) {
+      if (!mounted || token != _searchToken) return;
+      setState(() {
+        _submittedBundle = const SearchBundle();
+        _loadingSearch = false;
+        _searchError = 'Không tải được kết quả. Kiểm tra kết nối máy chủ.';
+      });
+      return;
+    }
 
     if (!mounted || token != _searchToken) return;
 
@@ -254,14 +302,13 @@ class _SearchScreenState extends State<SearchScreen> {
       _submittedBundle = bundle;
       _recentSearches = recents;
       _loadingSearch = false;
+      _searchError = null;
     });
   }
 
   Future<void> _useRecent(String query) async {
     _queryController.text = query;
-    _queryController.selection = TextSelection.collapsed(
-      offset: query.length,
-    );
+    _queryController.selection = TextSelection.collapsed(offset: query.length);
 
     await _submitSearch(query);
   }
@@ -281,9 +328,7 @@ class _SearchScreenState extends State<SearchScreen> {
     final filter = await GoMateBottomSheet.show<SearchPlaceFilter>(
       context: context,
       size: GoMateBottomSheetSize.compact,
-      child: PlaceFilterContent(
-        selected: _placeFilters,
-      ),
+      child: PlaceFilterContent(selected: _placeFilters),
     );
 
     if (!mounted || filter == null) return;
@@ -330,25 +375,37 @@ class _SearchScreenState extends State<SearchScreen> {
 
     setState(() {
       _loadingSearch = true;
+      _searchError = null;
     });
 
-    final bundle = await _repository.search(
-      query: query,
-      placeFilters: _placeFilters,
-      hashtags: _postHashtags,
-    );
+    SearchBundle bundle;
+    try {
+      bundle = await _repository.search(
+        query: query,
+        placeFilters: _placeFilters,
+        hashtags: _postHashtags,
+      );
+    } catch (_) {
+      if (!mounted || token != _searchToken) return;
+      setState(() {
+        _loadingSearch = false;
+        _searchError = 'Không tải được kết quả. Kiểm tra kết nối máy chủ.';
+      });
+      return;
+    }
 
     if (!mounted || token != _searchToken) return;
 
     setState(() {
       _submittedBundle = bundle;
       _loadingSearch = false;
+      _searchError = null;
     });
   }
 
   Future<void> _removePlaceFilter(String label) async {
     final filter = SearchPlaceFilter.values.where(
-          (item) => item.label == label,
+      (item) => item.label == label,
     );
 
     if (filter.isEmpty) return;
@@ -401,8 +458,51 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  Future<void> _openUser(SearchUserItem user) async {
+    if (user.id.isEmpty) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            PublicProfileScreen(userId: user.id, repository: _repository),
+      ),
+    );
+    if (!mounted) return;
+    await _refreshSubmittedResults();
+    if (_queryController.text.trim().isNotEmpty && _editing) {
+      await _runLiveSearch(_queryController.text.trim());
+    }
+  }
+
+  Future<void> _toggleUserFollow(SearchUserItem user) async {
+    if (user.id.isEmpty) return;
+    try {
+      if (user.relation == SearchUserRelation.none ||
+          user.relation == SearchUserRelation.followsYou) {
+        await _repository.followUser(user.id);
+        if (!mounted) return;
+        GoMateSnackBar.show(context, message: 'Đã theo dõi ${user.name}');
+      } else {
+        await _repository.unfollowUser(user.id);
+        if (!mounted) return;
+        GoMateSnackBar.show(context, message: 'Đã bỏ theo dõi');
+      }
+      await AuthService.instance.loadProfile().catchError((_) {});
+      await _refreshSubmittedResults();
+      if (_queryController.text.trim().isNotEmpty && _editing) {
+        await _runLiveSearch(_queryController.text.trim());
+      }
+    } catch (_) {
+      if (!mounted) return;
+      GoMateSnackBar.show(
+        context,
+        message: 'Không thể cập nhật quan hệ lúc này.',
+      );
+    }
+  }
+
   @override
   void dispose() {
+    _liveSearchDebounce?.cancel();
     _queryController.dispose();
     _queryFocusNode.dispose();
     super.dispose();
@@ -472,14 +572,9 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                 )
               else if (_suggestedPlaces.isEmpty)
-                const SearchEmptyState(
-                  text: 'Chưa có gợi ý phù hợp.',
-                )
+                const SearchEmptyState(text: 'Chưa có gợi ý phù hợp.')
               else
-                _buildPlaceGrid(
-                  items: _suggestedPlaces,
-                  ui: ui,
-                ),
+                _buildPlaceGrid(items: _suggestedPlaces, ui: ui),
             ],
           ),
         ),
@@ -509,9 +604,7 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
         ),
         Expanded(
-          child: query.isEmpty
-              ? _buildRecent(ui)
-              : _buildLivePreview(ui),
+          child: query.isEmpty ? _buildRecent(ui) : _buildLivePreview(ui),
         ),
       ],
     );
@@ -542,24 +635,21 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildLivePreview(_SearchMetrics ui) {
+    if (_searchError != null) {
+      return SearchEmptyState(text: _searchError!);
+    }
+
     if (_loadingSearch && _liveBundle.isEmpty) {
-      return const Center(
-        child: CircularProgressIndicator(strokeWidth: 2.2),
-      );
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2.2));
     }
 
     if (_liveBundle.isEmpty) {
-      return const SearchEmptyState(
-        text: 'Không có kết quả phù hợp',
-      );
+      return const SearchEmptyState(text: 'Không có kết quả phù hợp');
     }
 
     return ListView(
       physics: const BouncingScrollPhysics(),
-      padding: EdgeInsets.only(
-        top: ui.sectionGap,
-        bottom: ui.bottomPadding,
-      ),
+      padding: EdgeInsets.only(top: ui.sectionGap, bottom: ui.bottomPadding),
       children: [
         if (_liveBundle.places.isNotEmpty) ...[
           Padding(
@@ -607,6 +697,7 @@ class _SearchScreenState extends State<SearchScreen> {
               itemBuilder: (context, index) {
                 return SearchUserPreviewItem(
                   item: _liveBundle.users[index],
+                  onTap: () => _openUser(_liveBundle.users[index]),
                 );
               },
             ),
@@ -621,10 +712,7 @@ class _SearchScreenState extends State<SearchScreen> {
           SizedBox(height: ui.itemGap),
 
           // Full-bleed ngang như mockup/Home.
-          SearchPostGrid(
-            items: _liveBundle.posts,
-            maxItems: 2,
-          ),
+          SearchPostGrid(items: _liveBundle.posts, maxItems: 2),
         ],
       ],
     );
@@ -696,8 +784,8 @@ class _SearchScreenState extends State<SearchScreen> {
           child: ClipRect(
             child: _loadingSearch
                 ? const Center(
-              child: CircularProgressIndicator(strokeWidth: 2.2),
-            )
+                    child: CircularProgressIndicator(strokeWidth: 2.2),
+                  )
                 : _buildSelectedResult(ui),
           ),
         ),
@@ -706,12 +794,14 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildSelectedResult(_SearchMetrics ui) {
+    if (_searchError != null) {
+      return SearchEmptyState(text: _searchError!);
+    }
+
     switch (_selectedTab) {
       case SearchTab.places:
         if (_submittedBundle.places.isEmpty) {
-          return const SearchEmptyState(
-            text: 'Không có địa điểm phù hợp',
-          );
+          return const SearchEmptyState(text: 'Không có địa điểm phù hợp');
         }
 
         return ListView(
@@ -722,19 +812,12 @@ class _SearchScreenState extends State<SearchScreen> {
             ui.horizontalPadding,
             ui.bottomPadding,
           ),
-          children: [
-            _buildPlaceGrid(
-              items: _submittedBundle.places,
-              ui: ui,
-            ),
-          ],
+          children: [_buildPlaceGrid(items: _submittedBundle.places, ui: ui)],
         );
 
       case SearchTab.users:
         if (_submittedBundle.users.isEmpty) {
-          return const SearchEmptyState(
-            text: 'Không có người dùng phù hợp',
-          );
+          return const SearchEmptyState(text: 'Không có người dùng phù hợp');
         }
 
         return ListView.builder(
@@ -749,33 +832,21 @@ class _SearchScreenState extends State<SearchScreen> {
           itemBuilder: (context, index) {
             return SearchUserTile(
               item: _submittedBundle.users[index],
-              onAction: () {
-                // UI-only. Sau này nối follow/friend backend tại đây.
-              },
+              onTap: () => _openUser(_submittedBundle.users[index]),
+              onAction: () => _toggleUserFollow(_submittedBundle.users[index]),
             );
           },
         );
 
       case SearchTab.posts:
         if (_submittedBundle.posts.isEmpty) {
-          return const SearchEmptyState(
-            text: 'Không có bài viết phù hợp',
-          );
+          return const SearchEmptyState(text: 'Không có bài viết phù hợp');
         }
 
         return ListView(
           physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(
-            0,
-            0,
-            0,
-            ui.bottomPadding,
-          ),
-          children: [
-            SearchPostGrid(
-              items: _submittedBundle.posts,
-            ),
-          ],
+          padding: EdgeInsets.fromLTRB(0, 0, 0, ui.bottomPadding),
+          children: [SearchPostGrid(items: _submittedBundle.posts)],
         );
     }
   }
