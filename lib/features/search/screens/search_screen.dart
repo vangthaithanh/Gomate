@@ -11,6 +11,8 @@ import '../data/search_repository.dart';
 import '../models/search_models.dart';
 import '../widgets/search_filter_content.dart';
 import '../widgets/search_widgets.dart';
+import '../../profile/screens/profile_post_feed_screen.dart';
+import '../../profile/widgets/profile_ui_widgets.dart';
 
 class SearchScreen extends StatefulWidget {
   final SearchRepository? repository;
@@ -77,6 +79,32 @@ class _SearchScreenState extends State<SearchScreen> {
     _postHashtags.addAll(widget.initialHashtags);
 
     _loadInitialData();
+  }
+
+  // TODO(BACKEND-PROFILE-UI-PREVIEW): thay projection demo bằng model bài
+  // viết thật khi backend trả postId, tác giả và danh sách media chính xác.
+  void _openPostFeed(List<SearchPostItem> source, int index) {
+    if (source.isEmpty || index < 0 || index >= source.length) return;
+
+    final posts = <GoMateProfilePostPreview>[
+      for (var i = 0; i < source.length; i++)
+        GoMateProfilePostPreview(
+          id: 'ui-preview-search-post-${source[i].id}',
+          authorId: '', // SearchPostItem hiện không có authorId.
+          authorName: 'Bài viết GoMate',
+          caption: source[i].caption,
+          media: <String>[searchPostPreviewImage(source[i], i)],
+        ),
+    ];
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => GoMateProfilePostFeedScreen(
+          posts: posts,
+          initialIndex: index,
+        ),
+      ),
+    );
   }
 
   Future<void> _loadInitialData() async {
@@ -712,7 +740,11 @@ class _SearchScreenState extends State<SearchScreen> {
           SizedBox(height: ui.itemGap),
 
           // Full-bleed ngang như mockup/Home.
-          SearchPostGrid(items: _liveBundle.posts, maxItems: 2),
+          SearchPostGrid(
+            items: _liveBundle.posts,
+            maxItems: 2,
+            onTapIndex: (index) => _openPostFeed(_liveBundle.posts, index),
+          ),
         ],
       ],
     );
@@ -846,7 +878,13 @@ class _SearchScreenState extends State<SearchScreen> {
         return ListView(
           physics: const BouncingScrollPhysics(),
           padding: EdgeInsets.fromLTRB(0, 0, 0, ui.bottomPadding),
-          children: [SearchPostGrid(items: _submittedBundle.posts)],
+          children: [
+            SearchPostGrid(
+              items: _submittedBundle.posts,
+              onTapIndex: (index) =>
+                  _openPostFeed(_submittedBundle.posts, index),
+            ),
+          ],
         );
     }
   }

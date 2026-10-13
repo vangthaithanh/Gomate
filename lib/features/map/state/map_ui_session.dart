@@ -44,6 +44,9 @@ class GoMateMapUiSession {
   static final ValueNotifier<int?> requestedMainTab =
       ValueNotifier<int?>(null);
 
+  static final ValueNotifier<bool> requestedCreateTrip =
+  ValueNotifier<bool>(false);
+
   static final List<GoMateMapPlace> _recentPlaces =
       <GoMateMapPlace>[];
 
@@ -276,6 +279,14 @@ class GoMateMapUiSession {
 
   static void clearRequestedMainTab() {
     requestedMainTab.value = null;
+  }
+
+  static void requestCreateTrip() {
+    requestedCreateTrip.value = true;
+  }
+
+  static void clearCreateTripRequest() {
+    requestedCreateTrip.value = false;
   }
 
   static void requestOpenTripOnMap(

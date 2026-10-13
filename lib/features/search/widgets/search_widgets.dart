@@ -584,11 +584,36 @@ class SearchUserAvatar extends StatelessWidget {
   }
 }
 
+// TODO(BACKEND-PROFILE-UI-PREVIEW): dữ liệu Search mock vẫn trỏ tới
+// assets/images/home/post_*.jpg không có trong assets của master.
+// Thay bằng ảnh demo có thật khi kiểm tra UI, nhưng luôn ưu tiên đường dẫn
+// nguồn khi sau này backend/model trả về ảnh hợp lệ.
+String searchPostPreviewImage(SearchPostItem post, int index) {
+  const demoAssets = <String>[
+    'assets/images/checkin.jpg',
+    'assets/images/thiennhien.jpg',
+    'assets/images/nghiduong.jpg',
+    'assets/images/lichsu.jpg',
+  ];
+
+  final source = post.imageAsset.trim();
+  if (source.isEmpty || source.startsWith('assets/images/home/post_')) {
+    return demoAssets[index % demoAssets.length];
+  }
+  return source;
+}
+
 class SearchPostGrid extends StatelessWidget {
   final List<SearchPostItem> items;
   final int maxItems;
+  final ValueChanged<int>? onTapIndex;
 
-  const SearchPostGrid({super.key, required this.items, this.maxItems = 999});
+  const SearchPostGrid({
+    super.key,
+    required this.items,
+    this.maxItems = 999,
+    this.onTapIndex,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -608,16 +633,19 @@ class SearchPostGrid extends StatelessWidget {
       itemBuilder: (context, index) {
         final post = visible[index];
 
-        return Image.asset(
-          post.imageAsset,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) {
-            return Container(
-              color: const Color(0xFFE7EBF3),
-              alignment: Alignment.center,
-              child: const Icon(LucideIcons.image, color: AppColors.grayText),
-            );
-          },
+        return InkWell(
+          onTap: onTapIndex == null ? null : () => onTapIndex!(index),
+          child: Image.asset(
+            searchPostPreviewImage(post, index),
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) {
+              return Container(
+                color: const Color(0xFFE7EBF3),
+                alignment: Alignment.center,
+                child: const Icon(LucideIcons.image, color: AppColors.grayText),
+              );
+            },
+          ),
         );
       },
     );

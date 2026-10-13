@@ -607,8 +607,8 @@ class _GoMateMapScreenState extends State<GoMateMapScreen> {
                 },
                 onQuickCreate: () {
                   Navigator.of(pickerContext).pop();
-
                   GoMateMapUiSession.requestMainTab(3);
+                  GoMateMapUiSession.requestCreateTrip();
                 },
                 onSelected: (item) {
                   Navigator.of(pickerContext).pop(item);

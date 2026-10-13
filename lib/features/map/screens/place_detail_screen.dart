@@ -15,6 +15,8 @@ import '../../trip/models/trip_ui_models.dart';
 import '../state/map_ui_session.dart';
 import '../utils/cloudinary_image_url.dart';
 import '../widgets/share_place_content.dart';
+import '../../profile/screens/profile_post_feed_screen.dart';
+import '../../profile/widgets/profile_ui_widgets.dart';
 
 class MapPlaceUi {
   final String id;
@@ -658,11 +660,24 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
 
   Widget _buildRelatedPosts(double width, double horizontal) {
     final fallback = _heroImages.isEmpty ? null : _heroImages.first;
+    // TODO(BACKEND-PROFILE-UI-PREVIEW): thay ảnh/postId/tác giả demo
+    // bằng bài viết thật được backend liên kết với địa điểm hiện tại.
     final postImages = <String>[
-      'assets/images/home/post_1_1.jpg',
-      'assets/images/home/post_1_2.jpg',
-      'assets/images/home/post_2_1.jpg',
-      'assets/images/home/post_2_2.jpg',
+      'assets/images/checkin.jpg',
+      'assets/images/thiennhien.jpg',
+      'assets/images/nghiduong.jpg',
+      'assets/images/lichsu.jpg',
+    ];
+    final relatedPosts = <GoMateProfilePostPreview>[
+      for (var i = 0; i < postImages.length; i++)
+        GoMateProfilePostPreview(
+          id: 'ui-preview-related-${place.id}-$i',
+          authorId: '', // Chưa có thông tin chủ bài viết.
+          authorName: 'Bài viết liên quan',
+          caption: place.name,
+          location: place.address,
+          media: <String>[postImages[i]],
+        ),
     ];
 
     return Column(
@@ -682,7 +697,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
               ),
               const Spacer(),
               Text(
-                '100 bài viết',
+                '${postImages.length} bài viết',
                 style: TextStyle(
                   fontSize: (width * 0.028).clamp(10.0, 12.0).toDouble(),
                   color: AppColors.primaryText,
@@ -705,12 +720,24 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
           ),
           itemBuilder: (context, index) {
             final asset = postImages[index];
-            return Image.asset(
-              asset,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => fallback == null
-                  ? _imageFallback()
-                  : _SmartImage(path: fallback, fit: BoxFit.cover),
+            return InkWell(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => GoMateProfilePostFeedScreen(
+                      posts: relatedPosts,
+                      initialIndex: index,
+                    ),
+                  ),
+                );
+              },
+              child: Image.asset(
+                asset,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => fallback == null
+                    ? _imageFallback()
+                    : _SmartImage(path: fallback, fit: BoxFit.cover),
+              ),
             );
           },
         ),

@@ -25,6 +25,7 @@ import '../widgets/report_reason_content.dart';
 import '../../moments/data/moments_repository.dart';
 import '../../moments/widgets/moments_strip.dart';
 import '../../../core/widgets/gomate_main_tab_header.dart';
+import '../../notifications/screens/notification_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   /// MainShell truyền callback này để chuyển sang tab Map mà không push
@@ -528,7 +529,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             leadingIcon: LucideIcons.search,
                             onLeadingTap: _openSearch,
                             trailingIcon: LucideIcons.bell,
-                            onTrailingTap: () {},
+                            onTrailingTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const GoMateNotificationScreen(),
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ),

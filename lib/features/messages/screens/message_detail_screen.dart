@@ -9,6 +9,7 @@ import '../../map/state/map_ui_session.dart';
 import '../../trip/models/trip_ui_models.dart';
 import '../../trip/data/trip_repository.dart';
 import '../../trip/screens/trip_detail_screen.dart';
+import '../../profile/screens/public_profile_screen.dart';
 import '../data/message_repository.dart';
 import '../models/message_models.dart';
 import '../widgets/message_widgets.dart';
@@ -406,9 +407,9 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
                                       conversationId: conversation.id,
                                       repository: widget.repository,
                                     )
-                                  : MessageProfilePlaceholderScreen(
-                                      participant: peer,
-                                    ),
+                                  : (peer == null || peer.id.trim().isEmpty)
+                                  ? MessageProfilePlaceholderScreen(participant: peer)
+                                  : PublicProfileScreen(userId: peer.id),
                             ),
                           );
                         },

@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/app_colors.dart';
 
+/// Shared editor. Optional maxLength is backward compatible with existing
+/// Message nickname and Trip name callers (their default remains unlimited).
 class GoMateNameEditorContent extends StatefulWidget {
   final String title;
   final String initialValue;
   final String hintText;
+  final int? maxLength;
 
   const GoMateNameEditorContent({
     super.key,
     required this.title,
     required this.initialValue,
     required this.hintText,
+    this.maxLength,
   });
 
   @override
@@ -19,8 +24,7 @@ class GoMateNameEditorContent extends StatefulWidget {
       _GoMateNameEditorContentState();
 }
 
-class _GoMateNameEditorContentState
-    extends State<GoMateNameEditorContent> {
+class _GoMateNameEditorContentState extends State<GoMateNameEditorContent> {
   late final TextEditingController _controller;
 
   bool get _canSave => _controller.text.trim().isNotEmpty;
@@ -28,9 +32,7 @@ class _GoMateNameEditorContentState
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(
-      text: widget.initialValue,
-    );
+    _controller = TextEditingController(text: widget.initialValue);
     _controller.addListener(_refresh);
   }
 
@@ -49,14 +51,12 @@ class _GoMateNameEditorContentState
   void _save() {
     final value = _controller.text.trim();
     if (value.isEmpty) return;
-
     Navigator.of(context).pop(value);
   }
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-
     return SizedBox(
       width: double.infinity,
       child: Column(
@@ -85,12 +85,21 @@ class _GoMateNameEditorContentState
             child: Row(
               children: [
                 Expanded(
-                  child: TextField(
+                  child: TextSelectionTheme(
+                    data: const TextSelectionThemeData(
+                      cursorColor: AppColors.primaryIcon,
+                      selectionColor: Color(0x330A43A8),
+                      selectionHandleColor: AppColors.primaryIcon,
+                    ),
+                    child: TextField(
                     controller: _controller,
                     autofocus: true,
                     cursorColor: AppColors.primaryIcon,
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _save(),
+                    inputFormatters: widget.maxLength == null
+                        ? null
+                        : [LengthLimitingTextInputFormatter(widget.maxLength)],
                     decoration: InputDecoration(
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
@@ -98,21 +107,14 @@ class _GoMateNameEditorContentState
                       isDense: true,
                       hintText: widget.hintText,
                       hintStyle: TextStyle(
-                        fontSize: _clamp(
-                          width * 0.032,
-                          11.5,
-                          13,
-                        ),
+                        fontSize: _clamp(width * 0.032, 11.5, 13),
                         color: AppColors.grayText,
                       ),
                     ),
                     style: TextStyle(
-                      fontSize: _clamp(
-                        width * 0.032,
-                        11.5,
-                        13,
-                      ),
+                      fontSize: _clamp(width * 0.032, 11.5, 13),
                       color: Colors.black,
+                    ),
                     ),
                   ),
                 ),
@@ -127,11 +129,7 @@ class _GoMateNameEditorContentState
                     child: Text(
                       'Lưu',
                       style: TextStyle(
-                        fontSize: _clamp(
-                          width * 0.030,
-                          11,
-                          12,
-                        ),
+                        fontSize: _clamp(width * 0.030, 11, 12),
                         fontWeight: FontWeight.w700,
                         color: _canSave
                             ? AppColors.primaryText
@@ -148,11 +146,6 @@ class _GoMateNameEditorContentState
     );
   }
 
-  static double _clamp(
-    double value,
-    double min,
-    double max,
-  ) {
-    return value.clamp(min, max).toDouble();
-  }
+  static double _clamp(double value, double min, double max) =>
+      value.clamp(min, max).toDouble();
 }

@@ -37,11 +37,12 @@ class _TripScreenState extends State<TripScreen> {
   @override
   void initState() {
     super.initState();
-
     GoMateMapUiSession.registerTrips(_trips);
-
     GoMateMapUiSession.revision.addListener(_pullTripChangesFromMap);
     unawaited(_loadTrips());
+    GoMateMapUiSession.requestedCreateTrip.addListener(
+      _handleCreateTripRequest,
+    );
   }
 
   void _pullTripChangesFromMap() {
@@ -126,6 +127,24 @@ class _TripScreenState extends State<TripScreen> {
 
     _searchController.dispose();
     super.dispose();
+    GoMateMapUiSession.requestedCreateTrip.removeListener(
+      _handleCreateTripRequest,
+    );
+  }
+
+  void _handleCreateTripRequest() {
+    if (!mounted || !GoMateMapUiSession.requestedCreateTrip.value) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !GoMateMapUiSession.requestedCreateTrip.value) {
+        return;
+      }
+
+      GoMateMapUiSession.clearCreateTripRequest();
+      unawaited(_createTrip());
+    });
   }
 
   Future<void> _createTrip() async {
