@@ -17,6 +17,8 @@ import 'profile_edit_screen.dart';
 import 'profile_people_screen.dart';
 import 'profile_post_feed_screen.dart';
 import 'setting_screen.dart';
+import '../../posts/screens/create_post_screen.dart';
+import '../../posts/ui_preview/post_ui_demo_store.dart';
 
 /// My profile - keeps the existing AuthService and FavoritePlaceStore contracts.
 /// Production posts remain injected by caller. UI-preview posts are isolated
@@ -33,12 +35,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _tab = 0;
   final _auth = AuthService.instance;
   final _moments = ApiMomentsRepository.instance;
+  final _createdPosts = GoMatePostUiDemoStore.instance;
 
   @override
   void initState() {
     super.initState();
     _auth.addListener(_refresh);
     _moments.addListener(_refresh);
+    _createdPosts.addListener(_refresh);
     _auth.loadProfile().catchError((_) {});
   }
 
@@ -46,6 +50,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void dispose() {
     _auth.removeListener(_refresh);
     _moments.removeListener(_refresh);
+    _createdPosts.removeListener(_refresh);
     super.dispose();
   }
 
@@ -99,15 +104,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final actual = widget.posts
         .where((post) => _userId.isNotEmpty && post.authorId == _userId)
         .toList(growable: false);
-    // TODO(BACKEND-PROFILE-UI-PREVIEW): remove UI-only posts.
-    if (actual.isEmpty && ProfileUiPreview.enabled) {
-      return ProfileUiPreview.posts(
-        authorId: _userId.isEmpty ? ProfileUiPreview.selfId : _userId,
-        authorName: _name,
-        authorAvatar: _avatar,
-      );
+    // TODO(BACKEND-CREATE-POST): created posts and legacy sample posts are
+    // separate from real API records; keep existing previews after sharing.
+    final previewId = _userId.isEmpty ? ProfileUiPreview.selfId : _userId;
+    final created = _createdPosts.postsOf(previewId)
+        .map((post) => post.toPreview()).toList(growable: false);
+    if (actual.isNotEmpty) {
+      return <GoMateProfilePostPreview>[...created, ...actual];
     }
-    return actual;
+    if (ProfileUiPreview.enabled) {
+      final samples = _createdPosts.visiblePreviewPosts(ProfileUiPreview.posts(
+        authorId: previewId, authorName: _name, authorAvatar: _avatar,
+      ));
+      return <GoMateProfilePostPreview>[...created, ...samples];
+    }
+    return created;
+  }
+
+  Future<void> _openCreatePost() async {
+    final shared = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const GoMateCreatePostScreen()),
+    );
+    if (!mounted) return;
+    if (shared == true) {
+      setState(() => _tab = 0);
+      // Never claim remote publishing: this is an in-memory UI preview.
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Bài viết đã xuất hiện trong bản xem thử; chưa đăng lên máy chủ.'),
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
   }
 
   Future<void> _openMoments() async {
@@ -252,8 +278,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _topBar() => GoMateMainTabHeader(
     title: _nickname,
     leadingIcon: LucideIcons.plus,
-    // UI ONLY: tạo bài viết chưa có route; tuyệt đối không mở camera Moments.
-    onLeadingTap: null,
+    // Uses Create Post. Never routes to Moments camera.
+    onLeadingTap: _openCreatePost,
     trailingIcon: LucideIcons.menu,
     onTrailingTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => const SettingsScreen(),

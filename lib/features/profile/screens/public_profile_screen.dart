@@ -30,6 +30,12 @@ class PublicProfileScreen extends StatefulWidget {
   final bool? isPrivate;
   /// UI-only sample object. When non-null, NEVER read/mutate server data.
   final ProfilePreviewPerson? previewPerson;
+  /// TODO(BACKEND-SETTINGS-UI): preview-only flags from Settings demo lists.
+  /// Real profiles still use their existing repository/conversation contract.
+  final bool initialPreviewBlocked;
+  final bool initialPreviewMuted;
+  final ValueChanged<bool>? onPreviewBlockedChanged;
+  final ValueChanged<bool>? onPreviewMutedChanged;
 
   const PublicProfileScreen({
     super.key,
@@ -38,6 +44,10 @@ class PublicProfileScreen extends StatefulWidget {
     this.posts = const [],
     this.isPrivate,
     this.previewPerson,
+    this.initialPreviewBlocked = false,
+    this.initialPreviewMuted = false,
+    this.onPreviewBlockedChanged,
+    this.onPreviewMutedChanged,
   });
 
   @override
@@ -65,6 +75,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   void initState() {
     super.initState();
     _repository = widget.repository ?? SearchRepository();
+    _previewBlocked = widget.initialPreviewBlocked;
+    _previewMuted = widget.initialPreviewMuted;
     _load();
   }
 
@@ -73,8 +85,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     super.didUpdateWidget(oldWidget);
     if (widget.userId != oldWidget.userId ||
         widget.previewPerson != oldWidget.previewPerson) {
-      _previewMuted = false;
-      _previewBlocked = false;
+      _previewMuted = widget.initialPreviewMuted;
+      _previewBlocked = widget.initialPreviewBlocked;
       _locallyMutedRealUser = false;
       _load();
     }
@@ -241,6 +253,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
 
       if (widget.previewPerson != null) {
         setState(() => _previewMuted = true);
+        widget.onPreviewMutedChanged?.call(true);
         GoMateSnackBar.show(context, message: 'Đã ẩn khoảnh khắc (demo)');
         return;
       }
@@ -258,6 +271,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
 
     if (widget.previewPerson != null) {
       setState(() => _previewMuted = false);
+      widget.onPreviewMutedChanged?.call(false);
       GoMateSnackBar.show(context, message: 'Đã bỏ ẩn khoảnh khắc (demo)');
       return;
     }
@@ -299,7 +313,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
         _menuItem(LucideIcons.message_square_warning, 'Báo cáo', 'report'),
         const Divider(height: 1, color: AppColors.grayBorder),
         _menuItem(LucideIcons.ban, blocked ? 'Bỏ chặn' : 'Chặn', 'block'),
-        if (friend) ...[
+        if (friend && !blocked) ...[
           const Divider(height: 1, color: AppColors.grayBorder),
           _menuItem(
             _muted ? LucideIcons.eye : LucideIcons.eye_off,
@@ -323,6 +337,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       if (blocked) {
         if (widget.previewPerson != null) {
           setState(() => _previewBlocked = false);
+          widget.onPreviewBlockedChanged?.call(false);
           GoMateSnackBar.show(context, message: 'Đã bỏ chặn (demo)');
         } else if (conversation != null) {
           RealDirectMessageRepository.instance.unblockConversation(conversation.id);
@@ -349,6 +364,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       if (!mounted || confirmed != true) return;
       if (widget.previewPerson != null) {
         setState(() => _previewBlocked = true);
+        widget.onPreviewBlockedChanged?.call(true);
         GoMateSnackBar.show(context, message: 'Đã chặn (demo)');
       } else if (conversation != null) {
         RealDirectMessageRepository.instance.blockConversation(conversation.id);
@@ -487,7 +503,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
             authorAvatar: profile.avatarUrl);
     final moment = _moments.stripItems.any(
         (m) => m.userId == profile.userId && m.hasAvailableMoment);
-    final locked = _isPrivate && !_following(profile.relation);
+    final blockedPreview = widget.previewPerson != null && _previewBlocked;
+    final locked = blockedPreview || (_isPrivate && !_following(profile.relation));
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
       slivers: [
@@ -540,15 +557,15 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                           Row(
                             children: [
                               Expanded(child: GoMateProfileStat(
-                                value: profile.followersCount,
+                                value: blockedPreview ? 0 : profile.followersCount,
                                 label: 'Người theo dõi',
-                                onTap: () => _openPeople(0),
+                                onTap: blockedPreview ? null : () => _openPeople(0),
                               )),
                               const SizedBox(width: 8),
                               Expanded(child: GoMateProfileStat(
-                                value: profile.mutualFriendCount,
+                                value: blockedPreview ? 0 : profile.mutualFriendCount,
                                 label: 'Bạn bè',
-                                onTap: () => _openPeople(1),
+                                onTap: blockedPreview ? null : () => _openPeople(1),
                               )),
                             ],
                           ),
@@ -568,7 +585,14 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                 const SizedBox(height: 14),
                 Row(
                   children: [
-                    Expanded(child: _action(_label(profile.relation), _toggleFollow)),
+                    if (blockedPreview)
+                      Expanded(child: _action('Bỏ chặn', () {
+                        setState(() => _previewBlocked = false);
+                        widget.onPreviewBlockedChanged?.call(false);
+                        GoMateSnackBar.show(context, message: 'Đã bỏ chặn (demo)');
+                      }))
+                    else
+                      Expanded(child: _action(_label(profile.relation), _toggleFollow)),
                     if (!locked) ...[
                       const SizedBox(width: 12),
                       Expanded(child: _action('Nhắn tin', _openMessage)),
@@ -581,19 +605,21 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           ),
         ),
         if (locked)
-          const SliverToBoxAdapter(
+          SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.only(top: 36),
               child: Column(
                 children: [
-                  Icon(LucideIcons.lock_keyhole, size: 65, color: Color(0xFF828282)),
+                  const Icon(LucideIcons.lock_keyhole, size: 65, color: Color(0xFF828282)),
                   SizedBox(height: 12),
-                  Text('Đây là trang cá nhân riêng tư',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                  Text(blockedPreview ? 'Bạn đã chặn người dùng này'
+                    : 'Đây là trang cá nhân riêng tư',
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                   SizedBox(height: 8),
-                  Text('Theo dõi người dùng này để xem nội dung của họ',
+                  Text(blockedPreview ? 'Bỏ chặn người dùng này để xem nội dung của họ'
+                    : 'Theo dõi người dùng này để xem nội dung của họ',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Color(0xFF828282), fontSize: 12)),
+                    style: const TextStyle(color: Color(0xFF828282), fontSize: 12)),
                 ],
               ),
             ),

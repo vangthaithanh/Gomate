@@ -5,7 +5,11 @@ import 'package:flutter_lucide/flutter_lucide.dart';
 import '../../../core/theme/app_colors.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
-  const ForgotPasswordScreen({super.key});
+  final bool changePasswordMode;
+  const ForgotPasswordScreen({
+    super.key,
+    this.changePasswordMode = false,
+  });
 
   @override
   State<ForgotPasswordScreen> createState() =>
@@ -485,14 +489,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
 
   String _titleForStep() {
     if (_step == 0) {
-      return 'Quên mật khẩu?';
+      return widget.changePasswordMode ? 'Đổi mật khẩu' : 'Quên mật khẩu?';
     }
 
     if (_step == 1) {
       return 'Nhập mã pin';
     }
 
-    return 'Đặt lại mật khẩu';
+    return widget.changePasswordMode ? 'Đổi mật khẩu' : 'Đặt lại mật khẩu';
   }
 
   Widget _buildCurrentStep(_ForgotMetrics ui) {

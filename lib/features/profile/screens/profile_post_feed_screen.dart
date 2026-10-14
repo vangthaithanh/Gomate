@@ -14,7 +14,10 @@ import '../../home/widgets/report_reason_content.dart';
 import '../ui_preview/profile_ui_preview.dart';
 import '../widgets/profile_ui_widgets.dart';
 import 'public_profile_screen.dart';
-
+import '../../../core/widgets/gomate_main_tab_header.dart';
+import '../../posts/ui_preview/post_ui_demo_store.dart';
+import '../../posts/widgets/post_audience_content.dart';
+import '../../posts/widgets/post_media_widget.dart';
 /// UI projection of posts supplied by Profile/Search/Place Detail.
 /// TODO(BACKEND-PROFILE-UI-PREVIEW): inject the real post repository when available.
 class GoMateProfilePostFeedScreen extends StatefulWidget {
@@ -69,6 +72,14 @@ class _GoMateProfilePostFeedScreenState
   }
 
   Future<void> _more(GoMateProfilePostPreview post) async {
+    final me = AuthService.instance.user;
+    final myId = (me?['userId'] ?? me?['id'])?.toString() ?? '';
+    final owned = post.authorId.isNotEmpty &&
+        (post.authorId == myId || post.authorId == ProfileUiPreview.selfId);
+    if (owned) {
+      await _ownPostActions(post);
+      return;
+    }
     final choice = await GoMateBottomSheet.show<PostActionResult>(
       context: context, child: const PostActionContent());
     if (!mounted || choice == null) return;
@@ -90,12 +101,99 @@ class _GoMateProfilePostFeedScreenState
     }
   }
 
+  Future<void> _ownPostActions(GoMateProfilePostPreview post) async {
+    final store = GoMatePostUiDemoStore.instance;
+    final owned = store.find(post.id);
+    final mockPreview = store.isPreviewPost(post.id);
+    final result = await GoMateBottomSheet.show<String>(
+      context: context,
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        _ownAction(LucideIcons.pin, (owned?.pinned == true || store.previewPinned(post.id))
+            ? 'Bỏ ghim bài viết' : 'Ghim bài viết', 'pin'),
+        const Divider(height: 1, color: AppColors.grayBorder),
+        _ownAction(LucideIcons.earth, 'Chỉnh sửa quyền riêng tư', 'audience'),
+        const Divider(height: 1, color: AppColors.grayBorder),
+        _ownAction(LucideIcons.trash, 'Xoá', 'delete', danger: true),
+      ]),
+    );
+    if (!mounted || result == null) return;
+    if (owned == null && !mockPreview) {
+      // Real posts must not be edited through the UI sample store.
+      GoMateSnackBar.show(context,
+        message: 'Bài viết thật cần API quản lý trước khi chỉnh sửa.');
+      return;
+    }
+    if (result == 'pin') {
+      final wasPinned = owned?.pinned ?? store.previewPinned(post.id);
+      if (owned != null) {
+        store.togglePin(post.id);
+      } else {
+        store.togglePreviewPin(post.id);
+      }
+      GoMateSnackBar.show(context, message: wasPinned
+          ? 'Đã bỏ ghim bài viết (demo)' : 'Đã ghim bài viết (demo)');
+    } else if (result == 'audience') {
+      final audience = await GoMateBottomSheet.show<GoMatePostAudience>(
+        context: context,
+        child: GoMatePostAudienceContent(initial:
+          owned?.audience ?? store.previewAudience(post.id)),
+      );
+      if (audience == null || !mounted) return;
+      if (owned != null) {
+        store.changeAudience(post.id, audience);
+      } else {
+        store.changePreviewAudience(post.id, audience);
+      }
+      GoMateSnackBar.show(context, message: 'Đã đổi quyền riêng tư (demo)');
+    } else if (result == 'delete') {
+      final confirm = await GoMateBottomSheet.show<bool>(
+        context: context,
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('Xoá bài viết?', style: TextStyle(
+            color: AppColors.primaryText, fontWeight: FontWeight.w800, fontSize: 16)),
+          const SizedBox(height: 10),
+          const Text('Bài viết sẽ bị xoá khỏi bản xem thử.',
+            style: TextStyle(fontSize: 13, color: AppColors.grayText)),
+          const SizedBox(height: 15),
+          TextButton(onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Xác nhận xoá')),
+          TextButton(onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Huỷ')),
+        ]),
+      );
+      if (!mounted || confirm != true) return;
+      if (owned != null) {
+        store.remove(post.id);
+      } else {
+        store.removePreview(post.id);
+      }
+      setState(() => _hidden.add(post.id));
+      GoMateSnackBar.show(context, message: 'Đã xoá bài viết (demo)');
+    }
+  }
+
+  Widget _ownAction(IconData icon, String title, String code,
+      {bool danger = false}) => InkWell(
+    onTap: () => Navigator.of(context).pop(code),
+    child: SizedBox(height: 55, child: Row(children: [
+      Icon(icon, size: 23, color: danger ? AppColors.primaryIcon : AppColors.black),
+      const SizedBox(width: 15),
+      Text(title, style: TextStyle(fontWeight: FontWeight.w600,
+        color: danger ? AppColors.primaryIcon : AppColors.black, fontSize: 14)),
+    ])),
+  );
+
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: Colors.white,
     body: SafeArea(
       child: Column(children: [
-        GoMateProfilePageHeader(title: 'Bài viết'),
+        GoMateMainTabHeader(
+          title: 'Bài viết',
+          titleSizeOverride: 16,
+          leadingIcon: LucideIcons.chevron_left,
+          onLeadingTap: () => Navigator.of(context).maybePop(),
+        ),
         Expanded(child: ListView.builder(
           physics: const BouncingScrollPhysics(),
           itemCount: _ordered.length,
@@ -216,7 +314,7 @@ class _PostFeedTileState extends State<_PostFeedTile> {
                 physics: const BouncingScrollPhysics(),
                 itemCount: img.length,
                 onPageChanged: (index) => setState(() => _page = index),
-                itemBuilder: (_, index) => _PostImage(source: img[index]),
+                itemBuilder: (_, index) => GoMatePostMediaWidget(source: img[index]),
               ),
               IgnorePointer(child: Center(child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 130),
@@ -281,21 +379,4 @@ class _PostAction extends StatelessWidget {
       Text(label, style: TextStyle(fontSize: size * 0.63, color: color)),
     ]),
   );
-}
-
-class _PostImage extends StatelessWidget {
-  final String source;
-  const _PostImage({required this.source});
-  @override
-  Widget build(BuildContext context) {
-    if (source.startsWith('https://') || source.startsWith('http://')) {
-      return Image.network(source, fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _fallback());
-    }
-    return Image.asset(source, fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => _fallback());
-  }
-  Widget _fallback() => const ColoredBox(
-    color: Color(0xFFE8EDF6),
-    child: Center(child: Icon(LucideIcons.image, size: 32)));
 }

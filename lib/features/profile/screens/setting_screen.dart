@@ -1,923 +1,232 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
-import '../../../core/theme/app_colors.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/gomate_search_field.dart';
 import '../../../core/widgets/snackbar.dart';
+import '../../auth/screens/forgot_password_screen.dart';
 import '../../auth/screens/login_screen.dart';
-import '../widgets/profile_account_sheets.dart';
+import '../../moments/data/moments_repository.dart';
+import '../../moments/screens/my_moments_screen.dart';
+import '../ui_preview/settings_ui_demo.dart';
+import '../widgets/profile_ui_widgets.dart';
+import '../widgets/settings_shared_widgets.dart';
+import 'profile_edit_screen.dart';
+import 'settings_activity_screen.dart';
+import 'settings_account_lists_screen.dart';
+import 'settings_collection_screen.dart';
+import 'settings_history_screen.dart';
+import 'settings_preferences_screen.dart';
 
+/// Settings home. Uses existing auth session and logout flow unchanged.
+/// The list is searchable by every nested setting, not only section names.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
-
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final TextEditingController _searchController = TextEditingController();
-
-  bool _notificationsEnabled = true;
-  bool _isLoggingOut = false;
-  String _query = '';
-
+  final _search = TextEditingController();
+  String _query='';
+  bool _isLoggingOut=false;
   @override
-  void initState() {
+  void initState(){
     super.initState();
     AuthService.instance.addListener(_refresh);
-    AuthService.instance.loadProfile().catchError((_) {});
+    SettingsUiDemo.instance.addListener(_refresh);
+    AuthService.instance.loadProfile().catchError((_ ){});
   }
-
   @override
-  void dispose() {
+  void dispose(){
     AuthService.instance.removeListener(_refresh);
-    _searchController.dispose();
+    SettingsUiDemo.instance.removeListener(_refresh);
+    _search.dispose();
     super.dispose();
   }
-
-  void _refresh() {
-    if (mounted) setState(() {});
+  void _refresh(){if(mounted)setState((){});}
+  Map<String,dynamic> get _user=>AuthService.instance.user ?? const {};
+  String get _name {
+    final full=(_user['fullName']??_user['displayName']??_user['nickname']??'Người dùng').toString();
+    return full.trim().isEmpty?'Người dùng':full;
   }
-
-  Map<String, dynamic> get _user => AuthService.instance.user ?? const {};
-
-  String get _nickname => _text(_user['nickname'], fallback: 'gomate');
-
-  String get _displayName {
-    final displayName = _text(_user['displayName']);
-    if (displayName.isNotEmpty) return displayName;
-    final fullName = _text(_user['fullName']);
-    return fullName.isNotEmpty ? fullName : _nickname;
+  String get _email=> (_user['email']??'').toString();
+  String? get _avatar {
+    final url=(_user['avatarUrl']??'').toString();
+    return url.isEmpty?null:url;
   }
+  void _go(Widget page)=>Navigator.of(context).push(
+    MaterialPageRoute<void>(builder:(_)=>page));
+  void _option(SettingsOptionsKind kind)=>_go(SettingsOptionsScreen(kind:kind));
+  void _activity()=>_go(const SettingsActivityScreen());
+  void _editProfile()=>_go(const ProfileEditScreen());
+  void _changePassword()=>_go(const ForgotPasswordScreen(changePasswordMode: true));
+  bool _searching(String value)=>_query.isEmpty ||
+    value.toLowerCase().contains(_query);
 
-  String get _email => _text(_user['email']);
+  List<_SettingsEntry> get _account=>[
+    _SettingsEntry('Chỉnh sửa hồ sơ',LucideIcons.user_round,_editProfile),
+    _SettingsEntry('Hoạt động của bạn',LucideIcons.timer,_activity),
+  ];
+  List<_SettingsEntry> get _security=>[
+    _SettingsEntry('Quyền riêng tư',LucideIcons.lock_keyhole,
+      ()=>_option(SettingsOptionsKind.privacy)),
+    _SettingsEntry('Đổi mật khẩu',LucideIcons.key_round,_changePassword),
+  ];
+  List<_SettingsEntry> get _options=>[
+    _SettingsEntry('Ngôn ngữ giao diện',LucideIcons.globe,
+      ()=>_option(SettingsOptionsKind.language),subtitle:'Tiếng Việt'),
+    _SettingsEntry('Chế độ tối',LucideIcons.moon,
+      ()=>_option(SettingsOptionsKind.darkMode),subtitle:'Tắt'),
+    _SettingsEntry('Quyền truy cập thiết bị',LucideIcons.smartphone,
+      ()=>_option(SettingsOptionsKind.permissions)),
+  ];
+  List<_SettingsEntry> get _help=>[
+    _SettingsEntry('Trợ giúp & Hỗ trợ',LucideIcons.circle_question_mark,
+      ()=>_option(SettingsOptionsKind.support)),
+    _SettingsEntry('Điều khoản & chính sách',LucideIcons.file_text,
+      ()=>_option(SettingsOptionsKind.terms)),
+    _SettingsEntry('Giới thiệu GoMate',LucideIcons.circle_alert,
+      ()=>_option(SettingsOptionsKind.about)),
+  ];
+  // All nested settings are searchable at the top level.
+  List<_SettingsEntry> get _nested=>[
+    _SettingsEntry('Lượt thích',LucideIcons.heart,
+      ()=>_go(const SettingsCollectionScreen(kind:SettingsCollectionKind.likes))),
+    _SettingsEntry('Bình luận',LucideIcons.message_circle,
+      ()=>_go(const SettingsCollectionScreen(kind:SettingsCollectionKind.comments))),
+    _SettingsEntry('Đánh giá',LucideIcons.star,
+      ()=>_go(const SettingsCollectionScreen(kind:SettingsCollectionKind.reviews))),
+    _SettingsEntry('Đã lưu',LucideIcons.bookmark,
+      ()=>_go(const SettingsCollectionScreen(kind:SettingsCollectionKind.saved))),
+    _SettingsEntry('Thư viện khoảnh khắc',LucideIcons.images,
+      ()=>_go(MyMomentsScreen(repository:ApiMomentsRepository.instance))),
+    _SettingsEntry('Đã chặn',LucideIcons.ban,
+      ()=>_go(const SettingsPeopleListScreen(kind:SettingsPeopleListKind.blocked))),
+    _SettingsEntry('Đã báo cáo',LucideIcons.message_square_warning,
+      ()=>_go(const SettingsPeopleListScreen(kind:SettingsPeopleListKind.reports))),
+    _SettingsEntry('Khoảnh khắc đã ẩn',LucideIcons.eye_off,
+      ()=>_go(const SettingsPeopleListScreen(kind:SettingsPeopleListKind.hiddenMoments))),
+    _SettingsEntry('Quản lý thời gian',LucideIcons.timer,
+      ()=>_go(const SettingsHistoryScreen(kind:SettingsHistoryKind.time))),
+    _SettingsEntry('Lịch sử xem',LucideIcons.timer_reset,
+      ()=>_go(const SettingsHistoryScreen(kind:SettingsHistoryKind.visits))),
+    _SettingsEntry('Tìm kiếm gần đây',LucideIcons.search,
+      ()=>_go(const SettingsHistoryScreen(kind:SettingsHistoryKind.searches))),
+  ];
 
-  String? get _avatarUrl {
-    final value = _text(_user['avatarUrl']);
-    return value.isEmpty ? null : value;
+  Widget _section(String name,List<_SettingsEntry> entries){
+    final filtered=_query.isEmpty || _searching(name)
+      ? entries : entries.where((e)=>_searching(e.title)).toList();
+    if(filtered.isEmpty)return const SizedBox.shrink();
+    return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      const Divider(height:8,thickness:4,color:AppColors.grayBackground),
+      SettingsSectionLabel(name),
+      for(final item in filtered)
+        if(item.title=='Chế độ tối')
+          SettingsMenuRow(title:item.title,icon:item.icon,showArrow:false,
+            trailing:Switch.adaptive(value:SettingsUiDemo.instance.darkModePreview,
+              activeColor:AppColors.primaryIcon,
+                inactiveTrackColor: const Color(0xFFF0F0F0),
+                inactiveThumbColor: Colors.white,
+                trackOutlineColor:
+                const WidgetStatePropertyAll<Color?>(
+                  Colors.transparent,
+                ),
+                onChanged:(v){
+                SettingsUiDemo.instance.darkModePreview=v;
+                SettingsUiDemo.instance.changed();
+                GoMateSnackBar.show(context,message:'Chỉ đổi công tắc xem thử; Theme toàn ứng dụng chưa thay đổi.');
+              }))
+        else
+          SettingsMenuRow(title:item.title,icon:item.icon,
+            value:item.subtitle,onTap:item.onTap),
+    ]);
   }
-
-  Future<void> _editProfile() async {
-    final saved = await showProfileEditSheet(context, user: _user);
-    if (!mounted || saved != true) return;
-    GoMateSnackBar.show(context, message: 'Đã cập nhật hồ sơ');
-  }
-
-  Future<void> _changePassword() async {
-    final changed = await showChangePasswordSheet(context);
-    if (!mounted || changed != true) return;
-
-    GoMateSnackBar.show(
-      context,
-      message: 'Đã đổi mật khẩu. Vui lòng đăng nhập lại.',
-    );
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (route) => false,
-    );
-  }
-
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildSearch(),
-
-                    const SizedBox(height: 18),
-
-                    _buildAccountCard(),
-
-                    const SizedBox(height: 18),
-
-                    ..._buildFilteredSections(),
-
-                    const SizedBox(height: 18),
-
-                    _buildLogoutCard(),
-                  ],
-                ),
-              ),
-            ),
+  Widget build(BuildContext context){
+    final w=MediaQuery.sizeOf(context).width;
+    final profileVisible=_query.isEmpty || _searching('tài khoản hồ sơ tên email') ||
+      _searching(_name) || _searching(_email);
+    return Scaffold(backgroundColor:Colors.white,
+      body:SafeArea(child:Column(children:[
+        const SettingsCompactHeader(title:'Cài đặt và hoạt động'),
+        Expanded(child:ListView(physics:const BouncingScrollPhysics(),children:[
+          Padding(padding:EdgeInsets.fromLTRB(
+            (w*.060).clamp(19.0,25.0).toDouble(),4,
+            (w*.060).clamp(19.0,25.0).toDouble(),14),
+            child:GoMateSearchField(
+              controller:_search,hintText:'Tìm kiếm ....',
+              showCancel:_query.isNotEmpty,
+              onChanged:(v)=>setState(()=>_query=v.trim().toLowerCase()),
+              onCancel:(){_search.clear();setState(()=>_query='');},
+            )),
+          if(profileVisible)...[
+            const SizedBox(height:9),
+            Center(child:SettingsVisualAvatar(url:_avatar,size:49)),
+            const SizedBox(height:8),
+            Center(child:Text(_name,style:const TextStyle(
+              fontWeight:FontWeight.w700,fontSize:16))),
+            const SizedBox(height:2),
+            Center(child:Text(_email.isEmpty?'Thông tin tài khoản':_email,
+              style:const TextStyle(color:AppColors.grayText,fontSize:12))),
+            const SizedBox(height:14),
           ],
-        ),
-      ),
+          _section('Tài khoản',_account),
+          _section('Bảo mật',_security),
+          _section('Tuỳ chọn',_options),
+          _section('Hỗ trợ',_help),
+          if(_query.isNotEmpty && _nested.any((e)=>_searching(e.title)))
+            _section('Trong hoạt động của bạn',_nested),
+          if(_query.isEmpty || _searching('đăng xuất logout'))...[
+            const SizedBox(height:18),
+            Align(alignment:Alignment.center,
+              child:SettingsGradientButton(
+                text:_isLoggingOut?'Đang đăng xuất...':'Đăng xuất',
+                enabled:!_isLoggingOut,onTap:_confirmLogout)),
+          ],
+          const SizedBox(height:36),
+        ])),
+      ])),
     );
   }
 
-  // ============================================================
-  // HEADER
-  // ============================================================
-
-  Widget _buildHeader() {
-    return SizedBox(
-      height: 54,
-      child: Row(
-        children: [
-          const SizedBox(width: 6),
-
-          IconButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            icon: const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              size: 19,
-              color: AppColors.textPrimary,
-            ),
-          ),
-
-          const Expanded(
-            child: Center(
-              child: Text(
-                'Cài đặt',
-                style: TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(width: 54),
+  // Keep the existing account logout contract (invalidate session, clear stack).
+  Future<void> _confirmLogout() async {
+    final confirmed=await showDialog<bool>(context:context,
+      builder:(dialog)=>AlertDialog(
+        backgroundColor:Colors.white,
+        title:const Text('Đăng xuất?',style:TextStyle(
+          fontWeight:FontWeight.w800,color:AppColors.primaryText)),
+        content:const Text('Bạn có chắc muốn đăng xuất khỏi GoMate không?'),
+        actions:[
+          TextButton(onPressed:()=>Navigator.of(dialog).pop(false),
+            child:const Text('Huỷ',style:TextStyle(color:AppColors.grayText))),
+          TextButton(onPressed:()=>Navigator.of(dialog).pop(true),
+            child:const Text('Đăng xuất',style:TextStyle(color:AppColors.primaryText))),
         ],
-      ),
-    );
+      ));
+    if(confirmed==true && mounted)await _logout();
   }
-
-  // ============================================================
-  // SEARCH
-  // ============================================================
-
-  Widget _buildSearch() {
-    return TextField(
-      controller: _searchController,
-
-      onChanged: (value) {
-        setState(() {
-          _query = value.trim().toLowerCase();
-        });
-      },
-
-      decoration: InputDecoration(
-        hintText: 'Tìm trong cài đặt',
-        hintStyle: const TextStyle(
-          fontSize: 14,
-          color: AppColors.textSecondary,
-        ),
-
-        prefixIcon: const Icon(
-          Icons.search_rounded,
-          color: AppColors.textSecondary,
-        ),
-
-        suffixIcon: _query.isEmpty
-            ? null
-            : IconButton(
-                onPressed: () {
-                  _searchController.clear();
-
-                  setState(() {
-                    _query = '';
-                  });
-                },
-                icon: const Icon(
-                  Icons.close_rounded,
-                  size: 19,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-
-        filled: true,
-        fillColor: AppColors.blue50.withOpacity(0.38),
-
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
-
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide.none,
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // ACCOUNT CARD
-  // ============================================================
-
-  Widget _buildAccountCard() {
-    if (!_matchesAny([
-      _displayName,
-      _nickname,
-      _email,
-      'tài khoản',
-      'hồ sơ',
-      'email',
-    ])) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-
-      decoration: BoxDecoration(
-        color: AppColors.blue50.withOpacity(0.34),
-        borderRadius: BorderRadius.circular(24),
-      ),
-
-      child: Row(
-        children: [
-          Container(
-            width: 58,
-            height: 58,
-
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.blue100,
-            ),
-
-            child: _avatarUrl == null
-                ? const Icon(
-                    Icons.person_rounded,
-                    size: 30,
-                    color: AppColors.blue500,
-                  )
-                : ClipOval(
-                    child: Image.network(
-                      _avatarUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(
-                        Icons.person_rounded,
-                        size: 30,
-                        color: AppColors.blue500,
-                      ),
-                    ),
-                  ),
-          ),
-
-          const SizedBox(width: 13),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _displayName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-
-                  style: const TextStyle(
-                    fontSize: 16.5,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-
-                const SizedBox(height: 3),
-
-                Text(
-                  _email.isEmpty ? '@$_nickname' : _email,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          InkWell(
-            onTap: _editProfile,
-            borderRadius: BorderRadius.circular(14),
-
-            child: Container(
-              width: 38,
-              height: 38,
-
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(13),
-              ),
-
-              child: const Icon(
-                Icons.edit_outlined,
-                size: 18,
-                color: AppColors.blue500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // SECTIONS
-  // ============================================================
-
-  List<Widget> _buildFilteredSections() {
-    final widgets = <Widget>[];
-
-    if (_sectionVisible([
-      'chỉnh sửa hồ sơ',
-      'tài khoản',
-      'hoạt động',
-      'đã lưu',
-    ])) {
-      widgets.add(
-        _SettingsSection(
-          title: 'Tài khoản',
-          children: [
-            _SettingsTile(
-              icon: Icons.person_outline_rounded,
-              iconBackground: const Color(0xFFEAF2FF),
-              iconColor: AppColors.blue500,
-              title: 'Chỉnh sửa hồ sơ',
-              subtitle: 'Tên, ảnh đại diện, tiểu sử',
-              onTap: _editProfile,
-            ),
-
-            _SettingsTile(
-              icon: Icons.history_rounded,
-              iconBackground: const Color(0xFFF2ECFF),
-              iconColor: const Color(0xFF8A63D2),
-              title: 'Hoạt động của bạn',
-              subtitle: 'Bài viết, đánh giá và lịch sử',
-              onTap: () {},
-            ),
-
-            _SettingsTile(
-              icon: Icons.bookmark_border_rounded,
-              iconBackground: const Color(0xFFEAF8F1),
-              iconColor: const Color(0xFF46A678),
-              title: 'Đã lưu',
-              subtitle: 'Địa điểm và thư mục yêu thích',
-              onTap: () {},
-            ),
-          ],
-        ),
-      );
-
-      widgets.add(const SizedBox(height: 16));
-    }
-
-    if (_sectionVisible([
-      'thông báo',
-      'ngôn ngữ',
-      'giao diện',
-      'vị trí',
-      'quyền vị trí',
-    ])) {
-      widgets.add(
-        _SettingsSection(
-          title: 'Tùy chọn',
-          children: [
-            _SettingsTile(
-              icon: Icons.notifications_none_rounded,
-              iconBackground: const Color(0xFFFFF2E7),
-              iconColor: const Color(0xFFF3A150),
-              title: 'Thông báo',
-              subtitle: 'Tin nhắn, chuyến đi và cập nhật',
-              trailing: Switch.adaptive(
-                value: _notificationsEnabled,
-                activeColor: AppColors.blue500,
-
-                onChanged: (value) {
-                  setState(() {
-                    _notificationsEnabled = value;
-                  });
-                },
-              ),
-            ),
-
-            _SettingsTile(
-              icon: Icons.language_rounded,
-              iconBackground: const Color(0xFFEAF2FF),
-              iconColor: AppColors.blue500,
-              title: 'Ngôn ngữ giao diện',
-              subtitle: 'Tiếng Việt',
-              onTap: () {},
-            ),
-
-            _SettingsTile(
-              icon: Icons.palette_outlined,
-              iconBackground: const Color(0xFFF3ECFF),
-              iconColor: const Color(0xFF9B6DDB),
-              title: 'Giao diện',
-              subtitle: 'Sáng',
-              onTap: () {},
-            ),
-
-            _SettingsTile(
-              icon: Icons.location_on_outlined,
-              iconBackground: const Color(0xFFE9F8F2),
-              iconColor: const Color(0xFF4FA77C),
-              title: 'Quyền vị trí',
-              subtitle: 'Dùng vị trí cho bản đồ và hành trình',
-              onTap: () {},
-            ),
-          ],
-        ),
-      );
-
-      widgets.add(const SizedBox(height: 16));
-    }
-
-    if (_sectionVisible([
-      'bảo mật',
-      'quyền riêng tư',
-      'mật khẩu',
-      'đăng nhập',
-    ])) {
-      widgets.add(
-        _SettingsSection(
-          title: 'Bảo mật',
-          children: [
-            _SettingsTile(
-              icon: Icons.shield_outlined,
-              iconBackground: const Color(0xFFF6EDFF),
-              iconColor: const Color(0xFFA268D5),
-              title: 'Bảo mật & Quyền riêng tư',
-              subtitle: 'Mật khẩu, phiên đăng nhập và quyền truy cập',
-              onTap: () {},
-            ),
-
-            _SettingsTile(
-              icon: Icons.lock_outline_rounded,
-              iconBackground: const Color(0xFFEAF2FF),
-              iconColor: AppColors.blue500,
-              title: 'Đổi mật khẩu',
-              subtitle: 'Cập nhật mật khẩu tài khoản',
-              onTap: _changePassword,
-            ),
-          ],
-        ),
-      );
-
-      widgets.add(const SizedBox(height: 16));
-    }
-
-    if (_sectionVisible([
-      'trợ giúp',
-      'hỗ trợ',
-      'điều khoản',
-      'chính sách',
-      'giới thiệu',
-    ])) {
-      widgets.add(
-        _SettingsSection(
-          title: 'Hỗ trợ',
-          children: [
-            _SettingsTile(
-              icon: Icons.help_outline_rounded,
-              iconBackground: const Color(0xFFE9F8F2),
-              iconColor: const Color(0xFF4FA77C),
-              title: 'Trợ giúp & Hỗ trợ',
-              subtitle: 'Câu hỏi thường gặp và liên hệ',
-              onTap: () {},
-            ),
-
-            _SettingsTile(
-              icon: Icons.description_outlined,
-              iconBackground: const Color(0xFFFFF4E8),
-              iconColor: const Color(0xFFE39A48),
-              title: 'Điều khoản & Chính sách',
-              subtitle: 'Điều khoản sử dụng và quyền riêng tư',
-              onTap: () {},
-            ),
-
-            _SettingsTile(
-              icon: Icons.info_outline_rounded,
-              iconBackground: const Color(0xFFEAF2FF),
-              iconColor: AppColors.blue500,
-              title: 'Giới thiệu GoMate',
-              subtitle: 'Phiên bản ứng dụng và thông tin',
-              onTap: () {},
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (widgets.isEmpty) {
-      widgets.add(const _NoSettingFound());
-    }
-
-    return widgets;
-  }
-
-  // ============================================================
-  // LOGOUT
-  // ============================================================
-
-  Widget _buildLogoutCard() {
-    if (!_matchesAny(['đăng xuất', 'logout', 'tài khoản'])) {
-      return const SizedBox.shrink();
-    }
-
-    return InkWell(
-      onTap: _isLoggingOut
-          ? null
-          : () {
-              _showLogoutDialog();
-            },
-      borderRadius: BorderRadius.circular(22),
-
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFF1F1),
-          borderRadius: BorderRadius.circular(22),
-        ),
-
-        child: Row(
-          children: [
-            const SizedBox(
-              width: 42,
-              height: 42,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Color(0xFFFFE2E2),
-                  borderRadius: BorderRadius.all(Radius.circular(13)),
-                ),
-                child: Icon(
-                  Icons.logout_rounded,
-                  size: 20,
-                  color: Color(0xFFE45858),
-                ),
-              ),
-            ),
-
-            const SizedBox(width: 12),
-
-            Expanded(
-              child: Text(
-                _isLoggingOut ? 'Đang đăng xuất...' : 'Đăng xuất',
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFFE45858),
-                ),
-              ),
-            ),
-
-            if (_isLoggingOut)
-              const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.2,
-                  color: Color(0xFFE45858),
-                ),
-              )
-            else
-              const Icon(Icons.chevron_right_rounded, color: Color(0xFFE45858)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showLogoutDialog() async {
-    await showDialog<void>(
-      context: context,
-
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-
-          title: const Text(
-            'Đăng xuất?',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
-
-          content: const Text(
-            'Bạn có chắc muốn đăng xuất khỏi GoMate không?',
-            style: TextStyle(height: 1.4, color: AppColors.textSecondary),
-          ),
-
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
-              child: const Text(
-                'Huỷ',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
-            ),
-
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                _logout();
-              },
-              child: const Text(
-                'Đăng xuất',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFFE45858),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   Future<void> _logout() async {
-    if (_isLoggingOut) return;
-
-    setState(() {
-      _isLoggingOut = true;
-    });
-
+    if(_isLoggingOut)return;
+    setState(()=>_isLoggingOut=true);
     try {
-      // Dùng lại AuthService hiện có của dự án:
-      // backend revoke refresh session + Flutter xoá token phía thiết bị.
       await AuthService.instance.logout();
-
-      if (!mounted) return;
-
-      // Xoá toàn bộ stack của MainShell/Profile/Settings
-      // để người dùng không thể back về màn đã đăng nhập.
+      if(!mounted)return;
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-        (route) => false,
-      );
-    } catch (error) {
-      if (!mounted) return;
-
-      setState(() {
-        _isLoggingOut = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(
-            'Không thể đăng xuất lúc này. Hãy kiểm tra kết nối và thử lại.',
-          ),
-        ),
-      );
+        MaterialPageRoute(builder:(_)=>const LoginScreen()),(route)=>false);
+    }catch(error){
+      if(!mounted)return;
+      setState(()=>_isLoggingOut=false);
+      GoMateSnackBar.show(context,
+        message:'Không thể đăng xuất lúc này. Kiểm tra kết nối và thử lại.');
     }
   }
-
-  // ============================================================
-  // SEARCH HELPERS
-  // ============================================================
-
-  bool _matchesAny(List<String> keywords) {
-    if (_query.isEmpty) {
-      return true;
-    }
-
-    return keywords.any((keyword) => keyword.toLowerCase().contains(_query));
-  }
-
-  bool _sectionVisible(List<String> keywords) {
-    return _matchesAny(keywords);
-  }
-
-  String _text(Object? value, {String fallback = ''}) {
-    if (value is! String) return fallback;
-    final trimmed = value.trim();
-    return trimmed.isEmpty ? fallback : trimmed;
-  }
 }
-
-// ============================================================================
-// SETTINGS SECTION
-// ============================================================================
-
-class _SettingsSection extends StatelessWidget {
-  final String title;
-  final List<Widget> children;
-
-  const _SettingsSection({required this.title, required this.children});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 9),
-
-          child: Text(
-            title,
-
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ),
-
-        Container(
-          width: double.infinity,
-
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-
-            border: Border.all(color: AppColors.blue100.withOpacity(0.45)),
-          ),
-
-          child: Column(
-            children: [
-              for (int i = 0; i < children.length; i++) ...[
-                children[i],
-
-                if (i != children.length - 1)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 68),
-                    child: Divider(
-                      height: 1,
-                      thickness: 1,
-                      color: AppColors.blue100.withOpacity(0.35),
-                    ),
-                  ),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ============================================================================
-// SETTINGS TILE
-// ============================================================================
-
-class _SettingsTile extends StatelessWidget {
-  final IconData icon;
-  final Color iconBackground;
-  final Color iconColor;
-  final String title;
+class _SettingsEntry {
+  final String title;final IconData icon;final VoidCallback onTap;
   final String? subtitle;
-  final Widget? trailing;
-  final VoidCallback? onTap;
-
-  const _SettingsTile({
-    required this.icon,
-    required this.iconBackground,
-    required this.iconColor,
-    required this.title,
-    this.subtitle,
-    this.trailing,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(22),
-
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-
-              decoration: BoxDecoration(
-                color: iconBackground,
-                borderRadius: BorderRadius.circular(13),
-              ),
-
-              child: Icon(icon, size: 21, color: iconColor),
-            ),
-
-            const SizedBox(width: 12),
-
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-
-                children: [
-                  Text(
-                    title,
-
-                    style: const TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 3),
-
-                    Text(
-                      subtitle!,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-
-                      style: const TextStyle(
-                        fontSize: 11.8,
-                        height: 1.3,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-
-            const SizedBox(width: 8),
-
-            trailing ??
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  size: 22,
-                  color: AppColors.textSecondary,
-                ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// EMPTY SEARCH
-// ============================================================================
-
-class _NoSettingFound extends StatelessWidget {
-  const _NoSettingFound();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
-
-      decoration: BoxDecoration(
-        color: AppColors.blue50.withOpacity(0.30),
-        borderRadius: BorderRadius.circular(22),
-      ),
-
-      child: const Column(
-        children: [
-          Icon(Icons.search_off_rounded, size: 32, color: AppColors.blue300),
-
-          SizedBox(height: 10),
-
-          Text(
-            'Không tìm thấy cài đặt',
-            style: TextStyle(
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-
-          SizedBox(height: 5),
-
-          Text(
-            'Thử tìm kiếm bằng từ khóa khác.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
+  const _SettingsEntry(this.title,this.icon,this.onTap,{this.subtitle});
 }

@@ -7,6 +7,7 @@ class GoMateMainTabHeader extends StatelessWidget {
 
   final IconData? leadingIcon;
   final VoidCallback? onLeadingTap;
+  final double? titleSizeOverride;
 
   final IconData? trailingIcon;
   final Widget? trailingWidget;
@@ -21,6 +22,7 @@ class GoMateMainTabHeader extends StatelessWidget {
     this.leadingIcon,
     this.onLeadingTap,
     this.trailingIcon,
+    this.titleSizeOverride,
     this.trailingWidget,
     this.onTrailingTap,
     this.leadingColor = AppColors.black,
@@ -52,7 +54,7 @@ class GoMateMainTabHeader extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: ui.titleSize,
+                  fontSize: titleSizeOverride ?? ui.titleSize,
                   height: 1,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.25,
