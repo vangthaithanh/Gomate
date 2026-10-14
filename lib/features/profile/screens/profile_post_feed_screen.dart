@@ -12,6 +12,9 @@ import '../../home/widgets/share_post_content.dart';
 import '../../home/widgets/post_action_content.dart';
 import '../../home/widgets/report_reason_content.dart';
 import '../ui_preview/profile_ui_preview.dart';
+import '../ui_preview/settings_ui_demo.dart';
+import '../../search/screens/search_screen.dart';
+import '../../search/models/search_models.dart';
 import '../widgets/profile_ui_widgets.dart';
 import 'public_profile_screen.dart';
 import '../../../core/widgets/gomate_main_tab_header.dart';
@@ -101,15 +104,31 @@ class _GoMateProfilePostFeedScreenState
     }
   }
 
+  void _openHashtag(String hashtag) {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => SearchScreen(
+        initialQuery: hashtag,
+        initialTab: SearchTab.posts,
+        initialHashtags: <String>{hashtag},
+        startSubmitted: true,
+        cancelReturnsToPrevious: true,
+      ),
+    ));
+  }
+
   Future<void> _ownPostActions(GoMateProfilePostPreview post) async {
     final store = GoMatePostUiDemoStore.instance;
     final owned = store.find(post.id);
     final mockPreview = store.isPreviewPost(post.id);
+    final user = AuthService.instance.user;
+    final isPrivate = user?['isPrivate'] == true ||
+        SettingsUiDemo.instance.privatePreview;
+    final pinned = store.isPinned(post.id);
     final result = await GoMateBottomSheet.show<String>(
       context: context,
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        _ownAction(LucideIcons.pin, (owned?.pinned == true || store.previewPinned(post.id))
-            ? 'Bỏ ghim bài viết' : 'Ghim bài viết', 'pin'),
+        _ownAction(pinned ? LucideIcons.pin_off : LucideIcons.pin,
+            pinned ? 'Bỏ ghim bài viết' : 'Ghim bài viết', 'pin'),
         const Divider(height: 1, color: AppColors.grayBorder),
         _ownAction(LucideIcons.earth, 'Chỉnh sửa quyền riêng tư', 'audience'),
         const Divider(height: 1, color: AppColors.grayBorder),
@@ -124,21 +143,27 @@ class _GoMateProfilePostFeedScreenState
       return;
     }
     if (result == 'pin') {
-      final wasPinned = owned?.pinned ?? store.previewPinned(post.id);
-      if (owned != null) {
-        store.togglePin(post.id);
-      } else {
-        store.togglePreviewPin(post.id);
+      final wasPinned = store.isPinned(post.id);
+      final success = owned != null
+          ? store.togglePin(post.id) : store.togglePreviewPin(post.id);
+      if (!mounted) return;
+      if (!success) {
+        GoMateSnackBar.show(context,
+          message: 'Chỉ được ghim tối đa 3 bài viết. Bỏ ghim bài cũ trước.');
+        return;
       }
       GoMateSnackBar.show(context, message: wasPinned
           ? 'Đã bỏ ghim bài viết (demo)' : 'Đã ghim bài viết (demo)');
     } else if (result == 'audience') {
       final audience = await GoMateBottomSheet.show<GoMatePostAudience>(
         context: context,
-        child: GoMatePostAudienceContent(initial:
-          owned?.audience ?? store.previewAudience(post.id)),
+        child: GoMatePostAudienceContent(
+          initial: owned?.audience ?? store.previewAudience(post.id),
+          isPrivate: isPrivate,
+        ),
       );
       if (audience == null || !mounted) return;
+      if (isPrivate && audience == GoMatePostAudience.everyone) return;
       if (owned != null) {
         store.changeAudience(post.id, audience);
       } else {
@@ -205,6 +230,7 @@ class _GoMateProfilePostFeedScreenState
               onComments: () => _comments(post),
               onShare: () => _share(post),
               onMore: () => _more(post),
+              onHashtag: _openHashtag,
             );
           },
         )),
@@ -218,9 +244,11 @@ class _PostFeedTile extends StatefulWidget {
   final VoidCallback onComments;
   final VoidCallback onShare;
   final VoidCallback onMore;
+  final ValueChanged<String> onHashtag;
   const _PostFeedTile({
     super.key, required this.post,
     required this.onComments, required this.onShare, required this.onMore,
+    required this.onHashtag,
   });
 
   @override
@@ -302,8 +330,22 @@ class _PostFeedTileState extends State<_PostFeedTile> {
         if (post.caption.isNotEmpty) ...[
           SizedBox(height: w * 0.018),
           Padding(padding: EdgeInsets.symmetric(horizontal: hp),
-            child: Text(post.caption,
-              style: TextStyle(fontSize: textSize, color: AppColors.black))),
+            child: Wrap(spacing: 4, runSpacing: 3,
+              children: [
+                for (final word in post.caption.split(RegExp(r'\s+')))
+                  if (word.isNotEmpty)
+                    word.startsWith('#')
+                      ? InkWell(
+                          onTap: () => widget.onHashtag(word),
+                          child: Text(word, style: TextStyle(
+                            fontSize: textSize,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primaryText)))
+                      : Text(word, style: TextStyle(
+                          fontSize: textSize, color: AppColors.black)),
+              ],
+            ),
+          ),
           SizedBox(height: w * 0.025),
         ],
         GestureDetector(
@@ -314,7 +356,11 @@ class _PostFeedTileState extends State<_PostFeedTile> {
                 physics: const BouncingScrollPhysics(),
                 itemCount: img.length,
                 onPageChanged: (index) => setState(() => _page = index),
-                itemBuilder: (_, index) => GoMatePostMediaWidget(source: img[index]),
+                itemBuilder: (_, index) => GoMatePostMediaWidget(
+                  source: img[index],
+                  trimRange: GoMatePostUiDemoStore.instance
+                      .find(post.id)?.videoSegments[img[index]],
+                ),
               ),
               IgnorePointer(child: Center(child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 130),

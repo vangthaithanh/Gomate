@@ -7,7 +7,9 @@ import '../ui_preview/post_ui_demo_store.dart';
 /// Shared by Create Post and My Post 3-dot menu.
 class GoMatePostAudienceContent extends StatefulWidget {
   final GoMatePostAudience initial;
-  const GoMatePostAudienceContent({super.key, required this.initial});
+  final bool isPrivate;
+  const GoMatePostAudienceContent({
+    super.key, required this.initial, this.isPrivate = false});
 
   @override
   State<GoMatePostAudienceContent> createState() => _GoMatePostAudienceContentState();
@@ -19,7 +21,8 @@ class _GoMatePostAudienceContentState extends State<GoMatePostAudienceContent> {
   @override
   void initState() {
     super.initState();
-    _selected = widget.initial;
+    _selected = widget.isPrivate && widget.initial == GoMatePostAudience.everyone
+        ? GoMatePostAudience.followers : widget.initial;
   }
 
   @override
@@ -36,11 +39,14 @@ class _GoMatePostAudienceContentState extends State<GoMatePostAudienceContent> {
             style: TextStyle(fontSize: 15, color: AppColors.primaryText,
               fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
-          const Text('Chọn đối tượng có thể xem bài viết của bạn.',
+          Text(widget.isPrivate
+              ? 'Tài khoản riêng tư chỉ chia sẻ cho người theo dõi hoặc chính bạn.'
+              : 'Chọn đối tượng có thể xem bài viết của bạn.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: AppColors.grayText)),
+            style: const TextStyle(fontSize: 12, color: AppColors.grayText)),
           const SizedBox(height: 14),
           for (final item in GoMatePostAudience.values)
+            if (!widget.isPrivate || item != GoMatePostAudience.everyone)
             InkWell(
               onTap: () => setState(() => _selected = item),
               child: SizedBox(

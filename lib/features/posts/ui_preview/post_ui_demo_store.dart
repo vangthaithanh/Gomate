@@ -15,6 +15,15 @@ enum GoMatePostAudience {
   final String label;
 }
 
+/// UI-selected clipping range, to be sent with a media upload job later.
+/// Never mistake this for a physically trimmed video file.
+class GoMatePostTrimRange {
+  final int startMs;
+  final int endMs;
+  const GoMatePostTrimRange({required this.startMs, required this.endMs});
+  int get durationMs => endMs - startMs;
+}
+
 class GoMateDemoPublishedPost {
   final String id;
   final String authorId;
@@ -22,6 +31,7 @@ class GoMateDemoPublishedPost {
   final String? authorAvatar;
   final List<String> media;
   final String caption;
+  final Map<String, GoMatePostTrimRange> videoSegments;
   final List<String> hashtags;
   final List<String> taggedUserIds;
   final String? placeName;
@@ -37,6 +47,7 @@ class GoMateDemoPublishedPost {
     required this.authorAvatar,
     required this.media,
     required this.caption,
+    required this.videoSegments,
     required this.hashtags,
     required this.taggedUserIds,
     required this.placeId,
@@ -64,6 +75,7 @@ class GoMateDemoPublishedPost {
         authorAvatar: authorAvatar,
         media: media,
         caption: caption,
+        videoSegments: videoSegments,
         hashtags: hashtags,
         taggedUserIds: taggedUserIds,
         placeId: placeId,
@@ -90,7 +102,21 @@ class GoMatePostUiDemoStore extends ChangeNotifier {
   bool isPreviewPost(String id) => id.startsWith('ui-preview-post-');
   bool previewPinned(String id) => _previewPinned.contains(id);
   GoMatePostAudience previewAudience(String id) =>
-      _previewAudiences[id] ?? GoMatePostAudience.followers;
+      _previewAudiences[id] ?? GoMatePostAudience.everyone;
+
+  static const int maxPinnedPosts = 3;
+
+  String? _previewOwner(String id) {
+    final match = RegExp(r'^ui-preview-post-[a-z]-([\s\S]+)$').firstMatch(id);
+    return match?.group(1);
+  }
+
+  int pinnedCountFor(String authorId) =>
+      _posts.where((post) => post.authorId == authorId && post.pinned).length +
+      _previewPinned.where((id) => _previewOwner(id) == authorId).length;
+
+  bool isPinned(String id) => find(id)?.pinned ?? _previewPinned.contains(id);
+
 
   List<GoMateProfilePostPreview> visiblePreviewPosts(
       List<GoMateProfilePostPreview> posts) {
@@ -104,10 +130,17 @@ class GoMatePostUiDemoStore extends ChangeNotifier {
     return List.unmodifiable(values);
   }
 
-  void togglePreviewPin(String id) {
-    if (!isPreviewPost(id)) return;
-    if (!_previewPinned.remove(id)) _previewPinned.add(id);
+  /// Returns false if the 3-pinned-post limit prevents the operation.
+  bool togglePreviewPin(String id) {
+    if (!isPreviewPost(id) || _previewRemoved.contains(id)) return false;
+    final owner = _previewOwner(id);
+    if (owner == null) return false;
+    if (!_previewPinned.remove(id)) {
+      if (pinnedCountFor(owner) >= maxPinnedPosts) return false;
+      _previewPinned.add(id);
+    }
     notifyListeners();
+    return true;
   }
 
   void changePreviewAudience(String id, GoMatePostAudience audience) {
@@ -119,6 +152,7 @@ class GoMatePostUiDemoStore extends ChangeNotifier {
   void removePreview(String id) {
     if (!isPreviewPost(id)) return;
     _previewRemoved.add(id);
+    _previewPinned.remove(id);
     notifyListeners();
   }
 
@@ -145,6 +179,7 @@ class GoMatePostUiDemoStore extends ChangeNotifier {
     String? authorAvatar,
     required List<String> media,
     required String caption,
+    required Map<String, GoMatePostTrimRange> videoSegments,
     required List<String> hashtags,
     required List<String> taggedUserIds,
     required String? placeId,
@@ -159,6 +194,7 @@ class GoMatePostUiDemoStore extends ChangeNotifier {
       authorAvatar: authorAvatar,
       media: List.unmodifiable(media),
       caption: caption,
+      videoSegments: Map.unmodifiable(videoSegments),
       hashtags: List.unmodifiable(hashtags),
       taggedUserIds: List.unmodifiable(taggedUserIds),
       placeId: placeId,
@@ -170,12 +206,16 @@ class GoMatePostUiDemoStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  void togglePin(String id) {
+  /// Returns false when trying to pin a fourth post (or for unknown IDs).
+  bool togglePin(String id) {
     final i = _posts.indexWhere((p) => p.id == id);
-    if (i < 0) return;
+    if (i < 0) return false;
     final current = _posts[i];
+    if (!current.pinned &&
+        pinnedCountFor(current.authorId) >= maxPinnedPosts) return false;
     _posts[i] = current.copyWith(pinned: !current.pinned);
     notifyListeners();
+    return true;
   }
 
   void changeAudience(String id, GoMatePostAudience audience) {
@@ -191,28 +231,5 @@ class GoMatePostUiDemoStore extends ChangeNotifier {
   }
 }
 
-/// Media picker gallery fixtures (assets must exist in pubspec asset directory).
-/// TODO(BACKEND-CREATE-POST): replace mock gallery with system media library
-/// and upload service; never upload these fixtures as actual user images.
-class GoMateDemoMediaItem {
-  final String source;
-  final bool isVideo;
-  const GoMateDemoMediaItem(this.source, {this.isVideo = false});
-}
-
-const goMateDemoGallery = <GoMateDemoMediaItem>[
-  GoMateDemoMediaItem('assets/images/checkin.jpg'),
-  GoMateDemoMediaItem('assets/images/thiennhien.jpg'),
-  GoMateDemoMediaItem('assets/images/lichsu.jpg'),
-  GoMateDemoMediaItem('assets/images/nghiduong.jpg'),
-  GoMateDemoMediaItem('assets/images/survey_landmark.jpg'),
-  GoMateDemoMediaItem('assets/images/survey_beach.jpg'),
-  GoMateDemoMediaItem('assets/images/survey_city.jpg'),
-  GoMateDemoMediaItem('assets/images/survey_food.jpg'),
-  GoMateDemoMediaItem('assets/images/survey_culture.jpg'),
-  GoMateDemoMediaItem('assets/images/survey_checkin.jpg'),
-  GoMateDemoMediaItem('assets/images/survey_country.jpg'),
-  GoMateDemoMediaItem('assets/images/survey_resort.jpg'),
-  GoMateDemoMediaItem('video-demo:assets/images/ketban.jpg', isVideo: true),
-  GoMateDemoMediaItem('assets/images/ketban.jpg'),
-];
+// TODO(BACKEND-CREATE-POST): no sample gallery is shipped in V2.
+// The gallery is provided by photo_manager on the user's device.

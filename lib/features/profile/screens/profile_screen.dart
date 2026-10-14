@@ -19,6 +19,7 @@ import 'profile_post_feed_screen.dart';
 import 'setting_screen.dart';
 import '../../posts/screens/create_post_screen.dart';
 import '../../posts/ui_preview/post_ui_demo_store.dart';
+import '../../posts/widgets/post_media_widget.dart';
 
 /// My profile - keeps the existing AuthService and FavoritePlaceStore contracts.
 /// Production posts remain injected by caller. UI-preview posts are isolated
@@ -104,21 +105,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final actual = widget.posts
         .where((post) => _userId.isNotEmpty && post.authorId == _userId)
         .toList(growable: false);
-    // TODO(BACKEND-CREATE-POST): created posts and legacy sample posts are
-    // separate from real API records; keep existing previews after sharing.
+    // TODO(BACKEND-CREATE-POST): merge and pin ordering should move to the
+    // authenticated post repository after the backend is implemented.
     final previewId = _userId.isEmpty ? ProfileUiPreview.selfId : _userId;
     final created = _createdPosts.postsOf(previewId)
         .map((post) => post.toPreview()).toList(growable: false);
-    if (actual.isNotEmpty) {
-      return <GoMateProfilePostPreview>[...created, ...actual];
-    }
-    if (ProfileUiPreview.enabled) {
-      final samples = _createdPosts.visiblePreviewPosts(ProfileUiPreview.posts(
-        authorId: previewId, authorName: _name, authorAvatar: _avatar,
-      ));
-      return <GoMateProfilePostPreview>[...created, ...samples];
-    }
-    return created;
+    final base = <GoMateProfilePostPreview>[
+      ...created,
+      if (actual.isNotEmpty) ...actual
+      else if (ProfileUiPreview.enabled)
+        ..._createdPosts.visiblePreviewPosts(ProfileUiPreview.posts(
+          authorId: previewId, authorName: _name, authorAvatar: _avatar,
+        )),
+    ];
+    // Stable partition: pinned items first, preserving their relative order.
+    return <GoMateProfilePostPreview>[
+      ...base.where((post) => _createdPosts.isPinned(post.id)),
+      ...base.where((post) => !_createdPosts.isPinned(post.id)),
+    ];
   }
 
   Future<void> _openCreatePost() async {
@@ -474,6 +478,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _image(String source) {
+    if (source.startsWith('file://') || source.startsWith('video-file:')) {
+      return GoMatePostMediaWidget(source: source);
+    }
     if (source.startsWith('http://') || source.startsWith('https://')) {
       return Image.network(source, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _fallback());
     }
