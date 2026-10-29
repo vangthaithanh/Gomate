@@ -1,0 +1,73 @@
+server:
+  port: ${PORT:8080}
+  error:
+    include-message: never
+    include-stacktrace: never
+spring:
+  application:
+    name: gomate-backend
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/gomate_auth}
+    username: ${DB_USERNAME:gomate}
+    password: ${DB_PASSWORD}
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://127.0.0.1:27017/gomate?serverSelectionTimeoutMS=1500&connectTimeoutMS=1500&socketTimeoutMS=1500}
+      database: ${MONGO_DATABASE:gomate}
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 101MB
+  sql:
+    init:
+      mode: never
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+    baseline-description: Auth current schema baseline
+    locations: classpath:db/migration
+    validate-on-migrate: true
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+app:
+  notification:
+    push-enabled: ${NOTIFICATION_PUSH_ENABLED:false}
+  firebase:
+    enabled: ${FIREBASE_ENABLED:false}
+    project-id: ${FIREBASE_PROJECT_ID:}
+    credentials-path: ${GOOGLE_APPLICATION_CREDENTIALS:}
+  cloudinary:
+    enabled: ${CLOUDINARY_ENABLED:false}
+    url: ${CLOUDINARY_URL:}
+  place:
+    seed:
+      enabled: ${PLACE_SEED_ENABLED:false}
+      path: ${PLACE_SEED_PATH:classpath:data/place_seed_dalat.csv}
+      limit: ${PLACE_SEED_LIMIT:10}
+      cloudinary-folder-prefix: ${PLACE_SEED_CLOUDINARY_FOLDER_PREFIX:gomate/dev/places}
+      media-retry-attempts: ${PLACE_SEED_MEDIA_RETRY_ATTEMPTS:3}
+      media-retry-delay-ms: ${PLACE_SEED_MEDIA_RETRY_DELAY_MS:10000}
+      remote-image-user-agent: "${PLACE_SEED_REMOTE_IMAGE_USER_AGENT:GoMateMediaImporter/1.0 (local development; contact: gomate-local@example.com)}"
+      remote-image-timeout-ms: ${PLACE_SEED_REMOTE_IMAGE_TIMEOUT_MS:20000}
+      remote-image-max-bytes: ${PLACE_SEED_REMOTE_IMAGE_MAX_BYTES:8388608}
+      exit-after-run: ${PLACE_SEED_EXIT_AFTER_RUN:false}
+  jwt-secret: ${JWT_SECRET}
+  issuer: gomate-api
+  access-token-seconds: 900
+  refresh-token-days: 30
+  cors-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:5173}
+  auth-requests-per-minute: 20
+  ai:
+    recommendation-url: ${AI_SERVICE_BASE_URL:${AI_RECOMMENDATION_URL:http://localhost:8000}}
+    recommendation-candidate-k: ${AI_RECOMMENDATION_CANDIDATE_K:50}
+    recommendation-home-limit: ${AI_RECOMMENDATION_HOME_LIMIT:10}
+    recommendation-timeout-ms: ${AI_RECOMMENDATION_TIMEOUT_MS:2500}
+  recommendation:
+    semantic-weight: ${RECOMMENDATION_SEMANTIC_WEIGHT:0.75}
+    context-weight: ${RECOMMENDATION_CONTEXT_WEIGHT:0.25}
+    distance-scale-km: ${RECOMMENDATION_DISTANCE_SCALE_KM:20}
+springdoc:
+  swagger-ui:
+    persist-authorization: false

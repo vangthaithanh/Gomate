@@ -1,0 +1,37 @@
+tag_code,tag_name,definition,active
+relaxing,Relaxing,"Place supports rest, low-pressure leisure or relaxation.",true
+quiet,Quiet,Place is expected to be calm or low-noise when verified.,true
+scenic,Scenic,Place has notable landscape or visual scenery.,true
+nature,Nature,Place is primarily nature-oriented.,true
+lake,Lake,Place is a lake or strongly lake-centered.,true
+beach,Beach,Place is beach or sea-oriented.,true
+mountain,Mountain,Place is mountain or highland-oriented.,true
+waterfall,Waterfall,Place is waterfall-oriented.,true
+forest,Forest,Place is forest-oriented.,true
+social,Social,Place supports social activity when verified.,true
+group_friendly,Group friendly,Place is suitable for groups when verified.,true
+crowded,Crowded,Place is often crowded when verified.,true
+event_place,Event place,Place hosts or supports events when verified.,true
+cafe_meeting,Cafe meeting,Cafe or meeting-friendly place when verified.,true
+walking_area,Walking area,Place supports walking or strolling when verified.,true
+night_market,Night market,Place is a night market or strongly night-market-related.,true
+photo_spot,Photo spot,Place is photogenic or commonly used for photos.,true
+landmark,Landmark,Place is a landmark or symbolic site.,true
+iconic,Iconic,Place is iconic or strongly representative when verified/category-derived.,true
+trendy,Trendy,Place is currently fashionable when verified.,true
+local,Local,Place has local character or serves local discovery.,true
+local_food,Local food,Place is associated with local food.,true
+local_market,Local market,Place is associated with local market experience.,true
+local_culture,Local culture,Place is associated with local culture.,true
+cultural,Cultural,Place is culture-oriented.,true
+historical,Historical,Place has historical orientation.,true
+heritage,Heritage,Place is heritage-oriented.,true
+museum,Museum,Place is museum-related.,true
+food,Food,Place is food-oriented.,true
+cafe,Cafe,Place is cafe-oriented.,true
+market,Market,Place is market-oriented.,true
+night_activity,Night activity,Place supports night activity when verified.,true
+resort_spa,Resort and spa,Place is resort/spa-oriented when verified.,true
+city_center,City center,Place is city-center-oriented.,true
+urban,Urban,Place is urban-oriented.,true
+countryside,Countryside,Place is countryside-oriented.,true

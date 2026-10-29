@@ -1,0 +1,29 @@
+﻿external_id,canonical_name,destination_key,category,semantic_status,runtime_eligible,selected_interest_codes,unmapped_interest_codes,semantic_score,semantic_score_upper,semantic_coverage,semantic_signal_available
+vung_tau:niet_ban_tinh_xa,Niết Bàn Tịnh Xá,vung_tau,heritage,READY,True,AM_THUC,,0.07272727272727272,0.07272727272727272,1.0,True
+vung_tau:bach_dinh,Bạch Dinh,vung_tau,heritage,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+vung_tau:bai_bien_298,Bãi Biển 298,vung_tau,nature,READY,True,AM_THUC,,0.0,0.0,1.0,True
+vung_tau:bai_dau,Bãi Dâu,vung_tau,nature,READY,True,AM_THUC,,0.0,0.0,1.0,True
+vung_tau:bai_sau,Bãi Sau,vung_tau,nature,READY,True,AM_THUC,,0.0,0.0,1.0,True
+vung_tau:bai_truoc,Bãi Trước,vung_tau,nature,READY,True,AM_THUC,,0.0,0.0,1.0,True
+vung_tau:bien_long_hai,Biển Long Hải,vung_tau,nature,READY,True,AM_THUC,,0.0,0.0,1.0,True
+vung_tau:cong_vien_rung_minera,Công Viên Rừng Minera,vung_tau,nature,READY,True,AM_THUC,,0.0,0.0,1.0,True
+vung_tau:dai_tong_lam,Đại Tòng Lâm,vung_tau,heritage,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+vung_tau:dao_long_son,Đảo Long Sơn,vung_tau,nature,READY,True,AM_THUC,,0.0,0.0,1.0,True
+vung_tau:deo_nuoc_ngot,Đèo Nước Ngọt,vung_tau,nature,READY,True,AM_THUC,,0.0,0.0,1.0,True
+vung_tau:dinh_co,Dinh Cô,vung_tau,heritage,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+vung_tau:doi_cuu_suoi_nghe,Đồi Cừu Suối Nghệ,vung_tau,nature,READY,True,AM_THUC,,0.0,0.0,1.0,True
+vung_tau:ho_may,Hồ Mây,vung_tau,lake,READY,True,AM_THUC,,0.0,0.0,1.0,True
+vung_tau:hon_ba,Hòn Bà,vung_tau,nature,READY,True,AM_THUC,,0.0,0.0,1.0,True
+vung_tau:marina_vung_tau,Marina Vũng Tàu,vung_tau,landmark,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+vung_tau:mui_nghinh_phong,Mũi Nghinh Phong,vung_tau,nature,READY,True,AM_THUC,,0.0,0.0,1.0,True
+vung_tau:ngon_hai_dang_vung_tau,Ngọn Hải Đăng Vũng Tàu,vung_tau,landmark,READY,True,AM_THUC,,0.0,0.0,1.0,True
+vung_tau:nha_lon_long_son,Nhà Lớn Long Sơn,vung_tau,heritage,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+vung_tau:suoi_da,Suối Đá,vung_tau,nature,READY,True,AM_THUC,,0.0,0.0,1.0,True
+vung_tau:suoi_nuoc_nong_binh_chau,Suối Nước Nóng Bình Châu,vung_tau,nature,READY,True,AM_THUC,,0.0,0.0,1.0,True
+vung_tau:thap_tam_thang,Tháp Tam Thắng,vung_tau,heritage,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+vung_tau:thich_ca_phat_dai,Thích Ca Phật Đài,vung_tau,landmark,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+vung_tau:thien_vien_thuong_chieu,Thiền Viện Thường Chiếu,vung_tau,heritage,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+vung_tau:thien_vien_truc_lam_chan_nguyen,Thiền Viện Trúc Lâm Chân Nguyên,vung_tau,heritage,PARTIAL,True,AM_THUC,,0.0,1.0,0.0,False
+vung_tau:tuong_chua_kito,Tượng Chúa Kitô,vung_tau,heritage,READY,True,AM_THUC,,0.0,0.0,1.0,True
+vung_tau:bien_ho_coc,Biển Hồ Cốc,vung_tau,lake,NEED_REVIEW,True,AM_THUC,,,,0.0,False
+vung_tau:bien_ho_tram,Biển Hồ Tràm,vung_tau,lake,NEED_REVIEW,True,AM_THUC,,,,0.0,False

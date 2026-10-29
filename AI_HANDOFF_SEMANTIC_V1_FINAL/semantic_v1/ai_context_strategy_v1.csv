@@ -1,0 +1,7 @@
+context_code,context_name,owner,primary_signal,description,included_in_model_v1
+GAN_TOI,Gan toi,BACKEND,DISTANCE,Use runtime GPS and place coordinates for distance scoring.,false
+LOCAL,Dia diem local,SHARED,LOCAL_TAG,May use local-related tags plus backend contextual boost.,false
+DANG_HOT,Dang hot,BACKEND,POPULARITY,"Use trend, save, review, view or click signals when available.",false
+DI_TRONG_NGAY,Di trong ngay,BACKEND,ROUTE_TIME,"Use distance, route duration, opening hours and available time.",false
+CO_REVIEW,Co review,BACKEND,REVIEW,Use review count and average rating signals.,false
+UU_TIEN_KHAC,Uu tien khac,BACKEND,MANUAL_CONTEXT,Reserved survey compatibility context.,false

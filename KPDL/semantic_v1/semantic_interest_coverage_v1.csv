@@ -1,0 +1,7 @@
+interest_code,matching_place_count,runtime_matching_place_count,avg_semantic_match
+NGHI_DUONG,92,74,1.518
+KET_BAN,28,19,0.725
+CHECKIN_HOT,135,103,1.476
+THIEN_NHIEN,90,73,1.714
+VAN_HOA,64,53,2.357
+AM_THUC,24,19,0.85

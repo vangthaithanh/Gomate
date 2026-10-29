@@ -1,0 +1,14 @@
+CREATE TABLE device_tokens (
+ id UUID PRIMARY KEY,
+ user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ installation_id UUID NOT NULL UNIQUE,
+ session_id UUID NOT NULL REFERENCES refresh_sessions(id) ON DELETE CASCADE,
+ token TEXT NOT NULL UNIQUE,
+ platform VARCHAR(10) NOT NULL CHECK (platform IN ('ANDROID','IOS')),
+ enabled BOOLEAN NOT NULL DEFAULT TRUE,
+ created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ last_seen_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX ix_device_tokens_recipient ON device_tokens(user_id,enabled);
+CREATE INDEX ix_device_tokens_session ON device_tokens(session_id);

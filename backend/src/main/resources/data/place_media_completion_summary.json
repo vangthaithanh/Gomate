@@ -1,0 +1,45 @@
+{
+  "imported_place_rows": 146,
+  "statuses": {
+    "MANUAL_MEDIA_REVIEW": 139,
+    "REPLACE_RECOMMENDED": 1,
+    "VERIFIED_READY": 6
+  },
+  "license_distribution": {
+    "CC-BY-NC-2.0": 1,
+    "CC-BY-2.0": 5,
+    "CC-BY-SA-4.0": 1
+  },
+  "by_destination": {
+    "da_lat": {
+      "total": 41,
+      "verified_ready": 4,
+      "manual": 36,
+      "replace_recommended": 1
+    },
+    "vung_tau": {
+      "total": 28,
+      "verified_ready": 0,
+      "manual": 28,
+      "replace_recommended": 0
+    },
+    "ha_noi": {
+      "total": 31,
+      "verified_ready": 1,
+      "manual": 30,
+      "replace_recommended": 0
+    },
+    "da_nang_hue_hoi_an": {
+      "total": 29,
+      "verified_ready": 0,
+      "manual": 29,
+      "replace_recommended": 0
+    },
+    "phan_thiet": {
+      "total": 17,
+      "verified_ready": 1,
+      "manual": 16,
+      "replace_recommended": 0
+    }
+  }
+}

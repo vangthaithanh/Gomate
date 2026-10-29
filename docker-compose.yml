@@ -1,0 +1,73 @@
+name: gomate-auth
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: gomate_auth
+      POSTGRES_USER: gomate
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Run backend/scripts/setup-env.ps1 first}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gomate -d gomate_auth"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  mongo:
+    image: mongo:7.0
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.runCommand({ ping: 1 }).ok\" | grep 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  api:
+    build: ./backend
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/gomate_auth
+      DB_USERNAME: gomate
+      DB_PASSWORD: ${DB_PASSWORD:?Run backend/scripts/setup-env.ps1 first}
+      FIREBASE_ENABLED: ${FIREBASE_ENABLED:-false}
+      NOTIFICATION_PUSH_ENABLED: ${NOTIFICATION_PUSH_ENABLED:-false}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-service-account.json
+      GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS:-}
+      JWT_SECRET: ${JWT_SECRET:?Run backend/scripts/setup-env.ps1 first}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      MAPBOX_SERVER_TOKEN: ${MAPBOX_SERVER_TOKEN:-}
+      CLOUDINARY_ENABLED: ${CLOUDINARY_ENABLED:-false}
+      CLOUDINARY_URL: ${CLOUDINARY_URL:-}
+      AI_SERVICE_BASE_URL: http://ai:8000
+      AI_RECOMMENDATION_CANDIDATE_K: ${AI_RECOMMENDATION_CANDIDATE_K:-50}
+      AI_RECOMMENDATION_HOME_LIMIT: ${AI_RECOMMENDATION_HOME_LIMIT:-10}
+      AI_RECOMMENDATION_TIMEOUT_MS: ${AI_RECOMMENDATION_TIMEOUT_MS:-2500}
+      RECOMMENDATION_SEMANTIC_WEIGHT: ${RECOMMENDATION_SEMANTIC_WEIGHT:-0.75}
+      RECOMMENDATION_CONTEXT_WEIGHT: ${RECOMMENDATION_CONTEXT_WEIGHT:-0.25}
+      RECOMMENDATION_DISTANCE_SCALE_KM: ${RECOMMENDATION_DISTANCE_SCALE_KM:-20}
+      MONGO_DATABASE: ${MONGO_DATABASE:-gomate}
+      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/gomate?serverSelectionTimeoutMS=1500&connectTimeoutMS=1500&socketTimeoutMS=1500}
+    ports:
+      - "${API_PORT:-8081}:8080"
+    volumes:
+      - ./backend/secrets:/run/secrets:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_started
+    restart: unless-stopped
+  ai:
+    build: ./KPDL
+    ports:
+      - "${AI_PORT:-8000}:8000"
+    restart: unless-stopped
+volumes:
+  postgres_data:
+  mongo_data:

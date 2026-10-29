@@ -1,0 +1,249 @@
+destination,interest,rank,external_id,canonical_name,score,matched_tags,semantic_status,runtime_eligible
+da_lat,NGHI_DUONG,1,da_lat:ho_xuan_huong,Hồ Xuân Hương,2.26,lake:1.0x0.3|nature:0.8x0.6|relaxing:0.6x1.0|scenic:0.8x0.8|walking_area:0.8x0.3,READY,true
+da_lat,NGHI_DUONG,2,da_lat:ho_tuyen_lam,Hồ Tuyền Lâm,2.2,lake:1.0x0.3|nature:0.8x0.6|relaxing:0.6x1.0|scenic:0.8x0.8|walking_area:0.6x0.3,READY,true
+da_lat,NGHI_DUONG,3,da_lat:ho_vo_cuc,Hồ Vô Cực,2.2,lake:1.0x0.3|nature:0.8x0.6|relaxing:0.6x1.0|scenic:0.8x0.8|walking_area:0.6x0.3,READY,true
+da_lat,NGHI_DUONG,4,da_lat:tiem_nuong_chuyen_tau_hoang_hon,Tiệm Nướng Chuyến Tàu Hoàng Hôn,1.72,nature:0.8x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,false
+da_lat,NGHI_DUONG,5,da_lat:vuon_chau_au,Vườn Châu Âu,1.72,nature:0.8x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,false
+da_lat,NGHI_DUONG,6,da_lat:vuon_dau_da_lat,Vườn Dâu Đà Lạt,1.72,nature:0.8x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+da_lat,NGHI_DUONG,7,da_lat:vuon_dia_dang,Vườn Địa Đàng,1.72,nature:0.8x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,false
+da_lat,NGHI_DUONG,8,da_lat:vuon_hoa_thanh_pho,Vườn Hoa Thành Phố,1.72,nature:0.8x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+da_lat,NGHI_DUONG,9,da_lat:thung_lung_tinh_yeu,Thung Lũng Tình Yêu,1.68,nature:1.0x0.6|relaxing:0.6x1.0|scenic:0.6x0.8,READY,true
+da_lat,NGHI_DUONG,10,da_lat:thung_lung_vang,Thung Lũng Vàng,1.68,nature:1.0x0.6|relaxing:0.6x1.0|scenic:0.6x0.8,READY,true
+da_lat,KET_BAN,1,da_lat:quang_truong_lam_vien,Quảng Trường Lâm Viên,2.12,crowded:0.6x0.6|group_friendly:0.6x0.8|social:0.8x1.0|walking_area:0.8x0.6,READY,true
+da_lat,KET_BAN,2,da_lat:cho_da_lat,Chợ Đà Lạt,1.08,crowded:0.8x0.6|social:0.6x1.0,READY,true
+da_lat,KET_BAN,3,da_lat:kdl_suoi_binh_yen,KDL Suối Bình Yên,1.08,group_friendly:0.6x0.8|social:0.6x1.0,READY,false
+da_lat,KET_BAN,4,da_lat:cafe_me_linh,Cafe Mê Linh,0.94,cafe_meeting:0.8x0.8|social:0.3x1.0,READY,true
+da_lat,KET_BAN,5,da_lat:cafe_mien_du_muc,Cafe Miền Du Mục,0.94,cafe_meeting:0.8x0.8|social:0.3x1.0,READY,false
+da_lat,KET_BAN,6,da_lat:lang_art_cafe,Lặng Art Café,0.94,cafe_meeting:0.8x0.8|social:0.3x1.0,READY,false
+da_lat,KET_BAN,7,da_lat:ho_xuan_huong,Hồ Xuân Hương,0.78,social:0.3x1.0|walking_area:0.8x0.6,READY,true
+da_lat,KET_BAN,8,da_lat:ho_tuyen_lam,Hồ Tuyền Lâm,0.36,walking_area:0.6x0.6,READY,true
+da_lat,KET_BAN,9,da_lat:ho_vo_cuc,Hồ Vô Cực,0.36,walking_area:0.6x0.6,READY,true
+da_lat,KET_BAN,10,da_lat:tiem_nuong_chuyen_tau_hoang_hon,Tiệm Nướng Chuyến Tàu Hoàng Hôn,0.3,social:0.3x1.0,READY,false
+da_lat,CHECKIN_HOT,1,da_lat:doi_mong_mo,Đồi Mộng Mơ,2.72,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0|scenic:0.8x0.8,READY,true
+da_lat,CHECKIN_HOT,2,da_lat:lang_hoa_van_thanh,Làng Hoa Vạn Thành,2.72,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0|scenic:0.8x0.8,READY,true
+da_lat,CHECKIN_HOT,3,da_lat:vuon_chau_au,Vườn Châu Âu,2.72,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0|scenic:0.8x0.8,READY,false
+da_lat,CHECKIN_HOT,4,da_lat:vuon_dau_da_lat,Vườn Dâu Đà Lạt,2.72,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0|scenic:0.8x0.8,READY,true
+da_lat,CHECKIN_HOT,5,da_lat:vuon_dia_dang,Vườn Địa Đàng,2.72,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0|scenic:0.8x0.8,READY,false
+da_lat,CHECKIN_HOT,6,da_lat:vuon_hoa_thanh_pho,Vườn Hoa Thành Phố,2.72,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0|scenic:0.8x0.8,READY,true
+da_lat,CHECKIN_HOT,7,da_lat:cong_troi_bali_green_hill,Cổng Trời Bali Green Hill,2.24,iconic:0.8x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,READY,false
+da_lat,CHECKIN_HOT,8,da_lat:nha_ga_da_lat,Nhà Ga Đà Lạt,2.24,iconic:0.8x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,READY,true
+da_lat,CHECKIN_HOT,9,da_lat:quang_truong_lam_vien,Quảng Trường Lâm Viên,2.24,iconic:0.8x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,READY,true
+da_lat,CHECKIN_HOT,10,da_lat:dapa_hill,Dapa Hill,2.08,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,PARTIAL,false
+da_lat,THIEN_NHIEN,1,da_lat:doi_che_cau_dat,Đồi Chè Cầu Đất,2.12,mountain:0.8x0.8|nature:1.0x1.0|scenic:0.8x0.6,READY,true
+da_lat,THIEN_NHIEN,2,da_lat:doi_robin,Đồi Robin,2.12,mountain:0.8x0.8|nature:1.0x1.0|scenic:0.8x0.6,READY,false
+da_lat,THIEN_NHIEN,3,da_lat:kdl_suoi_binh_yen,KDL Suối Bình Yên,2.12,nature:1.0x1.0|scenic:0.8x0.6|waterfall:0.8x0.8,READY,false
+da_lat,THIEN_NHIEN,4,da_lat:thac_bobla,Thác Bobla,2.12,nature:1.0x1.0|scenic:0.8x0.6|waterfall:0.8x0.8,READY,true
+da_lat,THIEN_NHIEN,5,da_lat:thac_cam_ly,Thác Cam Ly,2.12,nature:1.0x1.0|scenic:0.8x0.6|waterfall:0.8x0.8,READY,true
+da_lat,THIEN_NHIEN,6,da_lat:thac_datanla,Thác Datanla,2.12,nature:1.0x1.0|scenic:0.8x0.6|waterfall:0.8x0.8,READY,true
+da_lat,THIEN_NHIEN,7,da_lat:thac_pongour,Thác Pongour,2.12,nature:1.0x1.0|scenic:0.8x0.6|waterfall:0.8x0.8,READY,true
+da_lat,THIEN_NHIEN,8,da_lat:thac_prenn,Thác Prenn,2.12,nature:1.0x1.0|scenic:0.8x0.6|waterfall:0.8x0.8,READY,true
+da_lat,THIEN_NHIEN,9,da_lat:thac_voi,Thác Voi,2.12,nature:1.0x1.0|scenic:0.8x0.6|waterfall:0.8x0.8,READY,true
+da_lat,THIEN_NHIEN,10,da_lat:ho_tuyen_lam,Hồ Tuyền Lâm,2.08,lake:1.0x0.8|nature:0.8x1.0|scenic:0.8x0.6,READY,true
+da_lat,VAN_HOA,1,da_lat:bao_tang_madame_de,Bảo Tàng Madame De,3.2,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0|museum:1.0x0.8,PARTIAL,false
+da_lat,VAN_HOA,2,da_lat:lang_art_cafe,Lặng Art Café,2.76,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0|local_culture:0.6x0.6,READY,false
+da_lat,VAN_HOA,3,da_lat:lang_cu_lan,Làng Cù Lần,2.76,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0|local_culture:0.6x0.6,READY,true
+da_lat,VAN_HOA,4,da_lat:lang_hoa_van_thanh,Làng Hoa Vạn Thành,2.76,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0|local_culture:0.6x0.6,READY,true
+da_lat,VAN_HOA,5,da_lat:chua_linh_an,Chùa Linh Ẩn,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+da_lat,VAN_HOA,6,da_lat:chua_linh_phuoc,Chùa Linh Phước,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+da_lat,VAN_HOA,7,da_lat:chua_thien_vuong_co_sat,Chùa Thiên Vương Cổ Sát,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+da_lat,VAN_HOA,8,da_lat:crazy_house,Crazy House,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+da_lat,VAN_HOA,9,da_lat:dai_bao_thap_kinh_luan,Đại Bảo Tháp Kinh Luân,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,false
+da_lat,VAN_HOA,10,da_lat:dinh_bao_dai,Dinh Bảo Đại,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+da_lat,AM_THUC,1,da_lat:lang_art_cafe,Lặng Art Café,2.48,cafe:1.0x0.6|food:1.0x1.0|local:0.8x0.3|local_food:0.8x0.8,READY,false
+da_lat,AM_THUC,2,da_lat:cafe_me_linh,Cafe Mê Linh,2.24,cafe:1.0x0.6|food:1.0x1.0|local_food:0.8x0.8,READY,true
+da_lat,AM_THUC,3,da_lat:cafe_mien_du_muc,Cafe Miền Du Mục,2.24,cafe:1.0x0.6|food:1.0x1.0|local_food:0.8x0.8,READY,false
+da_lat,AM_THUC,4,da_lat:cho_da_lat,Chợ Đà Lạt,1.64,food:0.8x1.0|local:0.8x0.3|market:1.0x0.6,READY,true
+da_lat,AM_THUC,5,da_lat:happy_hill,Happy Hill,1.64,food:1.0x1.0|local_food:0.8x0.8,NEED_REVIEW,true
+da_lat,AM_THUC,6,da_lat:puppy_farm,Puppy Farm,1.64,food:1.0x1.0|local_food:0.8x0.8,NEED_REVIEW,true
+da_lat,AM_THUC,7,da_lat:tiem_nuong_chuyen_tau_hoang_hon,Tiệm Nướng Chuyến Tàu Hoàng Hôn,1.64,food:1.0x1.0|local_food:0.8x0.8,READY,false
+da_lat,AM_THUC,8,da_lat:lang_cu_lan,Làng Cù Lần,0.24,local:0.8x0.3,READY,true
+da_lat,AM_THUC,9,da_lat:lang_hoa_van_thanh,Làng Hoa Vạn Thành,0.24,local:0.8x0.3,READY,true
+vung_tau,NGHI_DUONG,1,vung_tau:suoi_nuoc_nong_binh_chau,Suối Nước Nóng Bình Châu,2.64,nature:1.0x0.6|relaxing:0.6x1.0|resort_spa:0.8x1.0|scenic:0.8x0.8,READY,true
+vung_tau,NGHI_DUONG,2,vung_tau:bien_ho_coc,Biển Hồ Cốc,2.2,lake:1.0x0.3|nature:0.8x0.6|relaxing:0.6x1.0|scenic:0.8x0.8|walking_area:0.6x0.3,NEED_REVIEW,true
+vung_tau,NGHI_DUONG,3,vung_tau:bien_ho_tram,Biển Hồ Tràm,2.2,lake:1.0x0.3|nature:0.8x0.6|relaxing:0.6x1.0|scenic:0.8x0.8|walking_area:0.6x0.3,NEED_REVIEW,true
+vung_tau,NGHI_DUONG,4,vung_tau:ho_may,Hồ Mây,2.2,lake:1.0x0.3|nature:0.8x0.6|relaxing:0.6x1.0|scenic:0.8x0.8|walking_area:0.6x0.3,READY,true
+vung_tau,NGHI_DUONG,5,vung_tau:ho_suoi_mo_binh_chau,Hồ Suối Mơ Bình Châu,2.2,lake:1.0x0.3|nature:0.8x0.6|relaxing:0.6x1.0|scenic:0.8x0.8|walking_area:0.6x0.3,READY,false
+vung_tau,NGHI_DUONG,6,vung_tau:bai_bien_298,Bãi Biển 298,1.84,nature:1.0x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+vung_tau,NGHI_DUONG,7,vung_tau:bai_dau,Bãi Dâu,1.84,nature:1.0x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+vung_tau,NGHI_DUONG,8,vung_tau:bai_sau,Bãi Sau,1.84,nature:1.0x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+vung_tau,NGHI_DUONG,9,vung_tau:bai_truoc,Bãi Trước,1.84,nature:1.0x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+vung_tau,NGHI_DUONG,10,vung_tau:bien_long_hai,Biển Long Hải,1.84,nature:1.0x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+vung_tau,KET_BAN,1,vung_tau:cong_vien_rung_minera,Công Viên Rừng Minera,1.44,group_friendly:0.6x0.8|social:0.6x1.0|walking_area:0.6x0.6,READY,true
+vung_tau,KET_BAN,2,vung_tau:kdl_bien_dong,KDL Biển Đông,1.08,group_friendly:0.6x0.8|social:0.6x1.0,READY,false
+vung_tau,KET_BAN,3,vung_tau:kdl_ngoc_xuong,KDL Ngọc Xương,1.08,group_friendly:0.6x0.8|social:0.6x1.0,READY,false
+vung_tau,KET_BAN,4,vung_tau:bien_ho_coc,Biển Hồ Cốc,0.36,walking_area:0.6x0.6,NEED_REVIEW,true
+vung_tau,KET_BAN,5,vung_tau:bien_ho_tram,Biển Hồ Tràm,0.36,walking_area:0.6x0.6,NEED_REVIEW,true
+vung_tau,KET_BAN,6,vung_tau:ho_may,Hồ Mây,0.36,walking_area:0.6x0.6,READY,true
+vung_tau,KET_BAN,7,vung_tau:ho_suoi_mo_binh_chau,Hồ Suối Mơ Bình Châu,0.36,walking_area:0.6x0.6,READY,false
+vung_tau,CHECKIN_HOT,1,vung_tau:cau_tinh_yeu_long_hai,Cầu Tình Yêu Long Hải,2.24,iconic:0.8x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,READY,false
+vung_tau,CHECKIN_HOT,2,vung_tau:ngon_hai_dang_vung_tau,Ngọn Hải Đăng Vũng Tàu,2.24,iconic:0.8x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,READY,true
+vung_tau,CHECKIN_HOT,3,vung_tau:kdl_ngoc_xuong,KDL Ngọc Xương,2.08,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,READY,false
+vung_tau,CHECKIN_HOT,4,vung_tau:khu_gieng_troi_binh_chau,Khu Giếng Trời Bình Châu,2.08,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,PARTIAL,false
+vung_tau,CHECKIN_HOT,5,vung_tau:marina_vung_tau,Marina Vũng Tàu,2.08,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,PARTIAL,true
+vung_tau,CHECKIN_HOT,6,vung_tau:nong_trai_cuu,Nông Trại Cừu,2.08,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,READY,false
+vung_tau,CHECKIN_HOT,7,vung_tau:thich_ca_phat_dai,Thích Ca Phật Đài,2.08,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,PARTIAL,true
+vung_tau,CHECKIN_HOT,8,vung_tau:cau_ngam_bien_hamptons,Cầu Ngắm Biển Hamptons,1.88,iconic:0.8x0.8|photo_spot:0.6x1.0|scenic:0.8x0.8,READY,false
+vung_tau,CHECKIN_HOT,9,vung_tau:bai_bien_298,Bãi Biển 298,1.24,photo_spot:0.6x1.0|scenic:0.8x0.8,READY,true
+vung_tau,CHECKIN_HOT,10,vung_tau:bai_dau,Bãi Dâu,1.24,photo_spot:0.6x1.0|scenic:0.8x0.8,READY,true
+vung_tau,THIEN_NHIEN,1,vung_tau:doi_cuu_suoi_nghe,Đồi Cừu Suối Nghệ,2.76,mountain:0.8x0.8|nature:1.0x1.0|scenic:0.8x0.6|waterfall:0.8x0.8,READY,true
+vung_tau,THIEN_NHIEN,2,vung_tau:ho_suoi_mo_binh_chau,Hồ Suối Mơ Bình Châu,2.72,lake:1.0x0.8|nature:0.8x1.0|scenic:0.8x0.6|waterfall:0.8x0.8,READY,false
+vung_tau,THIEN_NHIEN,3,vung_tau:deo_nuoc_ngot,Đèo Nước Ngọt,2.12,mountain:0.8x0.8|nature:1.0x1.0|scenic:0.8x0.6,READY,true
+vung_tau,THIEN_NHIEN,4,vung_tau:suoi_da,Suối Đá,2.12,nature:1.0x1.0|scenic:0.8x0.6|waterfall:0.8x0.8,READY,true
+vung_tau,THIEN_NHIEN,5,vung_tau:suoi_nuoc_nong_binh_chau,Suối Nước Nóng Bình Châu,2.12,nature:1.0x1.0|scenic:0.8x0.6|waterfall:0.8x0.8,READY,true
+vung_tau,THIEN_NHIEN,6,vung_tau:bien_ho_coc,Biển Hồ Cốc,2.08,lake:1.0x0.8|nature:0.8x1.0|scenic:0.8x0.6,NEED_REVIEW,true
+vung_tau,THIEN_NHIEN,7,vung_tau:bien_ho_tram,Biển Hồ Tràm,2.08,lake:1.0x0.8|nature:0.8x1.0|scenic:0.8x0.6,NEED_REVIEW,true
+vung_tau,THIEN_NHIEN,8,vung_tau:ho_may,Hồ Mây,2.08,lake:1.0x0.8|nature:0.8x1.0|scenic:0.8x0.6,READY,true
+vung_tau,THIEN_NHIEN,9,vung_tau:cong_vien_rung_minera,Công Viên Rừng Minera,2.0,forest:0.8x0.8|nature:1.0x1.0|scenic:0.6x0.6,READY,true
+vung_tau,THIEN_NHIEN,10,vung_tau:nui_minh_dam,Núi Minh Đạm,2.0,mountain:0.8x0.8|nature:1.0x1.0|scenic:0.6x0.6,READY,false
+vung_tau,VAN_HOA,1,vung_tau:lang_ca_ong,Lăng Cá Ông,2.76,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0|local_culture:0.6x0.6,READY,false
+vung_tau,VAN_HOA,2,vung_tau:niet_ban_tinh_xa,Niết Bàn Tịnh Xá,2.76,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0|local_culture:0.6x0.6,READY,true
+vung_tau,VAN_HOA,3,vung_tau:bach_dinh,Bạch Dinh,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+vung_tau,VAN_HOA,4,vung_tau:dai_tong_lam,Đại Tòng Lâm,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+vung_tau,VAN_HOA,5,vung_tau:dinh_co,Dinh Cô,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+vung_tau,VAN_HOA,6,vung_tau:nha_lon_long_son,Nhà Lớn Long Sơn,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+vung_tau,VAN_HOA,7,vung_tau:thap_tam_thang,Tháp Tam Thắng,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+vung_tau,VAN_HOA,8,vung_tau:thap_vong_thien,Tháp Vọng Thiên,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,false
+vung_tau,VAN_HOA,9,vung_tau:thien_vien_thuong_chieu,Thiền Viện Thường Chiếu,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+vung_tau,VAN_HOA,10,vung_tau:thien_vien_truc_lam_chan_nguyen,Thiền Viện Trúc Lâm Chân Nguyên,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+vung_tau,AM_THUC,1,vung_tau:lang_ca_ong,Lăng Cá Ông,0.24,local:0.8x0.3,READY,false
+vung_tau,AM_THUC,2,vung_tau:niet_ban_tinh_xa,Niết Bàn Tịnh Xá,0.24,local:0.8x0.3,READY,true
+ha_noi,NGHI_DUONG,1,ha_noi:ho_dai_lai,Hồ Đại Lải,2.2,lake:1.0x0.3|nature:0.8x0.6|relaxing:0.6x1.0|scenic:0.8x0.8|walking_area:0.6x0.3,READY,true
+ha_noi,NGHI_DUONG,2,ha_noi:ho_hoan_kiem,Hồ Hoàn Kiếm,2.2,lake:1.0x0.3|nature:0.8x0.6|relaxing:0.6x1.0|scenic:0.8x0.8|walking_area:0.6x0.3,READY,true
+ha_noi,NGHI_DUONG,3,ha_noi:ho_tay,Hồ Tây,2.2,lake:1.0x0.3|nature:0.8x0.6|relaxing:0.6x1.0|scenic:0.8x0.8|walking_area:0.6x0.3,READY,true
+ha_noi,NGHI_DUONG,4,ha_noi:lang_chu_tich_ho_chi_minh,Lăng Chủ Tịch Hồ Chí Minh,2.2,lake:1.0x0.3|nature:0.8x0.6|relaxing:0.6x1.0|scenic:0.8x0.8|walking_area:0.6x0.3,NEED_REVIEW,true
+ha_noi,NGHI_DUONG,5,ha_noi:vuon_quoc_gia_ba_vi,Vườn Quốc Gia Ba Vì,1.84,nature:1.0x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+ha_noi,NGHI_DUONG,6,ha_noi:pho_co_ha_noi,Phố Cổ Hà Nội,1.44,lake:1.0x0.3|nature:0.8x0.6|scenic:0.6x0.8|walking_area:0.6x0.3,NEED_REVIEW,true
+ha_noi,NGHI_DUONG,7,ha_noi:nha_tho_da_sapa,Nhà Thờ Đá Sapa,1.26,lake:1.0x0.3|nature:0.8x0.6|scenic:0.6x0.8,NEED_REVIEW,false
+ha_noi,NGHI_DUONG,8,ha_noi:chua_bai_dinh,Chùa Bái Đính,1.24,relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+ha_noi,NGHI_DUONG,9,ha_noi:dong_thien_cung,Động Thiên Cung,1.24,nature:1.0x0.6|scenic:0.8x0.8,READY,true
+ha_noi,NGHI_DUONG,10,ha_noi:hang_mua,Hang Múa,1.24,nature:1.0x0.6|scenic:0.8x0.8,READY,true
+ha_noi,KET_BAN,1,ha_noi:ho_dai_lai,Hồ Đại Lải,0.36,walking_area:0.6x0.6,READY,true
+ha_noi,KET_BAN,2,ha_noi:ho_hoan_kiem,Hồ Hoàn Kiếm,0.36,walking_area:0.6x0.6,READY,true
+ha_noi,KET_BAN,3,ha_noi:ho_tay,Hồ Tây,0.36,walking_area:0.6x0.6,READY,true
+ha_noi,KET_BAN,4,ha_noi:lang_chu_tich_ho_chi_minh,Lăng Chủ Tịch Hồ Chí Minh,0.36,walking_area:0.6x0.6,NEED_REVIEW,true
+ha_noi,KET_BAN,5,ha_noi:pho_co_ha_noi,Phố Cổ Hà Nội,0.36,walking_area:0.6x0.6,NEED_REVIEW,true
+ha_noi,CHECKIN_HOT,1,ha_noi:cau_the_huc,Cầu Thê Húc,2.24,iconic:0.8x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,READY,true
+ha_noi,CHECKIN_HOT,2,ha_noi:ban_cat_cat,Bản Cát Cát,2.08,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,READY,true
+ha_noi,CHECKIN_HOT,3,ha_noi:ban_lac,Bản Lác,2.08,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,READY,true
+ha_noi,CHECKIN_HOT,4,ha_noi:fansipan,Fansipan,2.08,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,READY,true
+ha_noi,CHECKIN_HOT,5,ha_noi:mai_chau,Mai Châu,2.08,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,PARTIAL,true
+ha_noi,CHECKIN_HOT,6,ha_noi:moana_sapa,Moana Sapa,2.08,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,PARTIAL,true
+ha_noi,CHECKIN_HOT,7,ha_noi:tuan_chau,Tuần Châu,2.08,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,PARTIAL,true
+ha_noi,CHECKIN_HOT,8,ha_noi:yen_tu,Yên Tử,2.08,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,PARTIAL,true
+ha_noi,CHECKIN_HOT,9,ha_noi:chua_bai_dinh,Chùa Bái Đính,1.24,photo_spot:0.6x1.0|scenic:0.8x0.8,READY,true
+ha_noi,CHECKIN_HOT,10,ha_noi:dong_thien_cung,Động Thiên Cung,1.24,photo_spot:0.6x1.0|scenic:0.8x0.8,READY,true
+ha_noi,THIEN_NHIEN,1,ha_noi:vuon_quoc_gia_ba_vi,Vườn Quốc Gia Ba Vì,2.12,forest:0.8x0.8|nature:1.0x1.0|scenic:0.8x0.6,READY,true
+ha_noi,THIEN_NHIEN,2,ha_noi:ho_dai_lai,Hồ Đại Lải,2.08,lake:1.0x0.8|nature:0.8x1.0|scenic:0.8x0.6,READY,true
+ha_noi,THIEN_NHIEN,3,ha_noi:ho_hoan_kiem,Hồ Hoàn Kiếm,2.08,lake:1.0x0.8|nature:0.8x1.0|scenic:0.8x0.6,READY,true
+ha_noi,THIEN_NHIEN,4,ha_noi:ho_tay,Hồ Tây,2.08,lake:1.0x0.8|nature:0.8x1.0|scenic:0.8x0.6,READY,true
+ha_noi,THIEN_NHIEN,5,ha_noi:lang_chu_tich_ho_chi_minh,Lăng Chủ Tịch Hồ Chí Minh,2.08,lake:1.0x0.8|nature:0.8x1.0|scenic:0.8x0.6,NEED_REVIEW,true
+ha_noi,THIEN_NHIEN,6,ha_noi:nha_tho_da_sapa,Nhà Thờ Đá Sapa,1.96,lake:1.0x0.8|nature:0.8x1.0|scenic:0.6x0.6,NEED_REVIEW,false
+ha_noi,THIEN_NHIEN,7,ha_noi:pho_co_ha_noi,Phố Cổ Hà Nội,1.96,lake:1.0x0.8|nature:0.8x1.0|scenic:0.6x0.6,NEED_REVIEW,true
+ha_noi,THIEN_NHIEN,8,ha_noi:dong_thien_cung,Động Thiên Cung,1.48,nature:1.0x1.0|scenic:0.8x0.6,READY,true
+ha_noi,THIEN_NHIEN,9,ha_noi:hang_mua,Hang Múa,1.48,nature:1.0x1.0|scenic:0.8x0.6,READY,true
+ha_noi,THIEN_NHIEN,10,ha_noi:hang_sung_sot,Hang Sửng Sốt,1.48,nature:1.0x1.0|scenic:0.8x0.6,READY,true
+ha_noi,VAN_HOA,1,ha_noi:bao_tang_dan_toc_hoc,Bảo Tàng Dân Tộc Học,3.2,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0|museum:1.0x0.8,PARTIAL,true
+ha_noi,VAN_HOA,2,ha_noi:lang_chu_tich_ho_chi_minh,Lăng Chủ Tịch Hồ Chí Minh,2.76,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0|local_culture:0.6x0.6,NEED_REVIEW,true
+ha_noi,VAN_HOA,3,ha_noi:lang_co_duong_lam,Làng Cổ Đường Lâm,2.76,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0|local_culture:0.6x0.6,READY,false
+ha_noi,VAN_HOA,4,ha_noi:lang_gom_bat_trang,Làng Gốm Bát Tràng,2.76,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0|local_culture:0.6x0.6,READY,true
+ha_noi,VAN_HOA,5,ha_noi:chua_bai_dinh,Chùa Bái Đính,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,READY,true
+ha_noi,VAN_HOA,6,ha_noi:chua_huong,Chùa Hương,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+ha_noi,VAN_HOA,7,ha_noi:chua_mot_cot,Chùa Một Cột,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+ha_noi,VAN_HOA,8,ha_noi:chua_tran_quoc,Chùa Trấn Quốc,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+ha_noi,VAN_HOA,9,ha_noi:den_ngoc_son,Đền Ngọc Sơn,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+ha_noi,VAN_HOA,10,ha_noi:hoa_lu,Hoa Lư,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+ha_noi,AM_THUC,1,ha_noi:ban_cat_cat,Bản Cát Cát,0.24,local:0.8x0.3,READY,true
+ha_noi,AM_THUC,2,ha_noi:ban_lac,Bản Lác,0.24,local:0.8x0.3,READY,true
+ha_noi,AM_THUC,3,ha_noi:lang_chu_tich_ho_chi_minh,Lăng Chủ Tịch Hồ Chí Minh,0.24,local:0.8x0.3,NEED_REVIEW,true
+ha_noi,AM_THUC,4,ha_noi:lang_co_duong_lam,Làng Cổ Đường Lâm,0.24,local:0.8x0.3,READY,false
+ha_noi,AM_THUC,5,ha_noi:lang_gom_bat_trang,Làng Gốm Bát Tràng,0.24,local:0.8x0.3,READY,true
+da_nang_hue_hoi_an,NGHI_DUONG,1,da_nang_hue_hoi_an:pha_tam_giang,Phá Tam Giang,2.02,lake:1.0x0.3|nature:0.8x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+da_nang_hue_hoi_an,NGHI_DUONG,2,da_nang_hue_hoi_an:song_hoai,Sông Hoài,2.02,lake:1.0x0.3|nature:0.8x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+da_nang_hue_hoi_an,NGHI_DUONG,3,da_nang_hue_hoi_an:song_huong,Sông Hương,2.02,lake:1.0x0.3|nature:0.8x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+da_nang_hue_hoi_an,NGHI_DUONG,4,da_nang_hue_hoi_an:ban_dao_son_tra,Bán Đảo Sơn Trà,1.84,nature:1.0x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+da_nang_hue_hoi_an,NGHI_DUONG,5,da_nang_hue_hoi_an:bien_an_bang,Biển An Bàng,1.84,nature:1.0x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,false
+da_nang_hue_hoi_an,NGHI_DUONG,6,da_nang_hue_hoi_an:bien_cua_dai,Biển Cửa Đại,1.84,nature:1.0x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+da_nang_hue_hoi_an,NGHI_DUONG,7,da_nang_hue_hoi_an:bien_my_khe,Biển Mỹ Khê,1.84,nature:1.0x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+da_nang_hue_hoi_an,NGHI_DUONG,8,da_nang_hue_hoi_an:cu_lao_cham,Cù Lao Chàm,1.84,nature:1.0x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+da_nang_hue_hoi_an,NGHI_DUONG,9,da_nang_hue_hoi_an:pho_co_hoi_an,Phố Cổ Hội An,1.44,lake:1.0x0.3|nature:0.8x0.6|scenic:0.6x0.8|walking_area:0.6x0.3,NEED_REVIEW,true
+da_nang_hue_hoi_an,NGHI_DUONG,10,da_nang_hue_hoi_an:deo_hai_van,Đèo Hải Vân,1.24,nature:1.0x0.6|scenic:0.8x0.8,READY,true
+da_nang_hue_hoi_an,KET_BAN,1,da_nang_hue_hoi_an:pho_co_hoi_an,Phố Cổ Hội An,0.36,walking_area:0.6x0.6,NEED_REVIEW,true
+da_nang_hue_hoi_an,KET_BAN,2,da_nang_hue_hoi_an:cho_dong_ba,Chợ Đông Ba,0.3,social:0.3x1.0,READY,true
+da_nang_hue_hoi_an,CHECKIN_HOT,1,da_nang_hue_hoi_an:ba_na_hills,Bà Nà Hills,2.24,iconic:0.8x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,READY,true
+da_nang_hue_hoi_an,CHECKIN_HOT,2,da_nang_hue_hoi_an:cau_rong,Cầu Rồng,2.24,iconic:0.8x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,READY,true
+da_nang_hue_hoi_an,CHECKIN_HOT,3,da_nang_hue_hoi_an:cau_tinh_yeu_da_nang,Cầu Tình Yêu Đà Nẵng,2.24,iconic:0.8x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,READY,true
+da_nang_hue_hoi_an,CHECKIN_HOT,4,da_nang_hue_hoi_an:cau_vang,Cầu Vàng,2.24,iconic:0.8x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,READY,true
+da_nang_hue_hoi_an,CHECKIN_HOT,5,da_nang_hue_hoi_an:ngu_hanh_son,Ngũ Hành Sơn,2.08,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,PARTIAL,true
+da_nang_hue_hoi_an,CHECKIN_HOT,6,da_nang_hue_hoi_an:nha_co_tan_ky,Nhà Cổ Tấn Ký,2.08,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,READY,true
+da_nang_hue_hoi_an,CHECKIN_HOT,7,da_nang_hue_hoi_an:ban_dao_son_tra,Bán Đảo Sơn Trà,1.24,photo_spot:0.6x1.0|scenic:0.8x0.8,READY,true
+da_nang_hue_hoi_an,CHECKIN_HOT,8,da_nang_hue_hoi_an:bien_an_bang,Biển An Bàng,1.24,photo_spot:0.6x1.0|scenic:0.8x0.8,READY,false
+da_nang_hue_hoi_an,CHECKIN_HOT,9,da_nang_hue_hoi_an:bien_cua_dai,Biển Cửa Đại,1.24,photo_spot:0.6x1.0|scenic:0.8x0.8,READY,true
+da_nang_hue_hoi_an,CHECKIN_HOT,10,da_nang_hue_hoi_an:bien_my_khe,Biển Mỹ Khê,1.24,photo_spot:0.6x1.0|scenic:0.8x0.8,READY,true
+da_nang_hue_hoi_an,THIEN_NHIEN,1,da_nang_hue_hoi_an:deo_hai_van,Đèo Hải Vân,2.12,mountain:0.8x0.8|nature:1.0x1.0|scenic:0.8x0.6,READY,true
+da_nang_hue_hoi_an,THIEN_NHIEN,2,da_nang_hue_hoi_an:doi_vong_canh,Đồi Vọng Cảnh,2.12,mountain:0.8x0.8|nature:1.0x1.0|scenic:0.8x0.6,READY,true
+da_nang_hue_hoi_an,THIEN_NHIEN,3,da_nang_hue_hoi_an:pha_tam_giang,Phá Tam Giang,2.08,lake:1.0x0.8|nature:0.8x1.0|scenic:0.8x0.6,READY,true
+da_nang_hue_hoi_an,THIEN_NHIEN,4,da_nang_hue_hoi_an:song_hoai,Sông Hoài,2.08,lake:1.0x0.8|nature:0.8x1.0|scenic:0.8x0.6,READY,true
+da_nang_hue_hoi_an,THIEN_NHIEN,5,da_nang_hue_hoi_an:song_huong,Sông Hương,2.08,lake:1.0x0.8|nature:0.8x1.0|scenic:0.8x0.6,READY,true
+da_nang_hue_hoi_an,THIEN_NHIEN,6,da_nang_hue_hoi_an:nui_than_tai,Núi Thần Tài,2.0,mountain:0.8x0.8|nature:1.0x1.0|scenic:0.6x0.6,READY,true
+da_nang_hue_hoi_an,THIEN_NHIEN,7,da_nang_hue_hoi_an:rung_dua_bay_mau,Rừng Dừa Bảy Mẫu,2.0,forest:0.8x0.8|nature:1.0x1.0|scenic:0.6x0.6,READY,true
+da_nang_hue_hoi_an,THIEN_NHIEN,8,da_nang_hue_hoi_an:pho_co_hoi_an,Phố Cổ Hội An,1.96,lake:1.0x0.8|nature:0.8x1.0|scenic:0.6x0.6,NEED_REVIEW,true
+da_nang_hue_hoi_an,THIEN_NHIEN,9,da_nang_hue_hoi_an:ban_dao_son_tra,Bán Đảo Sơn Trà,1.48,nature:1.0x1.0|scenic:0.8x0.6,READY,true
+da_nang_hue_hoi_an,THIEN_NHIEN,10,da_nang_hue_hoi_an:bien_an_bang,Biển An Bàng,1.48,nature:1.0x1.0|scenic:0.8x0.6,READY,false
+da_nang_hue_hoi_an,VAN_HOA,1,da_nang_hue_hoi_an:hoi_quan_phuc_kien,Hội Quán Phúc Kiến,2.76,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0|local_culture:0.6x0.6,READY,true
+da_nang_hue_hoi_an,VAN_HOA,2,da_nang_hue_hoi_an:lang_huong_thuy_xuan,Làng Hương Thủy Xuân,2.76,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0|local_culture:0.6x0.6,READY,true
+da_nang_hue_hoi_an,VAN_HOA,3,da_nang_hue_hoi_an:lang_khai_dinh,Lăng Khải Định,2.76,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0|local_culture:0.6x0.6,READY,true
+da_nang_hue_hoi_an,VAN_HOA,4,da_nang_hue_hoi_an:lang_minh_mang,Lăng Minh Mạng,2.76,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0|local_culture:0.6x0.6,READY,true
+da_nang_hue_hoi_an,VAN_HOA,5,da_nang_hue_hoi_an:lang_tu_duc,Lăng Tự Đức,2.76,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0|local_culture:0.6x0.6,READY,true
+da_nang_hue_hoi_an,VAN_HOA,6,da_nang_hue_hoi_an:chua_cau_hoi_an,Chùa Cầu Hội An,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,READY,true
+da_nang_hue_hoi_an,VAN_HOA,7,da_nang_hue_hoi_an:chua_linh_ung_son_tra,Chùa Linh Ứng Sơn Trà,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+da_nang_hue_hoi_an,VAN_HOA,8,da_nang_hue_hoi_an:chua_thien_mu,Chùa Thiên Mụ,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+da_nang_hue_hoi_an,VAN_HOA,9,da_nang_hue_hoi_an:dai_noi_hue,Đại Nội Huế,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+da_nang_hue_hoi_an,VAN_HOA,10,da_nang_hue_hoi_an:thanh_dia_la_vang,Thánh Địa La Vang,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,false
+da_nang_hue_hoi_an,AM_THUC,1,da_nang_hue_hoi_an:cho_dong_ba,Chợ Đông Ba,1.64,food:0.8x1.0|local:0.8x0.3|market:1.0x0.6,READY,true
+da_nang_hue_hoi_an,AM_THUC,2,da_nang_hue_hoi_an:ban_dao_son_tra,Bán Đảo Sơn Trà,0.24,local:0.8x0.3,READY,true
+da_nang_hue_hoi_an,AM_THUC,3,da_nang_hue_hoi_an:lang_huong_thuy_xuan,Làng Hương Thủy Xuân,0.24,local:0.8x0.3,READY,true
+da_nang_hue_hoi_an,AM_THUC,4,da_nang_hue_hoi_an:lang_khai_dinh,Lăng Khải Định,0.24,local:0.8x0.3,READY,true
+da_nang_hue_hoi_an,AM_THUC,5,da_nang_hue_hoi_an:lang_minh_mang,Lăng Minh Mạng,0.24,local:0.8x0.3,READY,true
+da_nang_hue_hoi_an,AM_THUC,6,da_nang_hue_hoi_an:lang_tu_duc,Lăng Tự Đức,0.24,local:0.8x0.3,READY,true
+phan_thiet,NGHI_DUONG,1,phan_thiet:bau_sen,Bàu Sen,2.02,lake:1.0x0.3|nature:0.8x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,false
+phan_thiet,NGHI_DUONG,2,phan_thiet:bau_trang,Bàu Trắng,2.02,lake:1.0x0.3|nature:0.8x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+phan_thiet,NGHI_DUONG,3,phan_thiet:bai_da_ong_dia,Bãi Đá Ông Địa,1.84,nature:1.0x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+phan_thiet,NGHI_DUONG,4,phan_thiet:bien_mui_ne,Biển Mũi Né,1.84,nature:1.0x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+phan_thiet,NGHI_DUONG,5,phan_thiet:hon_rom,Hòn Rơm,1.84,nature:1.0x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+phan_thiet,NGHI_DUONG,6,phan_thiet:mui_ke_ga,Mũi Kê Gà,1.84,nature:1.0x0.6|relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+phan_thiet,NGHI_DUONG,7,phan_thiet:suoi_tien,Suối Tiên,1.42,lake:1.0x0.3|nature:0.8x0.6|scenic:0.8x0.8,READY,true
+phan_thiet,NGHI_DUONG,8,phan_thiet:doi_cat_bay,Đồi Cát Bay,1.24,nature:1.0x0.6|scenic:0.8x0.8,READY,true
+phan_thiet,NGHI_DUONG,9,phan_thiet:lang_chai_mui_ne,Làng Chài Mũi Né,1.24,relaxing:0.6x1.0|scenic:0.8x0.8,READY,true
+phan_thiet,NGHI_DUONG,10,phan_thiet:nui_ta_cu,Núi Tà Cú,1.08,nature:1.0x0.6|scenic:0.6x0.8,READY,true
+phan_thiet,KET_BAN,1,phan_thiet:cong_vien_bikini_beach,Công Viên Bikini Beach,1.44,group_friendly:0.6x0.8|social:0.6x1.0|walking_area:0.6x0.6,READY,false
+phan_thiet,KET_BAN,2,phan_thiet:circus_land,Circus Land,1.08,group_friendly:0.6x0.8|social:0.6x1.0,READY,false
+phan_thiet,KET_BAN,3,phan_thiet:novaworld_phan_thiet,NovaWorld Phan Thiết,1.08,group_friendly:0.6x0.8|social:0.6x1.0,READY,true
+phan_thiet,KET_BAN,4,phan_thiet:cho_phan_thiet,Chợ Phan Thiết,0.3,social:0.3x1.0,READY,true
+phan_thiet,CHECKIN_HOT,1,phan_thiet:circus_land,Circus Land,2.08,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,READY,false
+phan_thiet,CHECKIN_HOT,2,phan_thiet:cong_vien_bikini_beach,Công Viên Bikini Beach,2.08,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,READY,false
+phan_thiet,CHECKIN_HOT,3,phan_thiet:lau_dai_ruou_vang,Lâu Đài Rượu Vang,2.08,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,PARTIAL,true
+phan_thiet,CHECKIN_HOT,4,phan_thiet:novaworld_phan_thiet,NovaWorld Phan Thiết,2.08,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,READY,true
+phan_thiet,CHECKIN_HOT,5,phan_thiet:sea_links_city,Sea Links City,2.08,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,READY,true
+phan_thiet,CHECKIN_HOT,6,phan_thiet:sea_links_golf,Sea Links Golf,2.08,iconic:0.6x0.8|landmark:1.0x0.8|photo_spot:0.8x1.0,READY,true
+phan_thiet,CHECKIN_HOT,7,phan_thiet:mui_ke_ga,Mũi Kê Gà,1.88,iconic:0.8x0.8|photo_spot:0.6x1.0|scenic:0.8x0.8,READY,true
+phan_thiet,CHECKIN_HOT,8,phan_thiet:bai_da_ong_dia,Bãi Đá Ông Địa,1.24,photo_spot:0.6x1.0|scenic:0.8x0.8,READY,true
+phan_thiet,CHECKIN_HOT,9,phan_thiet:bien_mui_ne,Biển Mũi Né,1.24,photo_spot:0.6x1.0|scenic:0.8x0.8,READY,true
+phan_thiet,CHECKIN_HOT,10,phan_thiet:doi_cat_bay,Đồi Cát Bay,1.24,photo_spot:0.6x1.0|scenic:0.8x0.8,READY,true
+phan_thiet,THIEN_NHIEN,1,phan_thiet:suoi_tien,Suối Tiên,2.72,lake:1.0x0.8|nature:0.8x1.0|scenic:0.8x0.6|waterfall:0.8x0.8,READY,true
+phan_thiet,THIEN_NHIEN,2,phan_thiet:doi_cat_bay,Đồi Cát Bay,2.12,mountain:0.8x0.8|nature:1.0x1.0|scenic:0.8x0.6,READY,true
+phan_thiet,THIEN_NHIEN,3,phan_thiet:bau_sen,Bàu Sen,2.08,lake:1.0x0.8|nature:0.8x1.0|scenic:0.8x0.6,READY,false
+phan_thiet,THIEN_NHIEN,4,phan_thiet:bau_trang,Bàu Trắng,2.08,lake:1.0x0.8|nature:0.8x1.0|scenic:0.8x0.6,READY,true
+phan_thiet,THIEN_NHIEN,5,phan_thiet:nui_ta_cu,Núi Tà Cú,2.0,mountain:0.8x0.8|nature:1.0x1.0|scenic:0.6x0.6,READY,true
+phan_thiet,THIEN_NHIEN,6,phan_thiet:bai_da_ong_dia,Bãi Đá Ông Địa,1.48,nature:1.0x1.0|scenic:0.8x0.6,READY,true
+phan_thiet,THIEN_NHIEN,7,phan_thiet:bien_mui_ne,Biển Mũi Né,1.48,nature:1.0x1.0|scenic:0.8x0.6,READY,true
+phan_thiet,THIEN_NHIEN,8,phan_thiet:hon_rom,Hòn Rơm,1.48,nature:1.0x1.0|scenic:0.8x0.6,READY,true
+phan_thiet,THIEN_NHIEN,9,phan_thiet:mui_ke_ga,Mũi Kê Gà,1.48,nature:1.0x1.0|scenic:0.8x0.6,READY,true
+phan_thiet,THIEN_NHIEN,10,phan_thiet:lang_chai_mui_ne,Làng Chài Mũi Né,0.48,scenic:0.8x0.6,READY,true
+phan_thiet,VAN_HOA,1,phan_thiet:bao_tang_ngoc_trai,Bảo Tàng Ngọc Trai,3.2,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0|museum:1.0x0.8,PARTIAL,false
+phan_thiet,VAN_HOA,2,phan_thiet:lang_chai_mui_ne,Làng Chài Mũi Né,2.76,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0|local_culture:0.6x0.6,READY,true
+phan_thiet,VAN_HOA,3,phan_thiet:dinh_van_thuy_tu,Dinh Vạn Thủy Tú,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+phan_thiet,VAN_HOA,4,phan_thiet:lau_ong_hoang,Lầu Ông Hoàng,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+phan_thiet,VAN_HOA,5,phan_thiet:thap_cham_poshanu,Tháp Chàm Poshanu,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,false
+phan_thiet,VAN_HOA,6,phan_thiet:truong_duc_thanh,Trường Dục Thanh,2.4,cultural:0.8x1.0|heritage:1.0x0.8|historical:0.8x1.0,PARTIAL,true
+phan_thiet,AM_THUC,1,phan_thiet:cho_phan_thiet,Chợ Phan Thiết,1.64,food:0.8x1.0|local:0.8x0.3|market:1.0x0.6,READY,true
+phan_thiet,AM_THUC,2,phan_thiet:lang_chai_mui_ne,Làng Chài Mũi Né,0.24,local:0.8x0.3,READY,true

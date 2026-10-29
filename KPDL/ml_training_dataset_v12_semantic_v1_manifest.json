@@ -1,0 +1,52 @@
+{
+  "datasetVersion": "ml-training-v12-semantic-v1",
+  "semanticDataVersion": "semantic-v1",
+  "placeCatalogVersion": "tour_places_v11",
+  "inputFile": "ml_training_dataset_v11.csv",
+  "inputSha256": "100ce09df7635b13a5ccbc53d6bdf7e78b0e038f7e6a25882fcb58010cf2ccee",
+  "outputFile": "ml_training_dataset_v12_semantic_v1.csv",
+  "outputSha256": "61f7860eeca9541b2be7ba09a57e41aa0836921033b911c961bf6c2624464eab",
+  "rows": 63950,
+  "queries": 2387,
+  "candidateExternalIds": 164,
+  "semanticCatalogPlaces": 188,
+  "semanticTags": 36,
+  "semanticTagFeatureCount": 36,
+  "semanticMaskFeatureCount": 36,
+  "originalColumnCount": 23,
+  "outputColumnCount": 102,
+  "labelCounts": {
+    "0": 61563,
+    "1": 2387
+  },
+  "splitCounts": {
+    "train": 52350,
+    "test": 6409,
+    "val": 5191
+  },
+  "candidateStatusCounts": {
+    "READY": 99,
+    "PARTIAL": 57,
+    "NEED_REVIEW": 8
+  },
+  "rowStatusCounts": {
+    "READY": 42077,
+    "PARTIAL": 18952,
+    "NEED_REVIEW": 2921
+  },
+  "querySurveyPreferencesPresent": false,
+  "distanceReviewPopularityContextAdded": false,
+  "maskPolicy": {
+    "READY": "all official tag dimensions are available to the semantic profile",
+    "PARTIAL": "only explicit official tag links are observed; other dimensions are masked unknown",
+    "NEED_REVIEW": "all semantic dimensions masked; use non-semantic model fallback"
+  },
+  "mlIdentifiersExcludedFromFeatures": [
+    "query_id",
+    "ma_tour",
+    "candidate_external_id",
+    "candidate_canonical_name",
+    "split_type",
+    "label"
+  ]
+}

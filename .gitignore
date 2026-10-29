@@ -1,0 +1,85 @@
+# Miscellaneous
+*.class
+*.log
+hs_err_pid*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Backend / local runtime
+backend/target/
+.m2-cache/
+backups/
+.env
+.env.*
+!.env.example
+**/.gradle/
+**/.kotlin/
+mobile/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Firebase local/project-specific config
+/android/app/google-services.json
+/backend/secrets/*.json
+!/backend/secrets/README.md
+KPDL/.venv/
+KPDL/.venv_ai/
+KPDL/__pycache__/
+KPDL/.pytest_cache/
+*.pyc
+KPDL/.venv_local/
+
+# Publication: local data/export archives, never application source/model weights
+*.dump
+*.backup
+*.sql.gz
+*.p12
+node_modules/
+__pycache__/
+.pytest_cache/
+.venv*/
+/AI_HANDOFF_SEMANTIC_V1_FINAL.rar
+/backend/src/main/resources/data/ai_handoff/semantic_v1.rar
+/docs/tonghop.zip
+**/GoogleService-Info.plist
+
+# Owner-approved private Flutter entrypoint; supply privately before Flutter build.
+/lib/main.dart

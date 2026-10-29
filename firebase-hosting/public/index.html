@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="GoMate - Ứng dụng du lịch thông minh hỗ trợ khám phá địa điểm, lập lịch trình và gợi ý cá nhân hóa.">
+  <title>GoMate - Ứng dụng du lịch thông minh</title>
+  <style>
+    :root{--bg:#0f172a;--card:#111827;--text:#f8fafc;--muted:#cbd5e1;--accent:#f59e0b;--accent2:#fb923c;--border:#334155}
+    *{box-sizing:border-box} body{margin:0;font-family:Arial,Helvetica,sans-serif;background:linear-gradient(135deg,var(--bg),#172554);color:var(--text);line-height:1.6}
+    .wrap{max-width:980px;margin:0 auto;padding:32px 20px 64px} header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 0 36px}
+    .brand{font-size:28px;font-weight:800}.brand span{color:var(--accent)} nav a{color:var(--muted);text-decoration:none;margin-left:18px} nav a:hover{color:#fff}
+    .hero{padding:72px 0 54px} h1{font-size:clamp(38px,7vw,72px);line-height:1.05;margin:0 0 20px;max-width:820px}.lead{font-size:20px;color:var(--muted);max-width:760px;margin-bottom:28px}
+    .btn{display:inline-block;padding:12px 18px;border-radius:10px;background:linear-gradient(90deg,var(--accent),var(--accent2));color:#111827;font-weight:700;text-decoration:none}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:26px}.card{background:rgba(17,24,39,.88);border:1px solid var(--border);border-radius:16px;padding:22px}.card h3{margin-top:0;color:#fff}
+    section{margin-top:54px} h2{font-size:30px;margin-bottom:10px} p,li{color:var(--muted)} footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--border);color:#94a3b8;font-size:14px} footer a{color:#fdba74}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header><div class="brand">Go<span>Mate</span></div><nav><a href="#about">Giới thiệu</a><a href="#features">Tính năng</a><a href="privacy.html">Chính sách riêng tư</a></nav></header>
+    <main>
+      <section class="hero"><h1>Khám phá, lên kế hoạch và du lịch thông minh cùng GoMate.</h1><p class="lead">GoMate là ứng dụng hỗ trợ người dùng khám phá địa điểm, xây dựng lịch trình cá nhân hoặc theo nhóm và nhận các gợi ý phù hợp với sở thích.</p><a class="btn" href="#about">Tìm hiểu về GoMate</a></section>
+      <section id="about"><h2>GoMate là gì?</h2><p>GoMate là một dự án ứng dụng du lịch thông minh được xây dựng theo kiến trúc đa tầng. Ứng dụng mobile sử dụng Flutter, backend sử dụng Java Spring Boot và dữ liệu nghiệp vụ được quản lý bởi hệ thống backend của GoMate.</p><p>Người dùng có thể đăng nhập bằng tài khoản Google thông qua Firebase Authentication. Sau khi xác thực thành công, GoMate tạo hoặc sử dụng lại tài khoản GoMate tương ứng để cung cấp trải nghiệm cá nhân hóa trong ứng dụng.</p></section>
+      <section id="features"><h2>Tính năng chính</h2><div class="grid"><div class="card"><h3>Khám phá địa điểm</h3><p>Tìm và tham khảo các địa điểm phù hợp cho chuyến đi.</p></div><div class="card"><h3>Lập lịch trình</h3><p>Tạo và quản lý kế hoạch du lịch cá nhân hoặc theo nhóm.</p></div><div class="card"><h3>Cá nhân hóa</h3><p>Sử dụng sở thích ban đầu và dữ liệu tương tác để hỗ trợ gợi ý phù hợp hơn.</p></div><div class="card"><h3>Đăng nhập Google</h3><p>Cho phép xác thực tài khoản Google thông qua Firebase Authentication.</p></div></div></section>
+      <section><h2>Thông tin dành cho người dùng</h2><p>GoMate chỉ yêu cầu các quyền cần thiết cho chức năng đăng nhập và trải nghiệm ứng dụng. Thông tin về cách dữ liệu được xử lý được mô tả trong <a href="privacy.html" style="color:#fdba74">Chính sách quyền riêng tư</a>.</p></section>
+    </main>
+    <footer><div>© 2026 GoMate. All rights reserved.</div><div><a href="privacy.html">Privacy Policy</a></div></footer>
+  </div>
+</body>
+</html>
