@@ -9,6 +9,7 @@ Report gốc còn thiếu native GPS phía bị chặn/khôi phục sau Unblock,
 
 | Phần | Report/source |
 |---|---|
+| Post Publish 422/404 build regression / teammate sync | [Hotfix](../POST_PUBLISH_TAG_VALIDATION_HOTFIX.md) — lỗi đã tái hiện trên baseline d94ebf6; smoke 26 test trước đó không bao gồm PostPublishApiTest, không thay thế full build |
 | Privacy P1A | [ACCOUNT_PRIVACY_FOUNDATION_P1A](../ACCOUNT_PRIVACY_FOUNDATION_P1A.md) |
 | Publish/Profile | [P1B](../POST_PUBLISH_P1B.md), [P1C](../PROFILE_POST_P1C.md) — mới30s supersedes P1B60s, không sửa migration cũ |
 | Home/Like/Save | [P2](../POST_HOME_FEED_P2.md), [My Activity](../SETTINGS_POST_ACTIVITY.md) |

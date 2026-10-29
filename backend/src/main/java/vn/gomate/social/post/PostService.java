@@ -50,7 +50,15 @@ public class PostService {
   String hash;
   try { hash=digest(json.writeValueAsBytes(Arrays.asList(req.caption(),req.audience(),req.mediaIds(),tags,people,req.placeId()))); }
   catch(Exception e) { throw new IllegalStateException(e); }
-  relationships.lockInteractions(owner,people);
+  try {
+   relationships.lockInteractions(owner,people);
+  } catch(ApiException error) {
+   // A missing tagged account has no settings row to lock. Keep this translation
+   // scoped to lock failure; blocked-user checks and idempotent replay stay below.
+   if(error.status==404 && repo.validUser(owner) && people.stream().anyMatch(user -> !repo.validUser(user)))
+    throw new ApiException(422,"INVALID_TAGGED_USER","Người được gắn thẻ không còn khả dụng.");
+   throw error;
+  }
   String visibility=repo.lockAccount(owner);
   var existing=repo.published(owner,req.clientRequestId());
   if(existing.isPresent()) {

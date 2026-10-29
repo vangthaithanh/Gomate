@@ -1,5 +1,7 @@
 > **PRIVATE FILE REQUIRED:** `lib/main.dart` is intentionally not in Git. Obtain it privately from the owner before Flutter build/run; a Git-only clone cannot compile/run Flutter without it. Keep it ignored/untracked. See [current handoff](docs/AI_HANDOFF/00_START_HERE.md).
 
+> Post Publish build 422/404: see [hotfix and teammate update steps](docs/POST_PUBLISH_TAG_VALIDATION_HOTFIX.md). Keep existing restored data; do not reset Docker volumes or skip tests.
+
 > Historical Auth-only README: the four-table/V1-only scope and backend-local env setup below are SUPERSEDED. Use docs/AI_HANDOFF/00_START_HERE.md and 01_CURRENT_ARCHITECTURE_AND_RUNBOOK.md for the V26 baseline.
 
 > Publication copy 2026-10-29: device/account identifiers redacted; test results and original limitations are unchanged.

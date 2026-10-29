@@ -1,5 +1,7 @@
 # GoMate — baseline local và bàn giao AI
 
+Sau baseline d94ebf6, đọc [Post Publish hotfix / đồng bộ máy](../POST_PUBLISH_TAG_VALIDATION_HOTFIX.md) khi gặp Docker build FAIL 422/404. Không cần gửi lại hoặc restore lại backup.
+
 > **PRIVATE FILE REQUIRED:** `lib/main.dart` được chủ dự án quyết định loại khỏi Git và bàn giao riêng qua kênh được duyệt. Bản clone **không compile/chạy Flutter được nếu chưa có file này tại đúng `lib/main.dart`**. Không có file thay thế giả và không đổi runtime sang `--dart-define`. Xem [release report](07_GIT_RELEASE_REPORT.md) để biết trạng thái chuẩn bị phát hành; SHA sau push được xác nhận riêng, không coi báo cáo trước push là bằng chứng đã phát hành.
 
 Chủ dự án duyệt source local hiện tại làm chuẩn ngày 29/10/2026, không lấy lại code remote cũ. Nhánh bàn giao: **master**. Sau clone dùng `git rev-parse HEAD` để lấy SHA chính xác; không ghi SHA tự tham chiếu vào chính commit này.

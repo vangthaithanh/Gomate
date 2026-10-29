@@ -104,6 +104,48 @@ class PostPublishApiTest {
   b=body(owner,"FOLLOWERS",1);call(post("/api/v1/posts"),owner,b,422);
   mvc.perform(post("/api/v1/posts").contentType("application/json").content(json.writeValueAsBytes(b))).andExpect(status().isUnauthorized());
  }
+ @Test void missingTaggedUserReturnsDomainErrorWithoutConsumingDraftOrRequestKey() throws Exception {
+  var owner=user();var tagged=user();var b=body(owner,"EVERYONE",1);
+  UUID mediaId=(UUID)((List<?>)b.get("mediaIds")).get(0);
+  b.put("taggedUserIds",List.of(UUID.randomUUID()));
+  long before=db.count("SELECT COUNT(*) FROM posts",Map.of());
+  var error=call(post("/api/v1/posts"),owner,b,422);
+  assertEquals("INVALID_TAGGED_USER",error.path("code").asText());
+  assertEquals(before,db.count("SELECT COUNT(*) FROM posts",Map.of()));
+  var draft=db.one("SELECT state,post_id FROM post_media WHERE id=:id",args("id",mediaId));
+  assertEquals("READY",draft.get("state"));assertNull(draft.get("postId"));
+  var missingOwner=assertThrows(ApiException.class,()->posts.publish(UUID.randomUUID(),json.convertValue(b,PostDtos.Publish.class)));
+  assertEquals(404,missingOwner.status);
+  b.put("taggedUserIds",List.of(tagged.id));
+  var published=call(post("/api/v1/posts"),owner,b,201);
+  assertEquals(published.get("id"),call(post("/api/v1/posts"),owner,b,201).get("id"));
+  assertEquals(1,db.count("SELECT COUNT(*) FROM posts WHERE author_id=:owner",args("owner",owner.id)));
+ }
+ @Test void inactiveTagRemains422ButBlockedTagRemainsHiddenInBothDirections() throws Exception {
+  var owner=user();var inactive=user();var blocked=user();var reverse=user();
+  db.update("UPDATE users SET status='LOCKED' WHERE id=:id",args("id",inactive.id));
+  var b=body(owner,"EVERYONE",1);b.put("taggedUserIds",List.of(inactive.id));
+  assertEquals("INVALID_TAGGED_USER",call(post("/api/v1/posts"),owner,b,422).path("code").asText());
+  call(put("/api/v1/users/"+blocked.id+"/block"),owner,null,200);
+  call(put("/api/v1/users/"+owner.id+"/block"),reverse,null,200);
+  for(var target:List.of(blocked,reverse)) {
+   b=body(owner,"EVERYONE",1);b.put("taggedUserIds",List.of(target.id));
+   assertEquals("NOT_FOUND",call(post("/api/v1/posts"),owner,b,404).path("code").asText());
+  }
+  db.update("UPDATE users SET status='LOCKED' WHERE id=:id",args("id",blocked.id));
+  b=body(owner,"EVERYONE",1);b.put("taggedUserIds",List.of(blocked.id));
+  call(post("/api/v1/posts"),owner,b,404);
+  assertEquals(0,db.count("SELECT COUNT(*) FROM posts WHERE author_id=:owner",args("owner",owner.id)));
+ }
+ @Test void publishedRetryStillSucceedsAfterTaggedUserBecomesInactive() throws Exception {
+  var owner=user();var tagged=user();var b=body(owner,"EVERYONE",1);b.put("taggedUserIds",List.of(tagged.id));
+  var published=call(post("/api/v1/posts"),owner,b,201);
+  db.update("UPDATE users SET status='LOCKED' WHERE id=:id",args("id",tagged.id));
+  assertEquals(published.get("id"),call(post("/api/v1/posts"),owner,b,201).get("id"));
+  b.put("caption","Different payload with the published key");call(post("/api/v1/posts"),owner,b,409);
+  b.put("clientRequestId",UUID.randomUUID());call(post("/api/v1/posts"),owner,b,422);
+  assertEquals(1,db.count("SELECT COUNT(*) FROM posts WHERE author_id=:owner",args("owner",owner.id)));
+ }
  @Test void tagDoesNotGrantAudienceAndRangeRemainsAuthenticated() throws Exception {
   var owner=user();var tagged=user();var b=body(owner,"ONLY_ME",1);b.put("taggedUserIds",List.of(tagged.id));
   var p=call(post("/api/v1/posts"),owner,b,201);binary(tagged,p,false);assertFalse(relationships.isFollowing(tagged.id,owner.id));
