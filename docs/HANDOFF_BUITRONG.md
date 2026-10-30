@@ -46,7 +46,7 @@ Feed lấy bài visible tại snapshot. Bucket `0` là mutual active follow, `1`
 
 ## 5. Artifact cần nhận riêng
 
-Branch có source, dataset v12, manifest và toàn bộ `semantic_v1/`. Sau khi merge lịch sử remote, branch cũng có artifact research v13 cũ của commit `0eb6e1a`, nhưng source AI hiện tại mặc định cần v15. Vì v15 chưa có trong Git, gói gửi riêng chứa:
+Branch `buitrong` được thay thế trực tiếp bằng source GoMate hiện tại; không merge và không giữ lịch sử cũ của `origin/buitrong` tại commit `0eb6e1a`. Branch có source, dataset v12, manifest và toàn bộ `semantic_v1/`. Artifact v13 cũ của branch remote trước đây không phải dependency của runtime hiện tại; source AI mặc định cần v15. Vì v15 chưa có trong Git, gói gửi riêng chứa:
 
 `KPDL/training_output_research_v15_grid001/gomate_ranker_research_v15_strict.joblib`
 
