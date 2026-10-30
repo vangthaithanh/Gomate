@@ -56,7 +56,7 @@ Các file trong ZIP: `README.md` (2,496 bytes, SHA-256 `cdf4ab471e58272072b063ed
 
 Các output `training_output_leaf_*`, `training_output_trees_*`, các `training_output_research_v15_*` khác và trainer backup là experiment/backup, không phải runtime dependency. Dùng source trainer + dataset trên branch để tái tạo khi cần.
 
-`lib/main.dart` bị loại khỏi Git theo quyết định release; Git-only clone chưa build/run Flutter được cho tới khi nhận file riêng an toàn. File này không thuộc ZIP model.
+`lib/main.dart` bị loại khỏi Git theo quyết định release; bản local hiện có 724 bytes và kiểm tra không in nội dung phát hiện literal dạng secret/token. Không phát hiện mẫu private key, JWT hoặc Google API key trong kiểm tra này, nhưng file vẫn là private release entrypoint có thông tin nhạy cảm theo chính sách dự án. Git-only clone chưa build/run Flutter được cho tới khi nhận file riêng an toàn. File này không thuộc ZIP model và không được gửi qua Git/Zalo công khai; dùng kênh bảo mật do chủ dự án kiểm soát.
 
 ## 6. Hướng dẫn đồng đội
 
