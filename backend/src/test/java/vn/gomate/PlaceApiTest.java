@@ -28,12 +28,12 @@ class PlaceApiTest {
   assertEquals(new TreeSet<>(Set.of(
    "flyway_schema_history",
    "users","user_profiles","user_settings","refresh_sessions",
-   "place_categories","places","place_media",
+   "place_categories","places","place_media","reviews",
    "trips","trip_members","trip_stops","trip_reminders","trip_pins","trip_invitations","notifications","device_tokens",
    "interest_groups","interest_options","user_interests",
    "place_tags","place_tag_links","interest_tag_mappings",
    "user_follows","follow_requests","user_blocks",
-   "posts","post_media","hashtags","post_hashtags","post_user_tags","post_likes","post_saves","comments","comment_likes","comment_media","post_reports",
+   "posts","post_media","hashtags","post_hashtags","post_user_tags","post_likes","post_saves","post_home_views","comments","comment_likes","comment_media","post_reports",
    "conversations","conversation_members","recent_searches"
   )),actual);
  }

@@ -15,7 +15,7 @@ public class PostRequestPolicyFilter extends OncePerRequestFilter {
  @Override protected void doFilterInternal(HttpServletRequest req,HttpServletResponse res,FilterChain chain) throws ServletException,IOException {
   boolean post=req.getRequestURI().startsWith("/api/v1/posts");
   if(req.getRequestURI().startsWith("/api/v1/search")) {res.setHeader("Cache-Control","private, no-store, max-age=0");res.setHeader("Pragma","no-cache");}
-  if(post || req.getRequestURI().startsWith("/api/v1/comments") || req.getRequestURI().startsWith("/api/v1/me/reports") || req.getRequestURI().equals("/api/v1/feed")
+  if(post || req.getRequestURI().startsWith("/api/v1/comments") || req.getRequestURI().startsWith("/api/v1/me/reports") || req.getRequestURI().equals("/api/v1/feed") || req.getRequestURI().startsWith("/api/v1/feed/recommended")
    || req.getRequestURI().equals("/api/v1/me/liked-posts") || req.getRequestURI().equals("/api/v1/me/saved-posts") || req.getRequestURI().equals("/api/v1/me/comments")) {res.setHeader("Cache-Control","private, no-store, max-age=0");res.setHeader("Pragma","no-cache");}
   // Raising the parser ceiling for Post must not relax legacy module file limits.
   if(!post && req.getContentType()!=null && req.getContentType().startsWith("multipart/")) {

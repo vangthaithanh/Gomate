@@ -1,5 +1,7 @@
 # GoMate — baseline local và bàn giao AI
 
+**Bổ sung local V27 (30/10/2026):** [Place Rating/Review](08_PLACE_RATING_REVIEW_V27.md) có gói patch bàn giao riêng trên baseline 84ac037, chưa push master. Giữ khác biệt điểm thật 0/0 khi chưa có review và mặc định UI 5 sao; không dùng mặc định UI làm nhãn AI. Không cần restore lại DB V26 để nâng cấp V27.
+
 Sau baseline d94ebf6, đọc [Post Publish hotfix / đồng bộ máy](../POST_PUBLISH_TAG_VALIDATION_HOTFIX.md) khi gặp Docker build FAIL 422/404. Không cần gửi lại hoặc restore lại backup.
 
 > **PRIVATE FILE REQUIRED:** `lib/main.dart` được chủ dự án quyết định loại khỏi Git và bàn giao riêng qua kênh được duyệt. Bản clone **không compile/chạy Flutter được nếu chưa có file này tại đúng `lib/main.dart`**. Không có file thay thế giả và không đổi runtime sang `--dart-define`. Xem [release report](07_GIT_RELEASE_REPORT.md) để biết trạng thái chuẩn bị phát hành; SHA sau push được xác nhận riêng, không coi báo cáo trước push là bằng chứng đã phát hành.

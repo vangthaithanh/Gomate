@@ -9,6 +9,8 @@ class PlaceSummary {
   final String? district;
   final String? address;
   final String? thumbnailUrl;
+  final double rating;
+  final int reviewCount;
 
   const PlaceSummary({
     required this.placeId,
@@ -21,6 +23,8 @@ class PlaceSummary {
     this.district,
     this.address,
     this.thumbnailUrl,
+    this.rating = 0,
+    this.reviewCount = 0,
   });
 
   factory PlaceSummary.fromJson(Map<String, dynamic> json) {
@@ -35,6 +39,8 @@ class PlaceSummary {
       district: _stringOrNull(json['district']),
       address: _stringOrNull(json['address']),
       thumbnailUrl: _stringOrNull(json['thumbnailUrl']),
+      rating: _doubleOrDefault(json['avgRating'], 0),
+      reviewCount: _intOrDefault(json['reviewCount'], 0),
     );
   }
 }

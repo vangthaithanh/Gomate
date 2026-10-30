@@ -44,8 +44,8 @@ public class PlaceService {
    asInt(row.get("saveCount")),
    (String)row.get("sourceType"),
    (String)row.get("status"),
-   (LocalDateTime)row.get("createdAt"),
-   (LocalDateTime)row.get("updatedAt"),
+   asTime(row.get("createdAt")),
+   asTime(row.get("updatedAt")),
    media
   );
  }
@@ -61,7 +61,9 @@ public class PlaceService {
    (String)row.get("province"),
    (String)row.get("district"),
    (String)row.get("address"),
-   (String)row.get("thumbnailUrl")
+   (String)row.get("thumbnailUrl"),
+   (BigDecimal)row.get("avgRating"),
+   asInt(row.get("reviewCount"))
   );
  }
 
@@ -72,8 +74,13 @@ public class PlaceService {
    (String)row.get("url"),
    (String)row.get("caption"),
    asInt(row.get("sortOrder")),
-   (LocalDateTime)row.get("createdAt")
+   asTime(row.get("createdAt"))
   );
+ }
+
+ private static LocalDateTime asTime(Object value) {
+  if(value instanceof java.time.OffsetDateTime time) return time.withOffsetSameInstant(java.time.ZoneOffset.UTC).toLocalDateTime();
+  return (LocalDateTime)value;
  }
 
  private static Long asLong(Object value) {

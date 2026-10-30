@@ -102,6 +102,30 @@ void main() {
     },
   );
   test(
+    'fresh snapshots keep backend relationship order and paging never resorts it',
+    () async {
+      final a = await fixture.auth();
+      final r = _Repo(a)
+        ..first = [fixture.post(30), fixture.post(10), fixture.post(20)];
+      final c = PostFeedController(r);
+
+      await c.refresh();
+      expect(c.items.map((post) => post['id']), [30, 10, 20]);
+
+      r.first = [fixture.post(10), fixture.post(30), fixture.post(20)];
+      await c.refresh();
+      expect(c.items.map((post) => post['id']), [10, 30, 20]);
+      expect(r.calls.where((call) => call == 'feed:null').length, 2);
+
+      await c.load();
+      expect(r.calls.last, 'feed:next');
+      expect(c.items.map((post) => post['id']), [10, 30, 20, 2, 3]);
+
+      c.dispose();
+      a.dispose();
+    },
+  );
+  test(
     'paging failure keeps authorized pages and retry; mutations refresh current truth',
     () async {
       final a = await fixture.auth();

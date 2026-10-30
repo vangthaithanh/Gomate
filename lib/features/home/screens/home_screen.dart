@@ -1,4 +1,6 @@
+import '../../place/data/place_review_repository.dart';
 import 'dart:async';
+import '../../place/widgets/place_rating_builder.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -36,6 +38,7 @@ import '../../../core/diagnostics/post_media_diagnostics.dart';
 import '../../posts/data/post_engagement_controller.dart';
 import '../../posts/data/profile_posts_controller.dart';
 import '../../posts/widgets/protected_post_media.dart';
+import '../../posts/widgets/home_post_view_marker.dart';
 import '../../profile/screens/profile_post_feed_screen.dart';
 import '../../notifications/screens/notification_screen.dart';
 import '../../notifications/data/notification_repository.dart';
@@ -536,25 +539,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         // Keep only lightweight card/page state; actual media has its own budget.
         cost: const PostRetentionCost(0, 0),
         bottomGap: index == posts.length - 1 && index >= 2 ? 0 : ui.gapSection,
-        child: AnimatedBuilder(
-          animation: _momentsRepository,
-          builder: (context, _) => _FeedPostCard(
-            post: post,
-            repository: _postRepository,
-            mediaStore: _mediaStore,
-            scrollController: _feedScroll,
-            mediaActive: _visible && !_feed.revalidating && _feed.error == null,
-            onUnavailable: () => _feed.remove(int.parse(post.id)),
-            onAcknowledged: (data) =>
-                _feed.patchEngagement(int.parse(post.id), data),
-            highlighted: _hasHighlightedMoment(post.authorName),
-            ui: ui,
-            onMoreTap: () => _openPostActions(post),
-            onCommentTap: () => _openComments(post),
-            onShareTap: () => _openShare(post),
-            onHashtagTap: _openHashtag,
-            onLocationTap: () => _openPostLocation(post),
-            onOpenTap: () => _openPost(post),
+        child: HomePostViewMarker(
+          postId: int.parse(post.id),
+          scrollController: _feedScroll,
+          active: _visible && !_feed.revalidating && _feed.error == null,
+          onViewed: _postRepository.recordHomeView,
+          child: AnimatedBuilder(
+            animation: _momentsRepository,
+            builder: (context, _) => _FeedPostCard(
+              post: post,
+              repository: _postRepository,
+              mediaStore: _mediaStore,
+              scrollController: _feedScroll,
+              mediaActive:
+                  _visible && !_feed.revalidating && _feed.error == null,
+              onUnavailable: () => _feed.remove(int.parse(post.id)),
+              onAcknowledged: (data) =>
+                  _feed.patchEngagement(int.parse(post.id), data),
+              highlighted: _hasHighlightedMoment(post.authorName),
+              ui: ui,
+              onMoreTap: () => _openPostActions(post),
+              onCommentTap: () => _openComments(post),
+              onShareTap: () => _openShare(post),
+              onHashtagTap: _openHashtag,
+              onLocationTap: () => _openPostLocation(post),
+              onOpenTap: () => _openPost(post),
+            ),
           ),
         ),
       );
@@ -1640,9 +1650,14 @@ class _PlaceSuggestionSection extends StatelessWidget {
                       Positioned(
                         top: ui.placeCardWidth * 0.065,
                         right: ui.placeCardWidth * 0.065,
-                        child: _RatingBadge(
-                          rating: item.rating,
-                          cardWidth: ui.placeCardWidth,
+                        child: PlaceRatingBuilder(
+                          placeId: item.placeId.toString(),
+                          average: item.rating,
+                          count: item.reviewCount,
+                          builder: (r) => _RatingBadge(
+                            rating: r,
+                            cardWidth: ui.placeCardWidth,
+                          ),
                         ),
                       ),
 
@@ -1761,7 +1776,7 @@ class _PlaceSuggestionSection extends StatelessWidget {
 }
 
 class _RatingBadge extends StatelessWidget {
-  final double rating;
+  final PlaceRating rating;
   final double cardWidth;
 
   const _RatingBadge({required this.rating, required this.cardWidth});
@@ -1769,6 +1784,7 @@ class _RatingBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      constraints: BoxConstraints(maxWidth: cardWidth * 0.87),
       padding: EdgeInsets.symmetric(
         horizontal: cardWidth * 0.045,
         vertical: cardWidth * 0.028,
@@ -1777,31 +1793,34 @@ class _RatingBadge extends StatelessWidget {
         color: Colors.white.withOpacity(0.94),
         borderRadius: BorderRadius.circular(cardWidth * 0.075),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.star_rounded,
-            size: cardWidth * 0.105,
-            color: AppColors.primaryIcon,
-          ),
-          SizedBox(width: cardWidth * 0.02),
-          Text(
-            itemRating(rating),
-            style: TextStyle(
-              fontSize: cardWidth * 0.077,
-              height: 1,
-              fontWeight: FontWeight.w600,
-              color: AppColors.primaryText,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              rating.hasValidRating
+                  ? Icons.star_rounded
+                  : Icons.star_border_rounded,
+              size: cardWidth * 0.105,
+              color: rating.hasValidRating
+                  ? AppColors.primaryIcon
+                  : AppColors.grayText,
             ),
-          ),
-        ],
+            SizedBox(width: cardWidth * 0.02),
+            Text(
+              rating.compactLabel,
+              style: TextStyle(
+                fontSize: cardWidth * 0.077,
+                height: 1,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primaryText,
+              ),
+            ),
+          ],
+        ),
       ),
     );
-  }
-
-  String itemRating(double value) {
-    return value.toStringAsFixed(1).replaceAll('.', ',');
   }
 }
 
@@ -2232,12 +2251,16 @@ class _HomePost {
 }
 
 class _PlaceSuggestion {
+  final int placeId;
+  final int reviewCount;
   final String title;
   final String subtitle;
   final double rating;
   final String? imageUrl;
 
   const _PlaceSuggestion({
+    required this.placeId,
+    required this.reviewCount,
     required this.title,
     required this.subtitle,
     required this.rating,
@@ -2245,8 +2268,10 @@ class _PlaceSuggestion {
   });
 
   factory _PlaceSuggestion.fromRecommended(RecommendedPlace place) {
-    final rating = place.rating > 0 ? place.rating : place.score.clamp(0, 5);
+    final rating = place.rating;
     return _PlaceSuggestion(
+      placeId: place.placeId,
+      reviewCount: place.reviewCount,
       title: place.name,
       subtitle: place.locationText,
       rating: rating.toDouble(),

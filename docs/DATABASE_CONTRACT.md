@@ -1,14 +1,14 @@
 # DATABASE_CONTRACT.md — GoMate Data + Flyway Contract
 
-> Current release 2026-10-29: actual Flyway V1–V26, **38 business tables** plus flyway_schema_history. The broad catalog below is a historical design roadmap, not a claim that every table exists. Actual Post save is `post_saves` (not `saved_posts`); Global Block is `user_blocks`; actual invitations are `trip_invitations`. Do not create parallel tables from conceptual names. See [AI handoff](AI_HANDOFF/01_CURRENT_ARCHITECTURE_AND_RUNBOOK.md).
+> Current source 2026-10-30: Flyway V1–V28, **40 business tables** plus flyway_schema_history. V27 adds `reviews`; V28 adds `post_home_views`. The broad catalog below is a historical design roadmap, not a claim that every conceptual table exists. Actual Post save is `post_saves` (not `saved_posts`); Global Block is `user_blocks`; actual invitations are `trip_invitations`. Do not create parallel tables from conceptual names.
 
-Actual V26 inventory:
+Actual V28 inventory:
 ```text
 users user_profiles user_settings refresh_sessions
 interest_groups interest_options user_interests interest_tag_mappings
-place_categories places place_media place_tags place_tag_links
+place_categories places place_media place_tags place_tag_links reviews
 user_follows follow_requests user_blocks
-posts post_media hashtags post_hashtags post_user_tags post_likes post_saves
+posts post_media hashtags post_hashtags post_user_tags post_likes post_saves post_home_views
 comments comment_likes comment_media post_reports
 conversations conversation_members
 trips trip_members trip_stops trip_reminders trip_pins trip_invitations
@@ -334,6 +334,8 @@ reviewed_at TIMESTAMPTZ nullable
 PK `(user_id, place_id)` + `saved_at`.
 
 ### reviews
+
+Implemented by V27 (see `PLACE_RATING_REVIEW_FOUNDATION.md`): one new table only, content VARCHAR(1000), publication ACTIVE/DELETED and moderation VISIBLE/HIDDEN. `verified_visit_at` below remains a future check-in proposal and is NOT in V27. `review_media` remains unimplemented. Existing `places.avg_rating/review_count` are recomputed transactionally from ACTIVE/VISIBLE reviews, with empty 0/0 (UI default-five is not stored). Never modify V1–V26.
 ```text
 id BIGSERIAL PK
 user_id UUID FK users
@@ -393,6 +395,14 @@ loss of viewing permission but cannot bypass it; denied requests expose no state
 Settings -> Post row locking serializes authorized idempotent Like/Save writes.
 Old rows/migrations remain intact; 32 business tables / 33 including Flyway.
 Current Feed/permission/API/evidence: POST_HOME_FEED_P2.md.
+
+### Recommended Home/V28 viewed-post history
+V28__post_home_views.sql adds only `post_home_views`: authenticated viewer UUID,
+Post BIGINT, viewed_at TIMESTAMPTZ and primary key `(viewer_user_id,post_id)`.
+The primary key is the idempotency authority. This history does not delete or
+hide source Posts and is not consulted by Profile. New recommended-feed
+snapshots consult it only for authors the viewer currently follows; scored
+remainder Posts are not filtered. See POST_RECOMMENDED_HOME_VIEW_HISTORY.md.
 
 ### Future Post schema roadmap (not the V19-V21 physical schema)
 

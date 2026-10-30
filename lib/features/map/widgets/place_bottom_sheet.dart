@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../place/widgets/place_rating_builder.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -32,7 +33,12 @@ class GoMatePlaceBottomSheet extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: Container(
-        padding: EdgeInsets.fromLTRB(horizontal, vertical, horizontal, vertical),
+        padding: EdgeInsets.fromLTRB(
+          horizontal,
+          vertical,
+          horizontal,
+          vertical,
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(radius),
@@ -73,8 +79,9 @@ class GoMatePlaceBottomSheet extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize:
-                                  (width * 0.039).clamp(14.0, 16.0).toDouble(),
+                              fontSize: (width * 0.039)
+                                  .clamp(14.0, 16.0)
+                                  .toDouble(),
                               fontWeight: FontWeight.w800,
                               color: AppColors.primaryText,
                               height: 1.12,
@@ -85,21 +92,27 @@ class GoMatePlaceBottomSheet extends StatelessWidget {
                             children: [
                               Icon(
                                 Icons.star_rounded,
-                                size:
-                                    (width * 0.038).clamp(14.0, 16.0).toDouble(),
+                                size: (width * 0.038)
+                                    .clamp(14.0, 16.0)
+                                    .toDouble(),
                                 color: AppColors.primaryIcon,
                               ),
                               SizedBox(width: width * 0.008),
                               Flexible(
-                                child: Text(
-                                  '${place.rating.toStringAsFixed(1)} (${place.reviewCount})   ${place.categoryLabel}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: (width * 0.026)
-                                        .clamp(9.5, 11.0)
-                                        .toDouble(),
-                                    color: AppColors.grayText,
+                                child: PlaceRatingBuilder(
+                                  placeId: place.placeId,
+                                  average: place.rating,
+                                  count: place.reviewCount,
+                                  builder: (r) => Text(
+                                    '${r.label}   ${place.categoryLabel}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: (width * 0.026)
+                                          .clamp(9.5, 11.0)
+                                          .toDouble(),
+                                      color: AppColors.grayText,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -111,8 +124,9 @@ class GoMatePlaceBottomSheet extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize:
-                                  (width * 0.025).clamp(9.3, 10.8).toDouble(),
+                              fontSize: (width * 0.025)
+                                  .clamp(9.3, 10.8)
+                                  .toDouble(),
                               color: AppColors.grayText,
                               height: 1.2,
                             ),
@@ -176,7 +190,8 @@ class GoMatePlaceBottomSheet extends StatelessWidget {
   }
 
   Widget _thumbnail() {
-    final raw = place.thumbnailUrl ??
+    final raw =
+        place.thumbnailUrl ??
         (place.mediaUrls.isEmpty ? null : place.mediaUrls.first);
 
     if (raw == null) return _fallback();
@@ -208,10 +223,7 @@ class _GradientButton extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
 
-  const _GradientButton({
-    required this.label,
-    required this.onTap,
-  });
+  const _GradientButton({required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {

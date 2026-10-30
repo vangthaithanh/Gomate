@@ -10,6 +10,8 @@ Codex always reads root `AGENTS.md`.
 
 | Task | Read |
 |---|---|
+| Recommended Home ranking / viewed-post history / snapshot cursor | `POST_RECOMMENDED_HOME_VIEW_HISTORY.md` + `POST_HOME_FEED_P2.md` + `GLOBAL_USER_BLOCK.md`; viewed filtering applies only to current friend/follow groups, never the scored remainder |
+| Place unrated display / real rating/review | `PLACE_UNRATED_DISPLAY_TEAM_HANDOFF.md` + `PLACE_RATING_REVIEW_FOUNDATION.md`; count=0 displays “Chưa có đánh giá”, no numeric score; old display-five instructions are superseded |
 | Docker build fails PostPublish tagged-user 422/404 / teammate sync | `POST_PUBLISH_TAG_VALIDATION_HOTFIX.md`; keep Global Block, replay/idempotency and full Docker test gate; no DB re-restore |
 | Publish local baseline / AI Post handoff | `AI_HANDOFF/00_START_HERE.md` through `07_GIT_RELEASE_REPORT.md`; Post AI and seed remain proposals, no permission to change current UI/business |
 | Global Block / legacy DIRECT conversion / viewer-scoped Trip GPS / group warning | `GLOBAL_USER_BLOCK.md` + `ACCOUNT_PRIVACY_FOUNDATION_P1A.md` + `DIRECT_MESSAGE_PRIVACY_REQUESTS.md`; final user decision 29/10/2026 supersedes independent DIRECT block |

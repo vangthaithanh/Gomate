@@ -1,4 +1,11 @@
-# Place AI hiện có / Post AI chưa triển khai
+# Place AI hiện có / Post model AI vẫn chưa triển khai
+
+> Cập nhật 2026-10-30: Home hiện có Spring ranking tại
+> `GET /api/v1/feed/recommended`, dùng điểm Place AI hiện có cùng hashtag và
+> tương tác; đây không phải model Post được train. Snapshot và lịch sử xem V28
+> được mô tả tại [POST_RECOMMENDED_HOME_VIEW_HISTORY](../POST_RECOMMENDED_HOME_VIEW_HISTORY.md).
+> Phần đề xuất model Post bên dưới chỉ còn là tài liệu tương lai và không mô tả
+> endpoint Home hiện hành.
 
 ## Đã có: Place cold-start
 

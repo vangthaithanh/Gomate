@@ -40,7 +40,7 @@ public class PlaceRepository {
  public List<Map<String,Object>> listActive() {
   return db.list("""
    SELECT p.id AS place_id,p.name,c.code AS category,c.name AS category_name,
-          p.latitude,p.longitude,p.province,p.district,p.address,
+          p.latitude,p.longitude,p.province,p.district,p.address,p.avg_rating,p.review_count,
           (SELECT pm.url FROM place_media pm
            WHERE pm.place_id=p.id AND pm.media_type='IMAGE'
            ORDER BY pm.sort_order,pm.id LIMIT 1) AS thumbnail_url
@@ -55,7 +55,7 @@ public class PlaceRepository {
   String like="%"+q.toLowerCase(Locale.ROOT)+"%";
   return db.list("""
    SELECT p.id AS place_id,p.name,c.code AS category,c.name AS category_name,
-          p.latitude,p.longitude,p.province,p.district,p.address,
+          p.latitude,p.longitude,p.province,p.district,p.address,p.avg_rating,p.review_count,
           (SELECT pm.url FROM place_media pm
            WHERE pm.place_id=p.id AND pm.media_type='IMAGE'
            ORDER BY pm.sort_order,pm.id LIMIT 1) AS thumbnail_url

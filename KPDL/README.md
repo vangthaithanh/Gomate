@@ -1,5 +1,3 @@
-> Historical v12 training overview below; runtime currently prefers the v13 research bundle in api_service.py. See docs/AI_HANDOFF/03_POST_AI_RECOMMENDATION_CONTRACT.md; this is Place AI, not a Post model.
-
 # GoMate semantic-v1 training bundle
 
 Start with `GOMATE_AI_ML_SEMANTIC_V1_TRAINING_GUIDE.md`.

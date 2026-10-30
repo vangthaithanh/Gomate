@@ -1,5 +1,6 @@
 import '../../../core/services/auth_service.dart';
 import '../models/recommendation_models.dart';
+import '../../place/data/place_review_repository.dart';
 
 class RecommendationRepository {
   final AuthService _auth;
@@ -13,6 +14,7 @@ class RecommendationRepository {
     double? latitude,
     double? longitude,
   }) async {
+    final ratingRevision = PlaceRatingChanges.revision;
     final query = <String, String>{
       'topK': topK.toString(),
       if (destinationKey != null && destinationKey.trim().isNotEmpty)
@@ -23,6 +25,15 @@ class RecommendationRepository {
 
     final uri = Uri(path: '/recommendations/home', queryParameters: query);
     final data = await _auth.request('GET', uri.toString());
-    return RecommendationResponse.fromJson(data);
+    final result = RecommendationResponse.fromJson(data);
+    if (ratingRevision == PlaceRatingChanges.revision) {
+      for (final place in result.items) {
+        PlaceRatingChanges.acknowledge(
+          place.placeId.toString(),
+          PlaceRating(place.rating, place.reviewCount),
+        );
+      }
+    }
+    return result;
   }
 }

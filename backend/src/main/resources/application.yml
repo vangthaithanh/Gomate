@@ -63,6 +63,7 @@ app:
     recommendation-url: ${AI_SERVICE_BASE_URL:${AI_RECOMMENDATION_URL:http://localhost:8000}}
     recommendation-candidate-k: ${AI_RECOMMENDATION_CANDIDATE_K:50}
     recommendation-home-limit: ${AI_RECOMMENDATION_HOME_LIMIT:10}
+    recommendation-history-limit: ${AI_RECOMMENDATION_HISTORY_LIMIT:50}
     recommendation-timeout-ms: ${AI_RECOMMENDATION_TIMEOUT_MS:2500}
   recommendation:
     semantic-weight: ${RECOMMENDATION_SEMANTIC_WEIGHT:0.75}

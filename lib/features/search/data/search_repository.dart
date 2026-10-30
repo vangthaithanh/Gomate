@@ -5,6 +5,7 @@ import '../../map/services/location_service.dart';
 import '../../recommendation/data/recommendation_repository.dart';
 import '../../recommendation/models/recommendation_models.dart';
 import '../models/search_models.dart';
+import '../../place/data/place_review_repository.dart';
 
 /// Search data stays server-owned; Recommendation is used only for Discovery.
 class SearchRepository {
@@ -148,6 +149,7 @@ class SearchRepository {
     double? latitude,
     double? longitude,
   }) async {
+    final ratingRevision = PlaceRatingChanges.revision;
     final data = await _auth.request(
       'GET',
       Uri(
@@ -164,6 +166,17 @@ class SearchRepository {
         },
       ).toString(),
     );
+    if (ratingRevision == PlaceRatingChanges.revision) {
+      for (final row in data['items'] as List) {
+        PlaceRatingChanges.acknowledge(
+          row['placeId'].toString(),
+          PlaceRating(
+            (row['avgRating'] as num?)?.toDouble() ?? 0,
+            (row['reviewCount'] as num?)?.toInt() ?? 0,
+          ),
+        );
+      }
+    }
     return SearchBundle(
       latitude: latitude,
       longitude: longitude,

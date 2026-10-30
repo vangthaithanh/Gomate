@@ -1,0 +1,6 @@
+CREATE TABLE post_home_views (
+ viewer_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+ viewed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ PRIMARY KEY(viewer_user_id,post_id)
+);

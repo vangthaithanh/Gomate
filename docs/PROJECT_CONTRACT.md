@@ -138,6 +138,7 @@ Spring -> AI. Flutter does not call AI directly. AI returns ranking/suggestion, 
 - External place is imported only when a business action needs an internal Place (save/review/add-to-trip) and no mapping exists.
 - Saved Place is unique user/place.
 - One active review per user/place; second submission is update flow.
+- V27 Place review implementation is documented in `PLACE_RATING_REVIEW_FOUNDATION.md`: owner-only create/edit/soft-delete, real ACTIVE/VISIBLE average/count. Owner clarification 2026-10-29: zero reviews DISPLAY 5.0 + “Chưa có đánh giá”, while DB/API remain 0/0; never use display-five as an AI rating/vote. No review media upload, notification, or AI model change in this foundation.
 - Review allowed without check-in.
 - Valid check-in can set/update `verified_visit_at`.
 
@@ -172,6 +173,12 @@ Latest P1B/P1C audience rules supersede older Post handoff audience lists:
   Like/Unlike and Save/Unsave return viewer-specific flags and real Like counts.
   List/count/actions/media enforce server eligibility; no Like notification or AI
   Feed ranking. No demo Post fallback. See POST_HOME_FEED_P2.md.
+- The current Home extension uses `GET /api/v1/feed/recommended`: mutual-follow
+  posts first, followed-author posts second, then the existing Spring
+  recommendation score. V28 stores idempotent per-viewer Home views. A new
+  snapshot filters viewed Posts only when the viewer currently follows the
+  author; the scored remainder and Profile are not filtered. See
+  POST_RECOMMENDED_HOME_VIEW_HISTORY.md. This does not train or change AI v15.
 - Comment/Report, internal Share/Post Search and DM privacy requests are implemented; see the addenda below. Guest sharing remains deferred.
   PROFILE_POST_P1C.md governs ownership/30s; POST_PUBLISH_P1B.md remains historical.
 - PRIVATE account cannot expose a truly PUBLIC post; backend gates visibility.

@@ -84,7 +84,7 @@ void main() {
   String path(int id) =>
       '/posts/$id/media/00000000-0000-4000-8000-000000000001';
   test(
-    'short tab/resume preserves metadata; >=5min away refreshes once; no timer polling',
+    'each Home return refreshes relationship snapshot once; no timer polling',
     () async {
       final auth = await fixture.auth();
       final repo = _Feed(auth);
@@ -96,16 +96,16 @@ void main() {
       await feed.setVisible(true);
       await auth
           .loadProfile(); // Unchanged self profile is not a permission event.
-      expect(repo.reads, 1);
+      expect(repo.reads, 2);
       await feed.setVisible(false);
       now = now.add(const Duration(minutes: 5));
       await feed.setVisible(true);
       await feed.setVisible(true);
-      expect(repo.reads, 2);
+      expect(repo.reads, 3);
       repo.hold = Completer();
       final a = feed.refresh(), b = feed.refresh();
       expect(identical(a, b), true);
-      expect(repo.reads, 3);
+      expect(repo.reads, 4);
       repo.hold!.complete({
         'items': [fixture.post(1)],
         'nextCursor': null,
@@ -116,12 +116,12 @@ void main() {
       PostChanges.changed(id: 1);
       await Future<void>.delayed(Duration.zero);
       expect(repo.details, 1);
-      expect(repo.reads, 3);
+      expect(repo.reads, 4);
       expect(feed.items.single['commentCount'], 7);
       repo.hold = null;
       ContentAccessChanges.changed();
       await Future<void>.delayed(Duration.zero);
-      expect(repo.reads, 4);
+      expect(repo.reads, 5);
       feed.dispose();
       auth.dispose();
     },

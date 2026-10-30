@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import '../../../core/config/api_config.dart';
 import '../../../core/network/api_exception.dart';
 import '../models/place_models.dart';
+import 'place_review_repository.dart';
 
 class PlaceApi {
   final http.Client _client;
@@ -16,21 +17,26 @@ class PlaceApi {
     : _client = client ?? http.Client(),
       _baseUrls = baseUrls;
 
+  void close() => _client.close();
+
   Future<List<PlaceSummary>> listPlaces() async {
+    final revision = PlaceRatingChanges.revision;
     final json = await _get('/places');
-    return _parseSummaryList(json);
+    return _summaries(json, revision);
   }
 
   Future<List<PlaceSummary>> searchPlaces(String query) async {
+    final revision = PlaceRatingChanges.revision;
     final q = query.trim();
     final json = await _get(
       '/places/search',
       queryParameters: q.isEmpty ? const {} : {'q': q},
     );
-    return _parseSummaryList(json);
+    return _summaries(json, revision);
   }
 
   Future<PlaceDetail> getPlace(int id) async {
+    final revision = PlaceRatingChanges.revision;
     final json = await _get('/places/$id');
     final data = _unwrapData(json);
     if (data is! Map) {
@@ -40,7 +46,26 @@ class PlaceApi {
         'Place detail API trả dữ liệu không hợp lệ.',
       );
     }
-    return PlaceDetail.fromJson(Map<String, dynamic>.from(data));
+    final detail = PlaceDetail.fromJson(Map<String, dynamic>.from(data));
+    if (revision == PlaceRatingChanges.revision)
+      PlaceRatingChanges.acknowledge(
+        id.toString(),
+        PlaceRating(detail.rating, detail.reviewCount),
+      );
+    return detail;
+  }
+
+  List<PlaceSummary> _summaries(Object? json, int revision) {
+    final rows = _parseSummaryList(json);
+    if (revision == PlaceRatingChanges.revision) {
+      for (final p in rows) {
+        PlaceRatingChanges.acknowledge(
+          p.placeId.toString(),
+          PlaceRating(p.rating, p.reviewCount),
+        );
+      }
+    }
+    return rows;
   }
 
   Future<Object?> _get(

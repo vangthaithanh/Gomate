@@ -140,8 +140,10 @@ public class ContextualRecommendationReranker {
     }
 
     private double reviewScore(Map<String, Object> item) {
-        double ratingScore = clamp01(number(item.get("avgRating")) / 5.0);
         double reviewCount = Math.max(0.0, number(item.get("reviewCount")));
+        if (reviewCount <= 0.0) return 0.0;
+        double rating = number(item.get("avgRating"));
+        double ratingScore = rating >= 1.0 && rating <= 5.0 ? clamp01(rating / 5.0) : 0.0;
         double volumeScore = reviewCount / (reviewCount + 10.0);
         return clamp01(0.7 * ratingScore + 0.3 * volumeScore);
     }
@@ -151,7 +153,10 @@ public class ContextualRecommendationReranker {
         double reviewCount = Math.max(0.0, number(item.get("reviewCount")));
         double saveScore = saveCount / (saveCount + 20.0);
         double reviewScore = reviewCount / (reviewCount + 10.0);
-        double ratingScore = clamp01(number(item.get("avgRating")) / 5.0);
+        double rating = number(item.get("avgRating"));
+        double ratingScore = reviewCount <= 0.0 || rating < 1.0 || rating > 5.0
+            ? 0.0
+            : clamp01(rating / 5.0);
         return clamp01(0.5 * saveScore + 0.3 * reviewScore + 0.2 * ratingScore);
     }
 

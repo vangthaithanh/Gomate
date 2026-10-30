@@ -31,8 +31,12 @@ class PostRepository {
       auth.request('POST', '/posts', body: body);
   Future<Map<String, dynamic>> feed({String? cursor}) => auth.request(
     'GET',
-    '/feed?size=20${cursor == null ? '' : '&cursor=${Uri.encodeQueryComponent(cursor)}'}',
+    '/feed/recommended?size=20${cursor == null ? '' : '&cursor=${Uri.encodeQueryComponent(cursor)}'}',
   );
+  Future<void> recordHomeView(int id) async {
+    await auth.request('PUT', '/feed/recommended/$id/view');
+  }
+
   Future<Map<String, dynamic>> engagement(
     int id,
     String kind,

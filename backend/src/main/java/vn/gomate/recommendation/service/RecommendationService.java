@@ -22,6 +22,7 @@ public class RecommendationService {
     private final ObjectMapper mapper;
     private final int candidateK;
     private final int homeLimit;
+    private final int historyLimit;
 
     public RecommendationService(
         AuthRepository auth,
@@ -31,7 +32,8 @@ public class RecommendationService {
         InteractionEventService interactionEvents,
         ObjectMapper mapper,
         @Value("${app.ai.recommendation-candidate-k:50}") int candidateK,
-        @Value("${app.ai.recommendation-home-limit:10}") int homeLimit
+        @Value("${app.ai.recommendation-home-limit:10}") int homeLimit,
+        @Value("${app.ai.recommendation-history-limit:50}") int historyLimit
     ) {
         this.auth = auth;
         this.ai = ai;
@@ -41,6 +43,7 @@ public class RecommendationService {
         this.mapper = mapper;
         this.candidateK = Math.max(1, Math.min(candidateK, 100));
         this.homeLimit = Math.max(1, Math.min(homeLimit, 50));
+        this.historyLimit = Math.max(1, Math.min(historyLimit, 100));
     }
 
     public Map<String, Object> mine(
@@ -63,6 +66,7 @@ public class RecommendationService {
                 .toList();
         }
         List<String> contextCodes = places.filterContextCodes(allOptionCodes);
+        List<String> historyExternalIds = places.findUserHistoryExternalIds(userId, historyLimit);
 
         if (semanticInterestCodes.isEmpty()) {
             Map<String, Object> result = fallbackOnly(
@@ -72,6 +76,7 @@ public class RecommendationService {
                 limit,
                 latitude,
                 longitude,
+                historyExternalIds.size(),
                 "Người dùng chưa có lựa chọn semantic từ khảo sát; dùng fallback PostgreSQL."
             );
             interactionEvents.recordHomeRecommendationServed(userId, result);
@@ -84,7 +89,8 @@ public class RecommendationService {
                 effectiveDestination,
                 semanticInterestCodes,
                 contextCodes,
-                Math.max(candidateK, limit)
+                Math.max(candidateK, limit),
+                historyExternalIds
             );
         } catch (ApiException error) {
             Map<String, Object> result = fallbackOnly(
@@ -94,6 +100,7 @@ public class RecommendationService {
                 limit,
                 latitude,
                 longitude,
+                historyExternalIds.size(),
                 error.getMessage()
             );
             interactionEvents.recordHomeRecommendationServed(userId, result);
@@ -149,12 +156,15 @@ public class RecommendationService {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("modelVersion", response.modelVersion());
-        result.put("coldStart", true);
+        result.put("coldStart", historyExternalIds.isEmpty());
         result.put("destinationKey", effectiveDestination);
         result.put("optionCodes", semanticInterestCodes);
         result.put("contextCodes", contextCodes);
+        result.put("historyCount", historyExternalIds.size());
         result.put("scoringMode", response.selectedStrategy());
         result.put("totalCandidates", response.totalCandidates());
+        result.put("componentAvailability", response.componentAvailability());
+        result.put("componentUnavailableReasons", response.componentUnavailableReasons());
         result.put("items", items.stream().limit(limit).toList());
         result.put("warnings", warnings);
         interactionEvents.recordHomeRecommendationServed(userId, result);
@@ -168,6 +178,7 @@ public class RecommendationService {
         int limit,
         Double latitude,
         Double longitude,
+        int historyCount,
         String warning
     ) {
         List<Map<String, Object>> items = new ArrayList<>();
@@ -179,11 +190,22 @@ public class RecommendationService {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("modelVersion", "postgres-popular-fallback");
-        result.put("coldStart", true);
+        result.put("coldStart", historyCount == 0);
         result.put("destinationKey", destinationKey);
         result.put("optionCodes", semanticInterestCodes);
         result.put("contextCodes", contextCodes);
+        result.put("historyCount", historyCount);
         result.put("scoringMode", "fallback");
+        result.put("componentAvailability", Map.of(
+            "association_rule", false,
+            "svd", false,
+            "content_based", false
+        ));
+        result.put("componentUnavailableReasons", Map.of(
+            "association_rule", "ai_unavailable_or_no_semantic_profile",
+            "svd", "ai_unavailable_or_no_semantic_profile",
+            "content_based", "ai_unavailable_or_no_semantic_profile"
+        ));
         result.put("totalCandidates", items.size());
         result.put("items", items.stream().limit(limit).toList());
         result.put("warnings", warnings);
@@ -280,7 +302,11 @@ public class RecommendationService {
         );
         item.put(
             "score",
-            recommendation == null ? row.get("score") : recommendation.semanticScore()
+            recommendation == null
+                ? row.get("score")
+                : recommendation.hybridScore() == null
+                    ? recommendation.semanticScore()
+                    : recommendation.hybridScore()
         );
         item.put(
             "reason",
@@ -292,19 +318,37 @@ public class RecommendationService {
             "modelSource",
             recommendation == null
                 ? "postgres_popular_fallback"
-                : "ai_semantic_v1"
+                : "ai_research_v15_hybrid_screen12"
         );
+        if (recommendation != null) {
+            item.put("semanticScore", recommendation.semanticScore());
+            item.put("hybridScore", recommendation.hybridScore());
+            item.put("associationRuleScore", recommendation.associationRuleScore());
+            item.put("associationRuleAvailable", recommendation.associationRuleAvailable());
+            item.put("svdScore", recommendation.svdScore());
+            item.put("svdAvailable", recommendation.svdAvailable());
+        }
         return item;
     }
 
     private String aiReason(
         RecommendationDtos.AiRecommendation recommendation
     ) {
-        if (recommendation.semanticStatus() == null || recommendation.semanticStatus().isBlank()) {
-            return "Phù hợp với nhóm sở thích bạn đã chọn trong khảo sát.";
+        List<String> signals = new ArrayList<>();
+        if (Boolean.TRUE.equals(recommendation.associationRuleAvailable())) {
+            signals.add("Association Rules");
         }
-        return "Phù hợp semantic-v1 (" + recommendation.semanticStatus() + "), điểm "
-            + String.format(Locale.ROOT, "%.2f", recommendation.semanticScore() == null ? 0.0 : recommendation.semanticScore())
+        if (Boolean.TRUE.equals(recommendation.svdAvailable())) {
+            signals.add("adapter SVD Tour × Place");
+        }
+        String source = signals.isEmpty()
+            ? "semantic-v1 theo sở thích khảo sát"
+            : "semantic-v1 và " + String.join(", ", signals);
+        double score = recommendation.hybridScore() == null
+            ? recommendation.semanticScore() == null ? 0.0 : recommendation.semanticScore()
+            : recommendation.hybridScore();
+        return "Phù hợp " + source + ", điểm "
+            + String.format(Locale.ROOT, "%.2f", score)
             + ".";
     }
 

@@ -174,7 +174,7 @@ Migration location:
 backend/src/main/resources/db/migration/
 ```
 
-Actual live history is V1-V26 after pin-centric reset, Trip reminders, privacy P1A,
+Actual live history is V1-V27 after Place Rating/Review foundation, pin-centric reset, Trip reminders, privacy P1A,
 Post P1B/P1C, Home Feed P2, Comment/Report P3, Settings activity indexes, P4 search history
 date-only Trip reminders and the single Global Block authority; inspect real
 Flyway history before choosing the next version. The staged outline below is a
@@ -289,6 +289,7 @@ Do not change these without explicit approval:
 - Block revokes both follows/cancels pending follow requests, restricts Post/media/Search/social notifications/GPS both ways, but keeps DM/group messages, Trip membership/Leader/Pin/reminders and global location snapshots. GPS REST/SSE/LAST_KNOWN is viewer-filtered; Unblock affects only caller direction and never restores relationships. Group warning is blocker-only, once per entry, explicit ACK Unblock or dismiss-only Close. See `docs/GLOBAL_USER_BLOCK.md`.
 - Post Share sends an ID reference to eligible mutual/ACCEPTED DM or active groups. User decision 2026-10-23: BOTH DM and GROUP recipients check current Post/media permission when opening; sender must be authorized at send time. Never copy private Post previews or relax Post/media read authorization. PENDING/blocked chats remain ineligible.
 - Review does not require check-in; valid check-in may set verified-visit signal.
+- Place reviews use V27 and one ACTIVE review per user/Place, owner edit/soft-delete, ACTIVE/VISIBLE average and count, plus Global Block author filtering. Owner decision 2026-10-30 supersedes display-five: count=0 displays “Chưa có đánh giá” and zero real reviews, never numeric 5.0/0.0 as a rated score or five filled stars. DB/API remain 0/0; no synthetic vote/AI feature. See docs/PLACE_UNRATED_DISPLAY_TEAM_HANDOFF.md. Core two-account CRUD confirmed 2026-10-30; owner then requested delete-sheet visual alignment and local AI packaging. Preserve untested-native limitations in `docs/PLACE_RATING_REVIEW_FOUNDATION.md` and `docs/AI_HANDOFF/08_PLACE_RATING_REVIEW_V27.md`. No review media/Admin/AI pipeline in this foundation.
 - Official Place comes from Admin, controlled external import, or approved user submission.
 - One Trip domain handles PERSONAL and GROUP.
 - Exactly one active LEADER per Trip.

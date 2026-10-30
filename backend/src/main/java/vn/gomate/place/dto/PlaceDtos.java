@@ -21,7 +21,9 @@ public final class PlaceDtos {
   String province,
   String district,
   String address,
-  String thumbnailUrl
+  String thumbnailUrl,
+  BigDecimal avgRating,
+  Integer reviewCount
  ) {}
 
  public record Detail(

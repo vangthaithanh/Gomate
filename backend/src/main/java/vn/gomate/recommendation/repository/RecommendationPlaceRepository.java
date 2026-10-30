@@ -79,7 +79,8 @@ public class RecommendationPlaceRepository {
                 p.save_count,
                 (COALESCE(p.save_count,0) * 2
                     + COALESCE(p.review_count,0) * 3
-                    + COALESCE(p.avg_rating,0) * 10) AS "score",
+                    + CASE WHEN COALESCE(p.review_count,0) > 0
+                           THEN COALESCE(p.avg_rating,0) * 10 ELSE 0 END) AS "score",
                 (SELECT pm.url
                  FROM place_media pm
                  WHERE pm.place_id=p.id AND pm.media_type='IMAGE'
@@ -92,7 +93,8 @@ public class RecommendationPlaceRepository {
             ORDER BY
                 COALESCE(p.save_count,0) DESC,
                 COALESCE(p.review_count,0) DESC,
-                COALESCE(p.avg_rating,0) DESC,
+                CASE WHEN COALESCE(p.review_count,0) > 0
+                     THEN COALESCE(p.avg_rating,0) ELSE 0 END DESC,
                 p.id DESC
             LIMIT :limit
             """, queryArgs);
@@ -131,6 +133,39 @@ public class RecommendationPlaceRepository {
             """, args("codes", optionCodes))
             .stream()
             .map(row -> String.valueOf(row.get("code")))
+            .toList();
+    }
+
+    /**
+     * Reads valid Place history from Trips where the current user has a
+     * membership row. Search text, global Place counters and unrelated users'
+     * data are intentionally excluded. The current schema does not record
+     * which member created each group Trip Stop, so this is Trip-membership
+     * history, not proof of an individual click/save action.
+     */
+    public List<String> findUserHistoryExternalIds(java.util.UUID userId, int limit) {
+        return db.list("""
+            SELECT p.external_id
+            FROM trip_stops s
+            JOIN trip_members tm ON tm.trip_id=s.trip_id
+            JOIN places p ON p.id=s.place_id
+            WHERE tm.user_id=:userId
+              AND tm.status IN ('ACTIVE','LEFT','KICKED')
+              AND s.status IN ('PLANNED','VISITED')
+              AND p.status='ACTIVE'
+              AND p.external_id IS NOT NULL
+              AND BTRIM(p.external_id)<>''
+            GROUP BY p.external_id
+            ORDER BY MAX(s.updated_at) DESC,p.external_id
+            LIMIT :limit
+            """, args(
+                "userId", userId,
+                "limit", Math.max(1, Math.min(limit, 100))
+            ))
+            .stream()
+            .map(row -> String.valueOf(row.get("externalId")).trim())
+            .filter(value -> !value.isBlank())
+            .distinct()
             .toList();
     }
 }

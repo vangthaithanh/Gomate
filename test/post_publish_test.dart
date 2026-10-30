@@ -66,7 +66,10 @@ class _SessionStore implements SessionStore {
 }
 
 void main() {
-  for (final path in ['/users/owner/posts?size=20', '/feed?size=20']) {
+  for (final path in [
+    '/users/owner/posts?size=20',
+    '/feed/recommended?size=20',
+  ]) {
     test('Post media keeps the API candidate that served $path', () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
@@ -102,6 +105,42 @@ void main() {
       service.dispose();
     });
   }
+  test('Home feed requests recommended snapshot and encodes its cursor', () async {
+    Uri? feedRequest;
+    final service = AuthService(
+      store: _SessionStore(),
+      baseUrl: 'http://localhost:8081/api/v1',
+      client: MockClient((request) async {
+        if (request.url.path.endsWith('/login')) {
+          return http.Response(
+            jsonEncode({
+              'accessToken': 'access',
+              'refreshToken': 'refresh',
+              'user': {'id': 'owner'},
+            }),
+            200,
+          );
+        }
+        feedRequest = request.url;
+        return http.Response(
+          jsonEncode({'items': [], 'nextCursor': null}),
+          200,
+        );
+      }),
+    );
+    await service.login(
+      email: 'owner@example.com',
+      password: 'TestPass123!',
+      remember: false,
+    );
+    await PostRepository(auth: service).feed(cursor: 'snapshot+/=');
+    expect(feedRequest?.path, '/api/v1/feed/recommended');
+    expect(feedRequest?.queryParameters, {
+      'size': '20',
+      'cursor': 'snapshot+/=',
+    });
+    service.dispose();
+  });
   test('protected Post media always requests fresh authorized bytes', () async {
     var mediaRequests = 0;
     var denied = false;

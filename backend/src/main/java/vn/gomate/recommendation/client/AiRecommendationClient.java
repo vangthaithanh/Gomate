@@ -31,14 +31,16 @@ public class AiRecommendationClient {
         String destinationKey,
         List<String> semanticInterestCodes,
         List<String> contextCodes,
-        int topK
+        int topK,
+        List<String> historyExternalIds
     ) {
         var request = new RecommendationDtos.AiRequest(
             destinationKey,
             semanticInterestCodes == null ? List.of() : semanticInterestCodes,
             contextCodes == null ? List.of() : contextCodes,
             Math.max(1, Math.min(topK, 100)),
-            false
+            false,
+            historyExternalIds == null ? List.of() : historyExternalIds.stream().distinct().limit(100).toList()
         );
         try {
             var response = client.post()

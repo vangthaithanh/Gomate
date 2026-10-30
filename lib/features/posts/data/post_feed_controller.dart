@@ -7,7 +7,9 @@ import 'post_interaction_changes.dart';
 
 /// Metadata/permission state, independent of Home's bounded media resources.
 class PostFeedController extends ChangeNotifier {
-  static const absenceTtl = Duration(minutes: 5);
+  // Re-entering Home starts a new recommendation snapshot so current follow,
+  // friendship and block relationships are read again by the backend.
+  static const absenceTtl = Duration.zero;
   final PostRepository repository;
   final DateTime Function() now;
   List<Map<String, dynamic>> items = [];

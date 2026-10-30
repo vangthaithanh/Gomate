@@ -1,9 +1,13 @@
 import 'dart:io';
+import 'dart:async';
+import '../../../core/services/content_access_changes.dart';
+import '../../../core/network/api_exception.dart';
+import '../../place/data/place_review_repository.dart';
+import '../../place/data/place_api.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/bottom_sheet.dart';
@@ -17,6 +21,7 @@ import '../utils/cloudinary_image_url.dart';
 import '../widgets/share_place_content.dart';
 import '../../profile/screens/profile_post_feed_screen.dart';
 import '../../profile/widgets/profile_ui_widgets.dart';
+import '../../messages/widgets/message_widgets.dart' show MessageConfirmContent;
 
 class MapPlaceUi {
   final String id;
@@ -26,8 +31,14 @@ class MapPlaceUi {
   final String distanceText;
   final String openInfo;
   final String priceInfo;
-  final double rating;
-  final int reviewCount;
+  final double _rating;
+  final int _reviewCount;
+  double get rating =>
+      (PlaceRatingChanges.forPlace(id).value ??
+              PlaceRating(_rating, _reviewCount))
+          .display;
+  int get reviewCount =>
+      PlaceRatingChanges.forPlace(id).value?.count ?? _reviewCount;
   final int likeCount;
   final List<String> tags;
   final String? imageAsset;
@@ -42,14 +53,15 @@ class MapPlaceUi {
     required this.distanceText,
     required this.openInfo,
     required this.priceInfo,
-    required this.rating,
-    required this.reviewCount,
+    required double rating,
+    required int reviewCount,
     required this.likeCount,
     required this.tags,
     this.imageAsset,
     this.imageUrl,
     this.mediaUrls = const <String>[],
-  });
+  }) : _rating = rating,
+       _reviewCount = reviewCount;
 }
 
 /// UI store tạm thời để không thay đổi backend hiện tại.
@@ -92,10 +104,14 @@ class FavoritePlaceStore {
 
 class PlaceDetailScreen extends StatefulWidget {
   final MapPlaceUi place;
+  final PlaceReviewRepository? reviewRepository;
+  final PlaceApi? placeApi;
 
   const PlaceDetailScreen({
     super.key,
     required this.place,
+    this.reviewRepository,
+    this.placeApi,
   });
 
   @override
@@ -107,7 +123,152 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
   final PostInteractionRepository _shareRepository =
       DemoPostInteractionRepository();
 
-  late List<_PlaceReviewUi> _reviews;
+  List<_PlaceReviewUi> _reviews = [];
+  late final _reviewRepo = widget.reviewRepository ?? PlaceReviewRepository();
+  late final _placeApi = widget.placeApi ?? PlaceApi();
+  PlaceReview? _ownedReview;
+  bool _reviewsLoading = true;
+  String? _reviewError;
+  int _reviewEpoch = 0;
+  int? _nextReview;
+  String? _actor;
+  String _message(Object e) => e is ApiException
+      ? e.message
+      : 'Không tải được đánh giá. Vui lòng thử lại.';
+  _PlaceReviewUi _reviewUi(
+    PlaceReview r, {
+    bool mine = false,
+  }) => _PlaceReviewUi(
+    id: r.id.toString(),
+    author: mine ? 'Bạn' : r.author,
+    subtitle: r.hidden ? 'Đang ẩn' : '',
+    timeText: r.createdAt == null
+        ? ''
+        : '${r.createdAt!.toLocal().day}/${r.createdAt!.toLocal().month}/${r.createdAt!.toLocal().year}',
+    body: r.content,
+    rating: r.rating.toDouble(),
+    images: const [],
+    isMine: mine,
+  );
+  void _sessionChanged() {
+    final current = _reviewRepo.auth.user?['id']?.toString();
+    if (current == _actor) return;
+    _actor = current;
+    if (mounted)
+      setState(() {
+        _myReview = null;
+        _ownedReview = null;
+        _reviews = [];
+      });
+    unawaited(_loadReviews());
+  }
+
+  void _accessChanged() {
+    if (mounted) {
+      setState(() => _reviews = []);
+      unawaited(_loadReviews());
+    }
+  }
+
+  Future<void> _loadReviews() async {
+    final epoch = ++_reviewEpoch;
+    if (!mounted) return;
+    setState(() {
+      _reviewsLoading = true;
+      _reviewError = null;
+    });
+    try {
+      await _placeApi.getPlace(int.parse(place.id));
+      if (!mounted || epoch != _reviewEpoch) return;
+      if (!_reviewRepo.auth.signedIn) {
+        setState(() {
+          _reviewsLoading = false;
+          _reviewError = 'Đăng nhập để xem và gửi đánh giá.';
+        });
+        return;
+      }
+      final values = await Future.wait([
+        _reviewRepo.mine(place.id),
+        _reviewRepo.page(place.id),
+      ]);
+      if (!mounted || epoch != _reviewEpoch) return;
+      final own = values[0] as PlaceReviewState;
+      final page = values[1] as PlaceReviewPage;
+      _applyOwn(own);
+      setState(() {
+        _reviews = page.items
+            .where((r) => r.userId != _actor)
+            .map((r) => _reviewUi(r))
+            .toList();
+        _nextReview = page.nextBeforeId;
+        _reviewsLoading = false;
+      });
+    } catch (e) {
+      if (mounted && epoch == _reviewEpoch)
+        setState(() {
+          _reviewError = _message(e);
+          _reviewsLoading = false;
+        });
+    }
+  }
+
+  void _applyOwn(PlaceReviewState state) {
+    if (!mounted) return;
+    PlaceRatingChanges.acknowledge(place.id, state.stats);
+    setState(() {
+      _ownedReview = state.mine;
+      _myReview = state.mine == null
+          ? null
+          : _reviewUi(state.mine!, mine: true);
+    });
+  }
+
+  Future<void> _deleteMyReview() async {
+    final own = _ownedReview;
+    if (own == null) return;
+    final confirmed = await GoMateBottomSheet.show<bool>(
+      context: context,
+      child: Builder(
+        builder: (sheetContext) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            MessageConfirmContent(
+              title: 'Xóa đánh giá?',
+              description:
+                  'Đánh giá của bạn sẽ không còn được hiển thị và tính điểm.',
+              confirmLabel: 'Xóa',
+              onConfirm: () => Navigator.of(sheetContext).pop(true),
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.grayText,
+                backgroundColor: AppColors.grayBackground,
+                minimumSize: const Size(150, 44),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: const BorderSide(color: AppColors.grayBorder),
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              onPressed: () => Navigator.of(sheetContext).pop(false),
+              child: const Text('Đóng'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      _applyOwn(await _reviewRepo.delete(place.id, own.id));
+    } catch (e) {
+      if (mounted) GoMateSnackBar.show(context, message: _message(e));
+    }
+  }
+
   late Set<String> _selectedFolders;
   _PlaceReviewUi? _myReview;
   int _heroIndex = 0;
@@ -139,68 +300,20 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
   void initState() {
     super.initState();
     _selectedFolders = FavoritePlaceStore.foldersContaining(place);
-    _reviews = _buildDemoReviews();
+    _actor = _reviewRepo.auth.user?['id']?.toString();
+    _reviewRepo.auth.addListener(_sessionChanged);
+    ContentAccessChanges.revision.addListener(_accessChanged);
+    unawaited(_loadReviews());
   }
 
   @override
   void dispose() {
+    ++_reviewEpoch;
+    _reviewRepo.auth.removeListener(_sessionChanged);
+    ContentAccessChanges.revision.removeListener(_accessChanged);
+    if (widget.placeApi == null) _placeApi.close();
     _heroController.dispose();
     super.dispose();
-  }
-
-  List<_PlaceReviewUi> _buildDemoReviews() {
-    final hero = _heroImages;
-    final imageSource = hero.isEmpty
-        ? <String>[
-            'assets/images/home/post_1_1.jpg',
-            'assets/images/home/post_1_2.jpg',
-            'assets/images/home/post_1_3.jpg',
-          ]
-        : hero;
-
-    final reviewImages = List<String>.generate(
-      6,
-      (index) => imageSource[index % imageSource.length],
-    );
-
-    return <_PlaceReviewUi>[
-      _PlaceReviewUi(
-        id: 'review-1',
-        author: 'Thune',
-        subtitle: 'Xuan Thu',
-        timeText: '3 ngày',
-        body: 'Caption, đánh giá',
-        rating: 4.8,
-        images: reviewImages,
-      ),
-      _PlaceReviewUi(
-        id: 'review-2',
-        author: 'ChiThanh',
-        subtitle: 'Đà Nẵng',
-        timeText: '4 ngày',
-        body: 'Khung cảnh rất đẹp, trải nghiệm phù hợp cho chuyến đi ngắn.',
-        rating: 4.5,
-        images: const <String>[],
-      ),
-      _PlaceReviewUi(
-        id: 'review-3',
-        author: 'Buji',
-        subtitle: 'Quảng Bình',
-        timeText: '1 tuần',
-        body: 'Caption, đánh giá',
-        rating: 4.2,
-        images: reviewImages.take(3).toList(growable: false),
-      ),
-      _PlaceReviewUi(
-        id: 'review-4',
-        author: 'DaDaDa',
-        subtitle: 'Thanh Thuý',
-        timeText: '2 tuần',
-        body: 'Địa điểm đông vào giờ cao điểm nhưng cảnh rất đáng xem.',
-        rating: 3.9,
-        images: const <String>[],
-      ),
-    ];
   }
 
   void _toggleFavorite() {
@@ -218,48 +331,49 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
   }
 
   Future<void> _openReviewComposer({int? selectedRating}) async {
-    final current = _myReview;
-    final initialRating = selectedRating ?? current?.rating.round() ?? 0;
-
-    final draft = await GoMateBottomSheet.show<_DraftReview>(
+    if (_reviewsLoading || _reviewError != null) {
+      GoMateSnackBar.show(
+        context,
+        message: _reviewError ?? 'Đang tải đánh giá của bạn.',
+      );
+      return;
+    }
+    final current = _ownedReview;
+    await GoMateBottomSheet.show<bool>(
       context: context,
       size: GoMateBottomSheetSize.expanded,
       contentPadding: EdgeInsets.zero,
       child: _ReviewComposer(
-        initialRating: initialRating,
-        initialBody: current?.body ?? '',
-        initialImagePaths: current?.images ?? const <String>[],
+        initialRating: selectedRating ?? current?.rating ?? 5,
+        initialBody: current?.content ?? '',
+        initialImagePaths: const [],
         editing: current != null,
+        onSubmit: (rating, body) async {
+          final result = await _reviewRepo.save(
+            place.id,
+            rating,
+            body,
+            reviewId: current?.id,
+          );
+          ++_reviewEpoch;
+          _reviewsLoading = false;
+          _applyOwn(result);
+        },
       ),
     );
-
-    if (!mounted || draft == null) return;
-
-    final updated = _PlaceReviewUi(
-      id: current?.id ?? 'my-review',
-      author: 'Thune',
-      subtitle: 'Xuan Thu',
-      timeText: current == null ? 'Vừa xong' : 'Đã chỉnh sửa',
-      body: draft.body.isEmpty ? 'Đánh giá địa điểm' : draft.body,
-      rating: draft.rating.toDouble(),
-      images: draft.imagePaths,
-      isMine: true,
-    );
-
-    setState(() {
-      _myReview = updated;
-      _reviews.removeWhere((item) => item.isMine);
-      _reviews.insert(0, updated);
-    });
   }
 
   Future<void> _openAllReviews() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => PlaceReviewsScreen(
+          placeId: place.id,
+          repository: _reviewRepo,
+          nextBeforeId: _nextReview,
           placeName: place.name,
           address: place.address,
           overallRating: place.rating,
+          reviewCount: place.reviewCount,
           reviews: <_PlaceReviewUi>[
             if (_myReview != null) _myReview!,
             ..._reviews.where((item) => !item.isMine),
@@ -282,7 +396,6 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
     );
 
     if (!mounted || sentCount == null || sentCount <= 0) return;
-
   }
 
   Future<void> _openItineraryPicker() async {
@@ -294,32 +407,31 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
             id: trip.id,
             title: trip.title,
             dateRange: trip.dateRangeLabel,
-            summary:
-                '${trip.days} ngày - ${trip.places.length} địa điểm',
+            summary: '${trip.days} ngày - ${trip.places.length} địa điểm',
             imageAsset: trip.coverAsset,
             memberCount: trip.isGroup ? trip.memberCount : 0,
           ),
         )
         .toList(growable: false);
 
-    final selected =
-        await Navigator.of(context).push<GoMateItineraryPickerItem>(
-      MaterialPageRoute(
-        builder: (pickerContext) {
-          return GoMateItineraryPickerScreen(
-            items: items,
-            showCancel: true,
-            searchHint: 'Tìm kiếm lịch trình...',
-            onCancel: () {
-              Navigator.of(pickerContext).pop();
+    final selected = await Navigator.of(context)
+        .push<GoMateItineraryPickerItem>(
+          MaterialPageRoute(
+            builder: (pickerContext) {
+              return GoMateItineraryPickerScreen(
+                items: items,
+                showCancel: true,
+                searchHint: 'Tìm kiếm lịch trình...',
+                onCancel: () {
+                  Navigator.of(pickerContext).pop();
+                },
+                onSelected: (item) {
+                  Navigator.of(pickerContext).pop(item);
+                },
+              );
             },
-            onSelected: (item) {
-              Navigator.of(pickerContext).pop(item);
-            },
-          );
-        },
-      ),
-    );
+          ),
+        );
 
     if (!mounted || selected == null) return;
 
@@ -344,23 +456,19 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
 
     // Luồng từ Place Detail luôn đi đầy đủ:
     // Trip đã chọn -> chọn ngày -> giờ bắt đầu -> giờ kết thúc.
-    GoMateMapUiSession.requestAddPlaceFromDetail(
-      placeId: place.id,
-      trip: trip,
-    );
+    GoMateMapUiSession.requestAddPlaceFromDetail(placeId: place.id, trip: trip);
 
     // MainShell đã được yêu cầu đổi về Map.
     // Đóng toàn bộ route detail/search nằm trên MainShell để flow Map
     // luôn hiện ra ngay, bất kể Place Detail được mở từ đâu.
-    Navigator.of(context).popUntil(
-      (route) => route.isFirst,
-    );
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   bool _handleDetailScroll(UserScrollNotification notification) {
     if (notification.direction == ScrollDirection.idle) return false;
 
-    final shouldShow = notification.metrics.pixels <= 4 ||
+    final shouldShow =
+        notification.metrics.pixels <= 4 ||
         notification.direction == ScrollDirection.forward;
 
     if (shouldShow != _detailHeaderVisible && mounted) {
@@ -447,12 +555,9 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
             Positioned(
               left: 0,
               right: 0,
-              bottom:
-              safeBottom + (width * 0.035).clamp(12.0, 16.0).toDouble(),
+              bottom: safeBottom + (width * 0.035).clamp(12.0, 16.0).toDouble(),
               child: Center(
-                child: _AddItineraryButton(
-                  onTap: _openItineraryPicker,
-                ),
+                child: _AddItineraryButton(onTap: _openItineraryPicker),
               ),
             ),
           ],
@@ -488,7 +593,9 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
             padding: EdgeInsets.symmetric(vertical: width * 0.025),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(images.length.clamp(0, 5).toInt(), (index) {
+              children: List.generate(images.length.clamp(0, 5).toInt(), (
+                index,
+              ) {
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
                   margin: EdgeInsets.symmetric(horizontal: width * 0.008),
@@ -512,11 +619,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
     return const ColoredBox(
       color: AppColors.blue50,
       child: Center(
-        child: Icon(
-          LucideIcons.image,
-          size: 58,
-          color: AppColors.primaryIcon,
-        ),
+        child: Icon(LucideIcons.image, size: 58, color: AppColors.primaryIcon),
       ),
     );
   }
@@ -561,6 +664,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
               ...List.generate(5, (index) {
                 final active = index < userRating;
                 return InkWell(
+                  key: ValueKey('place-review-open-${index + 1}'),
                   onTap: () => _openReviewComposer(selectedRating: index + 1),
                   customBorder: const CircleBorder(),
                   child: Padding(
@@ -579,10 +683,22 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
           ),
         ),
         SizedBox(height: width * 0.042),
+        if (_reviewsLoading) const Center(child: CircularProgressIndicator()),
+        if (_reviewError != null)
+          TextButton(
+            onPressed: _loadReviews,
+            child: Text('$_reviewError · Thử lại'),
+          ),
+        if (!_reviewsLoading && _reviewError == null && place.reviewCount == 0)
+          const Text(
+            'Chưa có đánh giá',
+            style: TextStyle(color: AppColors.grayText),
+          ),
         for (final review in _mainReviews) ...[
           _ReviewCard(
             review: review,
             onEdit: review.isMine ? () => _openReviewComposer() : null,
+            onDelete: review.isMine ? _deleteMyReview : null,
           ),
           SizedBox(height: width * 0.040),
         ],
@@ -593,32 +709,20 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
   Widget _buildRelatedPlaces(double width, double horizontal) {
     final images = _heroImages;
     final first = images.isEmpty ? null : images.first;
-    final second = images.length > 1 ? images[1] : first;
 
     final cards = <_RelatedPlaceCardData>[
       _RelatedPlaceCardData(
         title: place.name,
         location: place.tags.length > 1 ? place.tags.last : 'Đà Nẵng',
-        rating: place.rating,
-        image: first,
-      ),
-      _RelatedPlaceCardData(
-        title: 'Động Phong Nha, Kẻ Bàng',
-        location: 'Quảng Bình',
-        rating: 4.8,
-        image: second,
-      ),
-      _RelatedPlaceCardData(
-        title: 'Địa điểm nổi bật',
-        location: 'Miền Trung',
-        rating: 4.8,
+        rating: PlaceRating(place.rating, place.reviewCount),
         image: first,
       ),
     ];
 
     final cardWidth = (width * 0.400).clamp(132.0, 156.0).toDouble();
     final cardHeight = cardWidth * (250 / 150);
-    final railHeight = cardHeight + (width * 0.045).clamp(16.0, 20.0).toDouble();
+    final railHeight =
+        cardHeight + (width * 0.045).clamp(16.0, 20.0).toDouble();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -687,12 +791,14 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
           padding: EdgeInsets.symmetric(horizontal: horizontal),
           child: Row(
             children: [
-              Text(
-                'Bài viết liên quan',
-                style: TextStyle(
-                  fontSize: (width * 0.033).clamp(12.0, 14.0).toDouble(),
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black,
+              Flexible(
+                child: Text(
+                  'Bài viết liên quan',
+                  style: TextStyle(
+                    fontSize: (width * 0.033).clamp(12.0, 14.0).toDouble(),
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black,
+                  ),
                 ),
               ),
               const Spacer(),
@@ -746,7 +852,6 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
   }
 }
 
-
 class _PlaceFloatingHeader extends StatelessWidget {
   final MapPlaceUi place;
   final bool isFavorite;
@@ -766,8 +871,7 @@ class _PlaceFloatingHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final horizontal =
-    (width * 0.055).clamp(18.0, 24.0).toDouble();
+    final horizontal = (width * 0.055).clamp(18.0, 24.0).toDouble();
 
     return Container(
       padding: EdgeInsets.fromLTRB(
@@ -792,25 +896,15 @@ class _PlaceFloatingHeader extends StatelessWidget {
           // Hàng icon: giữ nguyên luồng hiện tại.
           Row(
             children: [
-              _HeaderIconButton(
-                icon: LucideIcons.chevron_left,
-                onTap: onBack,
-              ),
+              _HeaderIconButton(icon: LucideIcons.chevron_left, onTap: onBack),
               const Spacer(),
               _HeaderIconButton(
-                icon: isFavorite
-                    ? Icons.favorite_rounded
-                    : LucideIcons.heart,
-                color: isFavorite
-                    ? AppColors.primaryIcon
-                    : Colors.black,
+                icon: isFavorite ? Icons.favorite_rounded : LucideIcons.heart,
+                color: isFavorite ? AppColors.primaryIcon : Colors.black,
                 onTap: onFavorite,
               ),
               SizedBox(width: width * 0.020),
-              _HeaderIconButton(
-                icon: LucideIcons.send,
-                onTap: onShare,
-              ),
+              _HeaderIconButton(icon: LucideIcons.send, onTap: onShare),
             ],
           ),
 
@@ -822,9 +916,7 @@ class _PlaceFloatingHeader extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: (width * 0.050)
-                  .clamp(18.0, 22.0)
-                  .toDouble(),
+              fontSize: (width * 0.050).clamp(18.0, 22.0).toDouble(),
               fontWeight: FontWeight.w800,
               color: AppColors.primaryText,
               height: 1.05,
@@ -838,23 +930,18 @@ class _PlaceFloatingHeader extends StatelessWidget {
             children: [
               Icon(
                 Icons.star_rounded,
-                size: (width * 0.040)
-                    .clamp(15.0, 17.0)
-                    .toDouble(),
+                size: (width * 0.040).clamp(15.0, 17.0).toDouble(),
                 color: AppColors.primaryIcon,
               ),
               SizedBox(width: width * 0.008),
               Expanded(
                 child: Text(
-                  '${place.rating.toStringAsFixed(1)} '
-                      '(${place.reviewCount})   '
-                      '${place.tags.isNotEmpty ? place.tags.first : 'Khu du lịch'}',
+                  '${PlaceRating(place.rating, place.reviewCount).label}   '
+                  '${place.tags.isNotEmpty ? place.tags.first : 'Khu du lịch'}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: (width * 0.028)
-                        .clamp(10.5, 12.0)
-                        .toDouble(),
+                    fontSize: (width * 0.028).clamp(10.5, 12.0).toDouble(),
                     color: AppColors.grayText,
                   ),
                 ),
@@ -870,9 +957,7 @@ class _PlaceFloatingHeader extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: (width * 0.027)
-                  .clamp(10.0, 11.5)
-                  .toDouble(),
+              fontSize: (width * 0.027).clamp(10.0, 11.5).toDouble(),
               color: AppColors.grayText,
             ),
           ),
@@ -881,7 +966,6 @@ class _PlaceFloatingHeader extends StatelessWidget {
     );
   }
 }
-
 
 class _HeaderIconButton extends StatelessWidget {
   final IconData icon;
@@ -938,11 +1022,9 @@ class _PlaceReviewUi {
 class _ReviewCard extends StatelessWidget {
   final _PlaceReviewUi review;
   final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
-  const _ReviewCard({
-    required this.review,
-    this.onEdit,
-  });
+  const _ReviewCard({required this.review, this.onEdit, this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -991,6 +1073,16 @@ class _ReviewCard extends StatelessWidget {
                             ),
                           ),
                         ),
+                        if (review.isMine && onDelete != null)
+                          IconButton(
+                            tooltip: 'Xóa đánh giá',
+                            onPressed: onDelete,
+                            icon: const Icon(
+                              LucideIcons.trash,
+                              size: 16,
+                              color: AppColors.grayText,
+                            ),
+                          ),
                         if (review.isMine && onEdit != null) ...[
                           SizedBox(width: width * 0.020),
                           InkWell(
@@ -1012,8 +1104,7 @@ class _ReviewCard extends StatelessWidget {
                     Text(
                       review.subtitle,
                       style: TextStyle(
-                        fontSize:
-                            (width * 0.027).clamp(10.0, 11.5).toDouble(),
+                        fontSize: (width * 0.027).clamp(10.0, 11.5).toDouble(),
                         color: AppColors.grayText,
                       ),
                     ),
@@ -1098,10 +1189,7 @@ class _ReviewImages extends StatelessWidget {
               child: SizedBox(
                 width: size,
                 height: size,
-                child: _SmartImage(
-                  path: images[index],
-                  fit: BoxFit.cover,
-                ),
+                child: _SmartImage(path: images[index], fit: BoxFit.cover),
               ),
             ),
           );
@@ -1138,7 +1226,7 @@ class _Avatar extends StatelessWidget {
 class _RelatedPlaceCardData {
   final String title;
   final String location;
-  final double rating;
+  final PlaceRating rating;
   final String? image;
 
   const _RelatedPlaceCardData({
@@ -1205,6 +1293,7 @@ class _RelatedPlaceCard extends StatelessWidget {
               top: cardWidth * 0.065,
               right: cardWidth * 0.065,
               child: Container(
+                constraints: BoxConstraints(maxWidth: cardWidth * 0.87),
                 padding: EdgeInsets.symmetric(
                   horizontal: cardWidth * 0.045,
                   vertical: cardWidth * 0.028,
@@ -1213,25 +1302,32 @@ class _RelatedPlaceCard extends StatelessWidget {
                   color: Colors.white.withOpacity(0.94),
                   borderRadius: BorderRadius.circular(cardWidth * 0.075),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.star_rounded,
-                      size: cardWidth * 0.105,
-                      color: AppColors.primaryIcon,
-                    ),
-                    SizedBox(width: cardWidth * 0.02),
-                    Text(
-                      data.rating.toStringAsFixed(1).replaceAll('.', ','),
-                      style: TextStyle(
-                        fontSize: cardWidth * 0.077,
-                        height: 1,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primaryText,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        data.rating.hasValidRating
+                            ? Icons.star_rounded
+                            : LucideIcons.star,
+                        size: cardWidth * 0.105,
+                        color: data.rating.hasValidRating
+                            ? AppColors.primaryIcon
+                            : AppColors.grayText,
                       ),
-                    ),
-                  ],
+                      SizedBox(width: cardWidth * 0.02),
+                      Text(
+                        data.rating.compactLabel,
+                        style: TextStyle(
+                          fontSize: cardWidth * 0.077,
+                          height: 1,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primaryText,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1300,8 +1396,9 @@ class _SmartImage extends StatelessWidget {
     }
 
     if (path.startsWith('/') || path.startsWith('file://')) {
-      final filePath =
-          path.startsWith('file://') ? Uri.parse(path).toFilePath() : path;
+      final filePath = path.startsWith('file://')
+          ? Uri.parse(path).toFilePath()
+          : path;
       return Image.file(
         File(filePath),
         fit: fit,
@@ -1324,10 +1421,7 @@ class _SmartImage extends StatelessWidget {
     return const ColoredBox(
       color: AppColors.blue50,
       child: Center(
-        child: Icon(
-          LucideIcons.image,
-          color: AppColors.primaryIcon,
-        ),
+        child: Icon(LucideIcons.image, color: AppColors.primaryIcon),
       ),
     );
   }
@@ -1336,9 +1430,7 @@ class _SmartImage extends StatelessWidget {
 class _AddItineraryButton extends StatelessWidget {
   final VoidCallback onTap;
 
-  const _AddItineraryButton({
-    required this.onTap,
-  });
+  const _AddItineraryButton({required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -1349,30 +1441,22 @@ class _AddItineraryButton extends StatelessWidget {
     // button: 189 x 45
     //
     // Quy đổi theo width thật thay vì fix cứng 189px.
-    final buttonWidth =
-    (width * (189 / 375)).clamp(178.0, 205.0).toDouble();
+    final buttonWidth = (width * (189 / 375)).clamp(178.0, 205.0).toDouble();
 
-    final buttonHeight =
-    (width * (45 / 375)).clamp(43.0, 47.0).toDouble();
+    final buttonHeight = (width * (45 / 375)).clamp(43.0, 47.0).toDouble();
 
     // Figma radius: 20 / height 45.
-    final radius =
-        buttonHeight * (20 / 45);
+    final radius = buttonHeight * (20 / 45);
 
-    final iconCircleSize =
-    (buttonHeight * 0.59).clamp(25.0, 27.5).toDouble();
+    final iconCircleSize = (buttonHeight * 0.59).clamp(25.0, 27.5).toDouble();
 
-    final iconSize =
-    (iconCircleSize * 0.58).clamp(14.5, 16.0).toDouble();
+    final iconSize = (iconCircleSize * 0.58).clamp(14.5, 16.0).toDouble();
 
-    final contentGap =
-    (width * (8 / 375)).clamp(7.0, 9.0).toDouble();
+    final contentGap = (width * (8 / 375)).clamp(7.0, 9.0).toDouble();
 
-    final horizontalPadding =
-    (width * (13 / 375)).clamp(11.0, 14.0).toDouble();
+    final horizontalPadding = (width * (13 / 375)).clamp(11.0, 14.0).toDouble();
 
-    final fontSize =
-    (width * (14 / 375)).clamp(13.5, 14.5).toDouble();
+    final fontSize = (width * (14 / 375)).clamp(13.5, 14.5).toDouble();
 
     return Material(
       color: Colors.transparent,
@@ -1382,9 +1466,7 @@ class _AddItineraryButton extends StatelessWidget {
         child: Ink(
           width: buttonWidth,
           height: buttonHeight,
-          padding: EdgeInsets.symmetric(
-            horizontal: horizontalPadding,
-          ),
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
           decoration: BoxDecoration(
             // Figma:
             // #0A43A8 0%
@@ -1393,16 +1475,8 @@ class _AddItineraryButton extends StatelessWidget {
             gradient: const LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
-              stops: [
-                0.0,
-                0.57,
-                1.0,
-              ],
-              colors: [
-                Color(0xFF0A43A8),
-                Color(0xFF0C6ECF),
-                Color(0xFF0D8AE8),
-              ],
+              stops: [0.0, 0.57, 1.0],
+              colors: [Color(0xFF0A43A8), Color(0xFF0C6ECF), Color(0xFF0D8AE8)],
             ),
             borderRadius: BorderRadius.circular(radius),
 
@@ -1425,10 +1499,7 @@ class _AddItineraryButton extends StatelessWidget {
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white,
-                      width: 2.5,
-                    ),
+                    border: Border.all(color: Colors.white, width: 2.5),
                   ),
                   child: Center(
                     child: Icon(
@@ -1468,10 +1539,7 @@ class _GradientButton extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
 
-  const _GradientButton({
-    required this.label,
-    required this.onTap,
-  });
+  const _GradientButton({required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -1512,29 +1580,19 @@ class _GradientButton extends StatelessWidget {
   }
 }
 
-class _DraftReview {
-  final int rating;
-  final String body;
-  final List<String> imagePaths;
-
-  const _DraftReview({
-    required this.rating,
-    required this.body,
-    required this.imagePaths,
-  });
-}
-
 class _ReviewComposer extends StatefulWidget {
   final int initialRating;
   final String initialBody;
   final List<String> initialImagePaths;
   final bool editing;
+  final Future<void> Function(int rating, String content) onSubmit;
 
   const _ReviewComposer({
     required this.initialRating,
     required this.initialBody,
     required this.initialImagePaths,
     required this.editing,
+    required this.onSubmit,
   });
 
   @override
@@ -1542,7 +1600,8 @@ class _ReviewComposer extends StatefulWidget {
 }
 
 class _ReviewComposerState extends State<_ReviewComposer> {
-  final ImagePicker _picker = ImagePicker();
+  bool _saving = false;
+  String? _error;
   late final TextEditingController _controller;
   late List<String> _images;
   late int _rating;
@@ -1568,27 +1627,31 @@ class _ReviewComposerState extends State<_ReviewComposer> {
   }
 
   Future<void> _pickImages() async {
-    final remain = 10 - _images.length;
-    if (remain <= 0) return;
-
-    final result = await _picker.pickMultiImage(
-      imageQuality: 88,
-      limit: remain,
+    GoMateSnackBar.show(
+      context,
+      message: 'Đính ảnh đánh giá chưa được hỗ trợ ở phiên bản này.',
     );
-
-    if (!mounted || result.isEmpty) return;
-    setState(() => _images.addAll(result.take(remain).map((item) => item.path)));
   }
 
-  void _submit() {
-    if (_rating <= 0) return;
-    Navigator.of(context).pop(
-      _DraftReview(
-        rating: _rating,
-        body: _controller.text.trim(),
-        imagePaths: List<String>.from(_images),
-      ),
-    );
+  Future<void> _submit() async {
+    if (_rating <= 0 || _saving) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await widget.onSubmit(_rating, _controller.text.trim());
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted)
+        setState(
+          () => _error = e is ApiException
+              ? e.message
+              : 'Chưa lưu được đánh giá. Vui lòng thử lại.',
+        );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
@@ -1628,15 +1691,17 @@ class _ReviewComposerState extends State<_ReviewComposer> {
             children: List.generate(5, (index) {
               final active = index < _rating;
               return InkWell(
-                onTap: () => setState(() => _rating = index + 1),
+                key: ValueKey('place-review-star-${index + 1}'),
+                onTap: _saving
+                    ? null
+                    : () => setState(() => _rating = index + 1),
                 customBorder: const CircleBorder(),
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: width * 0.018),
                   child: Icon(
                     active ? Icons.star_rounded : LucideIcons.star,
                     size: (width * 0.060).clamp(22.0, 26.0).toDouble(),
-                    color:
-                        active ? AppColors.primaryIcon : AppColors.grayText,
+                    color: active ? AppColors.primaryIcon : AppColors.grayText,
                   ),
                 ),
               );
@@ -1665,6 +1730,8 @@ class _ReviewComposerState extends State<_ReviewComposer> {
               borderRadius: BorderRadius.circular(15),
             ),
             child: TextField(
+              key: const ValueKey('place-review-content'),
+              enabled: !_saving,
               controller: _controller,
               maxLength: 1000,
               maxLines: 4,
@@ -1714,8 +1781,7 @@ class _ReviewComposerState extends State<_ReviewComposer> {
                 itemCount: _images.length,
                 separatorBuilder: (_, __) => SizedBox(width: width * 0.018),
                 itemBuilder: (context, index) {
-                  final size =
-                      (width * 0.24).clamp(88.0, 104.0).toDouble();
+                  final size = (width * 0.24).clamp(88.0, 104.0).toDouble();
                   return Stack(
                     children: [
                       ClipRRect(
@@ -1756,11 +1822,17 @@ class _ReviewComposerState extends State<_ReviewComposer> {
               ),
             ),
           ],
+          if (_error != null)
+            Text(_error!, style: const TextStyle(color: Colors.red)),
           SizedBox(height: width * 0.032),
           SizedBox(
             width: (width * 0.34).clamp(120.0, 150.0).toDouble(),
             child: _GradientButton(
-              label: widget.editing ? 'Chỉnh sửa' : 'Đăng',
+              label: _saving
+                  ? 'Đang lưu…'
+                  : widget.editing
+                  ? 'Chỉnh sửa'
+                  : 'Đăng',
               onTap: _submit,
             ),
           ),
@@ -1773,16 +1845,24 @@ class _ReviewComposerState extends State<_ReviewComposer> {
 enum _ReviewSort { newest, highest, lowest }
 
 class PlaceReviewsScreen extends StatefulWidget {
+  final String placeId;
+  final PlaceReviewRepository repository;
+  final int? nextBeforeId;
   final String placeName;
   final String address;
   final double overallRating;
+  final int reviewCount;
   final List<_PlaceReviewUi> reviews;
 
   const PlaceReviewsScreen({
     super.key,
+    required this.placeId,
+    required this.repository,
+    this.nextBeforeId,
     required this.placeName,
     required this.address,
     required this.overallRating,
+    required this.reviewCount,
     required this.reviews,
   });
 
@@ -1791,12 +1871,121 @@ class PlaceReviewsScreen extends StatefulWidget {
 }
 
 class _PlaceReviewsScreenState extends State<PlaceReviewsScreen> {
+  late List<_PlaceReviewUi> _items;
+  late PlaceRating _overall;
+  int? _next;
+  bool _loading = false;
+  @override
+  void initState() {
+    super.initState();
+    _items = List.of(widget.reviews);
+    _overall = PlaceRating(widget.overallRating, widget.reviewCount);
+    _next = widget.nextBeforeId;
+    widget.repository.auth.addListener(_reload);
+    ContentAccessChanges.revision.addListener(_reload);
+    unawaited(_reload());
+  }
+
+  int _epoch = 0;
+  String? _listError;
+  Future<void> _reload() async {
+    final epoch = ++_epoch;
+    if (!mounted) return;
+    setState(() {
+      _items = [];
+      _next = null;
+      _loading = true;
+      _listError = null;
+    });
+    try {
+      final page = await widget.repository.page(
+        widget.placeId,
+        sort: _sort.name,
+      );
+      if (!mounted || epoch != _epoch) return;
+      setState(() {
+        _items = page.items.map(_ui).toList();
+        _next = page.nextBeforeId;
+        _overall = page.stats;
+      });
+    } catch (e) {
+      if (mounted && epoch == _epoch)
+        setState(
+          () => _listError = e is ApiException
+              ? e.message
+              : 'Không tải được đánh giá.',
+        );
+    } finally {
+      if (mounted && epoch == _epoch) setState(() => _loading = false);
+    }
+  }
+
+  _PlaceReviewUi _ui(PlaceReview r) => _PlaceReviewUi(
+    id: r.id.toString(),
+    author: r.author,
+    subtitle: '',
+    timeText: r.createdAt == null
+        ? ''
+        : '${r.createdAt!.toLocal().day}/${r.createdAt!.toLocal().month}/${r.createdAt!.toLocal().year}',
+    body: r.content,
+    rating: r.rating.toDouble(),
+    images: const [],
+    isMine: r.userId == widget.repository.auth.user?['id'],
+  );
+  @override
+  void dispose() {
+    ++_epoch;
+    widget.repository.auth.removeListener(_reload);
+    ContentAccessChanges.revision.removeListener(_reload);
+    super.dispose();
+  }
+
+  Future<void> _more() async {
+    if (_loading || _next == null) return;
+    final epoch = _epoch;
+    setState(() => _loading = true);
+    try {
+      final result = await widget.repository.page(
+        widget.placeId,
+        before: _next,
+        sort: _sort.name,
+      );
+      if (!mounted || epoch != _epoch) return;
+      setState(() {
+        for (final r in result.items) {
+          if (!_items.any((i) => i.id == r.id.toString()))
+            _items.add(
+              _PlaceReviewUi(
+                id: r.id.toString(),
+                author: r.author,
+                subtitle: '',
+                timeText: '',
+                body: r.content,
+                rating: r.rating.toDouble(),
+                images: const [],
+                isMine: r.userId == widget.repository.auth.user?['id'],
+              ),
+            );
+        }
+        _next = result.nextBeforeId;
+      });
+    } catch (e) {
+      if (mounted)
+        GoMateSnackBar.show(
+          context,
+          message: e is ApiException ? e.message : 'Không tải được đánh giá.',
+        );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   _ReviewSort _sort = _ReviewSort.newest;
   bool _showFilters = false;
   bool _headerVisible = true;
 
   List<_PlaceReviewUi> get _visible {
-    final items = List<_PlaceReviewUi>.from(widget.reviews);
+    final items = List<_PlaceReviewUi>.from(_items);
 
     switch (_sort) {
       case _ReviewSort.newest:
@@ -1813,7 +2002,8 @@ class _PlaceReviewsScreenState extends State<PlaceReviewsScreen> {
   bool _handleScroll(UserScrollNotification notification) {
     if (notification.direction == ScrollDirection.idle) return false;
 
-    final shouldShow = notification.metrics.pixels <= 4 ||
+    final shouldShow =
+        notification.metrics.pixels <= 4 ||
         notification.direction == ScrollDirection.forward;
     if (shouldShow != _headerVisible && mounted) {
       setState(() => _headerVisible = shouldShow);
@@ -1852,8 +2042,22 @@ class _PlaceReviewsScreenState extends State<PlaceReviewsScreen> {
                       horizontal,
                       width * 0.035,
                     ),
-                    child: _OverallRating(rating: widget.overallRating),
+                    child: _OverallRating(rating: _overall),
                   ),
+                  if (_loading)
+                    const Center(child: CircularProgressIndicator()),
+                  if (_listError != null)
+                    TextButton(
+                      onPressed: _reload,
+                      child: Text('$_listError · Thử lại'),
+                    ),
+                  if (!_loading && _listError == null && _items.isEmpty)
+                    const Center(child: Text('Chưa có đánh giá')),
+                  if (_next != null)
+                    TextButton(
+                      onPressed: _loading ? null : _more,
+                      child: Text(_loading ? 'Đang tải…' : 'Xem thêm đánh giá'),
+                    ),
                   for (final review in _visible) ...[
                     _ReviewListItem(review: review),
                     SizedBox(height: width * 0.070),
@@ -1870,9 +2074,7 @@ class _PlaceReviewsScreenState extends State<PlaceReviewsScreen> {
                 child: AnimatedSlide(
                   duration: const Duration(milliseconds: 190),
                   curve: Curves.easeOutCubic,
-                  offset: _headerVisible
-                      ? Offset.zero
-                      : const Offset(0, -1.04),
+                  offset: _headerVisible ? Offset.zero : const Offset(0, -1.04),
                   child: AnimatedOpacity(
                     duration: const Duration(milliseconds: 150),
                     opacity: _headerVisible ? 1 : 0,
@@ -1893,7 +2095,9 @@ class _PlaceReviewsScreenState extends State<PlaceReviewsScreen> {
                           SizedBox(
                             height: baseHeaderHeight,
                             child: Padding(
-                              padding: EdgeInsets.symmetric(horizontal: horizontal),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: horizontal,
+                              ),
                               child: Stack(
                                 alignment: Alignment.center,
                                 children: [
@@ -1976,27 +2180,30 @@ class _PlaceReviewsScreenState extends State<PlaceReviewsScreen> {
                                       child: _SortButton(
                                         label: 'Mới nhất',
                                         active: _sort == _ReviewSort.newest,
-                                        onTap: () => setState(
-                                          () => _sort = _ReviewSort.newest,
-                                        ),
+                                        onTap: () => setState(() {
+                                          _sort = _ReviewSort.newest;
+                                          unawaited(_reload());
+                                        }),
                                       ),
                                     ),
                                     Expanded(
                                       child: _SortButton(
                                         label: 'Cao nhất',
                                         active: _sort == _ReviewSort.highest,
-                                        onTap: () => setState(
-                                          () => _sort = _ReviewSort.highest,
-                                        ),
+                                        onTap: () => setState(() {
+                                          _sort = _ReviewSort.highest;
+                                          unawaited(_reload());
+                                        }),
                                       ),
                                     ),
                                     Expanded(
                                       child: _SortButton(
                                         label: 'Thấp nhất',
                                         active: _sort == _ReviewSort.lowest,
-                                        onTap: () => setState(
-                                          () => _sort = _ReviewSort.lowest,
-                                        ),
+                                        onTap: () => setState(() {
+                                          _sort = _ReviewSort.lowest;
+                                          unawaited(_reload());
+                                        }),
                                       ),
                                     ),
                                   ],
@@ -2018,19 +2225,29 @@ class _PlaceReviewsScreenState extends State<PlaceReviewsScreen> {
 }
 
 class _OverallRating extends StatelessWidget {
-  final double rating;
+  final PlaceRating rating;
 
   const _OverallRating({required this.rating});
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final filled = rating.round().clamp(0, 5).toInt();
+    final filled = rating.display.round().clamp(0, 5).toInt();
+    if (!rating.hasValidRating) {
+      return Text(
+        rating.label,
+        style: TextStyle(
+          fontSize: (width * 0.052).clamp(19.0, 23.0).toDouble(),
+          fontWeight: FontWeight.w800,
+          color: AppColors.primaryText,
+        ),
+      );
+    }
 
     return Row(
       children: [
         Text(
-          rating.toStringAsFixed(1).replaceAll('.', ','),
+          rating.compactLabel,
           style: TextStyle(
             fontSize: (width * 0.052).clamp(19.0, 23.0).toDouble(),
             fontWeight: FontWeight.w800,
@@ -2121,8 +2338,9 @@ class _ReviewListItem extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize:
-                                (width * 0.023).clamp(8.5, 9.8).toDouble(),
+                            fontSize: (width * 0.023)
+                                .clamp(8.5, 9.8)
+                                .toDouble(),
                             color: AppColors.grayText,
                           ),
                         ),

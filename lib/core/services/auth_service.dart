@@ -136,14 +136,18 @@ class AuthService extends ChangeNotifier {
         final response = await (() async => http.Response.fromStream(
           await _client.send(request),
         ))().timeout(const Duration(seconds: 6));
+        final postFeed =
+            path == '/feed' ||
+            path.startsWith('/feed?') ||
+            path == '/feed/recommended' ||
+            path.startsWith('/feed/recommended?');
         if (path.startsWith('/comments') ||
             path.startsWith('/me/reports') ||
             path.startsWith('/posts') ||
-            path == '/feed' ||
-            path.startsWith('/feed?') ||
+            postFeed ||
             RegExp(r'^/users/[^/]+/posts(?:\?|$)').hasMatch(path))
           _postApiBase = base;
-        if (path == '/feed' || path.startsWith('/feed?'))
+        if (postFeed)
           PostMediaDiagnostics.event(
             'feed_http',
             'feed',

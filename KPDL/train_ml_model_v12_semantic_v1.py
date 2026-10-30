@@ -278,6 +278,82 @@ def hybrid_formula_scores(frame: pd.DataFrame, ml_scores: np.ndarray, sem_values
     scores["hybrid_recommendation_score"] = (weighted_sum / available_weight).clip(0, 1)
     return scores
 
+def uncertainty_hybrid_formula_scores(
+    frame: pd.DataFrame,
+    ml_scores: np.ndarray,
+    sem_values: list[str],
+    sem_masks: list[str],
+) -> pd.DataFrame:
+    """
+    Hybrid có điều chỉnh ảnh hưởng semantic theo độ đầy đủ dữ liệu.
+
+    READY: coverage gần 1
+    PARTIAL: coverage theo số tag đã biết
+    NEED_REVIEW: coverage bằng 0
+    """
+    scores = pd.DataFrame(index=frame.index)
+
+    scores["association_rule_score"] = normalized_rule_score(frame)
+    scores["content_based_score"] = content_scores_by_tour(
+        frame,
+        sem_values,
+        sem_masks,
+    )
+    scores["ml_ranker_score"] = pd.Series(
+        ml_scores,
+        index=frame.index,
+    ).clip(0, 1)
+
+    scores["popularity_score"] = (
+        pd.to_numeric(
+            frame["candidate_popularity"],
+            errors="coerce",
+        )
+        .fillna(0.0)
+        .clip(0, 1)
+    )
+
+    # Mỗi mask bằng 1 nghĩa là tag đó có dữ liệu đáng tin cậy.
+    # Lấy trung bình các mask để tính độ đầy đủ semantic.
+    semantic_coverage = (
+        frame[sem_masks]
+        .mean(axis=1)
+        .astype(float)
+        .clip(0, 1)
+    )
+
+    scores["semantic_coverage"] = semantic_coverage
+
+    # Giữ nguyên trọng số để so sánh công bằng với Hybrid cũ.
+    w_rule = 0.20
+    w_semantic = 0.30
+    w_ml = 0.30
+    w_popularity = 0.10
+
+    numerator = (
+        w_rule * scores["association_rule_score"]
+        + w_semantic
+        * scores["content_based_score"]
+        * semantic_coverage
+        + w_ml * scores["ml_ranker_score"]
+        + w_popularity * scores["popularity_score"]
+    )
+
+    denominator = (
+        w_rule
+        + w_semantic * semantic_coverage
+        + w_ml
+        + w_popularity
+    )
+
+    scores["uncertainty_hybrid_score"] = (
+        numerator
+        / denominator.replace(0, np.nan)
+    ).fillna(0.0).clip(0, 1)
+
+    scores["uncertainty_hybrid_available_weight"] = denominator
+
+    return scores
 
 def semantic_fallback_scores(
     frame: pd.DataFrame,
@@ -354,18 +430,42 @@ def main() -> None:
     val_svd = svd_scores_by_previous_places(val, svd_item_embeddings)
     test_svd = svd_scores_by_previous_places(test, svd_item_embeddings)
     val_hybrid_scores = hybrid_formula_scores(val, val_semantic, sem_values, sem_masks)
+
     test_hybrid_scores = hybrid_formula_scores(test, test_semantic, sem_values, sem_masks)
+
+    val_uncertainty_scores = uncertainty_hybrid_formula_scores(
+        val,
+        val_semantic,
+        sem_values,
+        sem_masks,
+    )
+
+    test_uncertainty_scores = uncertainty_hybrid_formula_scores(
+        test,
+        test_semantic,
+        sem_values,
+        sem_masks,
+    )
+
     val_formula_metrics = {
         "associationRules": rank_metrics(val, val_hybrid_scores["association_rule_score"].to_numpy()),
         "svdMatrixFactorization": rank_metrics(val, val_svd),
         "contentBased": rank_metrics(val, val_hybrid_scores["content_based_score"].to_numpy()),
         "hybridFormula": rank_metrics(val, val_hybrid_scores["hybrid_recommendation_score"].to_numpy()),
+        "uncertaintyHybrid": rank_metrics(
+            val,
+            val_uncertainty_scores["uncertainty_hybrid_score"].to_numpy(),
+        ),
     }
     test_formula_metrics = {
         "associationRules": rank_metrics(test, test_hybrid_scores["association_rule_score"].to_numpy()),
         "svdMatrixFactorization": rank_metrics(test, test_svd),
         "contentBased": rank_metrics(test, test_hybrid_scores["content_based_score"].to_numpy()),
         "hybridFormula": rank_metrics(test, test_hybrid_scores["hybrid_recommendation_score"].to_numpy()),
+        "uncertaintyHybrid": rank_metrics(
+            test,
+            test_uncertainty_scores["uncertainty_hybrid_score"].to_numpy(),
+        ),
     }
 
     test_base_metrics = rank_metrics(test, test_base)
@@ -382,6 +482,10 @@ def main() -> None:
     scores["svd_score"] = test_svd
     for col in test_hybrid_scores.columns:
         scores[col] = test_hybrid_scores[col].to_numpy()
+
+    for col in test_uncertainty_scores.columns:
+        scores[f"new_{col}"] = test_uncertainty_scores[col].to_numpy()
+
     scores.to_csv(outdir / "test_candidate_scores_v12_semantic_v1.csv", index=False, encoding="utf-8-sig")
 
     bundle = {

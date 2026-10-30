@@ -1,4 +1,6 @@
+import '../../place/data/place_review_repository.dart';
 import 'package:flutter/material.dart';
+import '../../place/widgets/place_rating_builder.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -359,7 +361,12 @@ class SearchPlaceCard extends StatelessWidget {
               Positioned(
                 top: width * 0.055,
                 right: width * 0.055,
-                child: _SearchRatingBadge(rating: item.rating, width: width),
+                child: PlaceRatingBuilder(
+                  placeId: item.id.toString(),
+                  average: item.rating,
+                  count: item.reviewCount,
+                  builder: (r) => _SearchRatingBadge(rating: r, width: width),
+                ),
               ),
               Positioned(
                 left: width * 0.075,
@@ -733,7 +740,7 @@ class SearchEmptyState extends StatelessWidget {
 }
 
 class _SearchRatingBadge extends StatelessWidget {
-  final double rating;
+  final PlaceRating rating;
   final double width;
 
   const _SearchRatingBadge({required this.rating, required this.width});
@@ -741,6 +748,7 @@ class _SearchRatingBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      constraints: BoxConstraints(maxWidth: width * 0.87),
       padding: EdgeInsets.symmetric(
         horizontal: width * 0.045,
         vertical: width * 0.026,
@@ -749,24 +757,31 @@ class _SearchRatingBadge extends StatelessWidget {
         color: Colors.white.withOpacity(0.82),
         borderRadius: BorderRadius.circular(width * 0.09),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.star_rounded,
-            size: width * 0.10,
-            color: AppColors.primaryIcon,
-          ),
-          SizedBox(width: width * 0.018),
-          Text(
-            rating.toStringAsFixed(1).replaceAll('.', ','),
-            style: TextStyle(
-              fontSize: width * 0.075,
-              fontWeight: FontWeight.w600,
-              color: AppColors.primaryText,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              rating.hasValidRating
+                  ? Icons.star_rounded
+                  : Icons.star_border_rounded,
+              size: width * 0.10,
+              color: rating.hasValidRating
+                  ? AppColors.primaryIcon
+                  : AppColors.grayText,
             ),
-          ),
-        ],
+            SizedBox(width: width * 0.018),
+            Text(
+              rating.compactLabel,
+              style: TextStyle(
+                fontSize: width * 0.075,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primaryText,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

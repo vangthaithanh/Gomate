@@ -64,6 +64,38 @@ class ContextualRecommendationRerankerTest {
         assertTrue((Double) meta.get("contextScore") > 0.0);
     }
 
+    @Test
+    void zeroReviewCountDoesNotTreatLegacyAverageAsEvidence() {
+        var unrated = item(1, "legacy-five-empty", 0.60, 10.3460, 107.0843);
+        unrated.put("avgRating", BigDecimal.valueOf(5.0));
+        var reviewed = item(2, "real-five", 0.60, 10.3460, 107.0843);
+        reviewed.put("avgRating", BigDecimal.valueOf(5.0));
+        reviewed.put("reviewCount", 1);
+
+        var ranked = reranker.rerank(List.of(unrated, reviewed), List.of("CO_REVIEW"), null, null);
+
+        assertEquals(2, ranked.get(0).get("placeId"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> emptyMeta = (Map<String, Object>) ranked.get(1).get("recommendation");
+        assertEquals(0.0, (Double) emptyMeta.get("reviewScore"), 0.0001);
+    }
+
+    @Test
+    void popularityDoesNotTreatLegacyAverageAsEvidenceWithoutReviews() {
+        var unrated = item(1, "legacy-five-empty", 0.60, 10.3460, 107.0843);
+        unrated.put("avgRating", BigDecimal.valueOf(5.0));
+        var reviewed = item(2, "real-five", 0.60, 10.3460, 107.0843);
+        reviewed.put("avgRating", BigDecimal.valueOf(5.0));
+        reviewed.put("reviewCount", 1);
+
+        var ranked = reranker.rerank(List.of(unrated, reviewed), List.of("DANG_HOT"), null, null);
+
+        assertEquals(2, ranked.get(0).get("placeId"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> emptyMeta = (Map<String, Object>) ranked.get(1).get("recommendation");
+        assertEquals(0.0, (Double) emptyMeta.get("popularityScore"), 0.0001);
+    }
+
     private Map<String, Object> item(
         int placeId,
         String name,
